@@ -156,14 +156,8 @@ class VehicleDetailService {
 
       if (vehicleDetail) {
         logger.info(`Vehicle details found in database: ${registrationNumber}`);
-        // Return wrapped response matching .NET GetVehicleDetailsByRcNumberResponse
-        return Result.success({
-          vehicleDetail: this.transformVehicleDetail(vehicleDetail),
-          challanDetails: {
-            challans: [],
-            blacklist: []
-          }
-        });
+        // Return full response matching frontend expectations
+        return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId));
       }
 
       // Call Surepass API to fetch RC details
@@ -203,18 +197,108 @@ class VehicleDetailService {
       });
 
       logger.info(`Vehicle details fetched and saved: ${registrationNumber}`);
-      // Return wrapped response matching .NET GetVehicleDetailsByRcNumberResponse
-      return Result.success({
-        vehicleDetail: this.transformVehicleDetail(vehicleDetail),
-        challanDetails: {
-          challans: [],
-          blacklist: []
-        }
-      });
+      // Return full response matching frontend expectations
+      return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId));
     } catch (error) {
       logger.error('Get vehicle details error:', error);
       return Result.failure(error.message || 'Failed to get vehicle details');
     }
+  }
+
+  /**
+   * Build full vehicle detail response with all related data
+   * Used by both getVehicleDetailsByRCAsync and getVehicleDetailByIdAsync
+   */
+  async buildVehicleDetailResponse(vehicleDetail, userId) {
+    const vehicleDetailId = vehicleDetail.Id;
+
+    // Get challan details for this vehicle
+    const challanDetails = await VehicleChallanDetail.findAll({
+      where: { VehicleDetailId: vehicleDetailId },
+      order: [['ChallanDate', 'DESC']]
+    });
+
+    // Check if vehicle is lost
+    const lostVehicle = await LostVehicle.findOne({
+      where: { RegistrationNumber: vehicleDetail.RegistrationNumber }
+    });
+
+    // Get NCRB report if exists
+    const ncrbReport = await NcrbReport.findOne({
+      where: { VehicleDetailId: vehicleDetailId }
+    });
+
+    // Get state from registration number
+    const stateCode = vehicleDetail.RegistrationNumber ? vehicleDetail.RegistrationNumber.substring(0, 2) : '';
+    const stateMapping = await StateMapping.findOne({
+      where: { StateCode: stateCode }
+    });
+
+    // Get user vehicle detail for createdAt timestamp
+    const userVehicleDetail = await UserVehicleDetail.findOne({
+      where: { VehicleDetailId: vehicleDetailId, UserId: userId }
+    });
+
+    // Calculate vehicle age from ManufacturingDateFormatted
+    const vehicleAge = this.calculateVehicleAge(vehicleDetail.ManufacturingDateFormatted);
+
+    // Get vehicle specification (if available)
+    let vehicleSpecification = null;
+    if (vehicleDetail.Manufacturer && vehicleDetail.Model) {
+      vehicleSpecification = await VehicleSpecification.findOne({
+        where: {
+          naming_make: vehicleDetail.Manufacturer,
+          naming_model: vehicleDetail.Model
+        }
+      });
+    }
+
+    // Transform challan details to match .NET VehicleChallanDetailDto
+    const transformedChallans = challanDetails.map(challan => ({
+      id: challan.Id,
+      challanNumber: challan.ChallanNumber,
+      challanDate: challan.ChallanDate,
+      violationType: challan.ViolationType,
+      amount: challan.Amount ? parseFloat(challan.Amount) : null,
+      status: challan.Status
+    }));
+
+    // Transform vehicle specification to match .NET VehicleSpecificationDto
+    const transformedSpec = vehicleSpecification ? {
+      make: vehicleSpecification.naming_make,
+      model: vehicleSpecification.naming_model,
+      version: vehicleSpecification.naming_version,
+      price: vehicleSpecification.naming_price,
+      keyPrice: vehicleSpecification.keydata_key_price,
+      mileageArai: vehicleSpecification.keydata_key_mileage_arai,
+      engine: vehicleSpecification.keydata_key_engine,
+      transmission: vehicleSpecification.keydata_key_transmission,
+      fuelType: vehicleSpecification.keydata_key_fueltype,
+      seatingCapacity: vehicleSpecification.keydata_key_seatingcapacity,
+      engineDetails: vehicleSpecification.enginetransmission_engine,
+      maxPower: vehicleSpecification.enginetransmission_maxpower,
+      maxTorque: vehicleSpecification.enginetransmission_maxtorque,
+      length: vehicleSpecification.dimensionweight_length,
+      width: vehicleSpecification.dimensionweight_width,
+      height: vehicleSpecification.dimensionweight_height,
+      wheelbase: vehicleSpecification.dimensionweight_wheelbase,
+      bootspace: vehicleSpecification.capacity_bootspace,
+      description: vehicleSpecification.Description,
+      fastTag: ''
+    } : null;
+
+    // Return response matching frontend expectations
+    return {
+      vehicleDetail: this.transformVehicleDetail(vehicleDetail),
+      vehicleChallanDetails: transformedChallans,
+      vehicleSpecification: transformedSpec,
+      ncrbReportAvailable: ncrbReport !== null,
+      reportId: ncrbReport ? ncrbReport.Id : null,
+      lostVehicle: lostVehicle !== null,
+      createdAt: userVehicleDetail ? userVehicleDetail.CreatedAt : vehicleDetail.CreatedAt,
+      vehicleAge: vehicleAge,
+      state: stateMapping ? stateMapping.StateName : ''
+    };
   }
 
   /**
@@ -230,93 +314,15 @@ class VehicleDetailService {
         return Result.failure('Vehicle detail not found');
       }
 
-      // Get challan details for this vehicle
-      const challanDetails = await VehicleChallanDetail.findAll({
-        where: { VehicleDetailId: id },
-        order: [['ChallanDate', 'DESC']]
-      });
+      // Build the response using shared method
+      const baseResponse = await this.buildVehicleDetailResponse(vehicleDetail, userId);
 
-      // Check if vehicle is lost
-      const lostVehicle = await LostVehicle.findOne({
-        where: { RegistrationNumber: vehicleDetail.RegistrationNumber }
-      });
-
-      // Get NCRB report if exists
-      const ncrbReport = await NcrbReport.findOne({
-        where: { VehicleDetailId: id }
-      });
-
-      // Get state from registration number
-      const stateCode = vehicleDetail.RegistrationNumber ? vehicleDetail.RegistrationNumber.substring(0, 2) : '';
-      const stateMapping = await StateMapping.findOne({
-        where: { StateCode: stateCode }
-      });
-
-      // Get user vehicle detail for createdAt timestamp
-      const userVehicleDetail = await UserVehicleDetail.findOne({
-        where: { VehicleDetailId: id, UserId: userId }
-      });
-
-      // Calculate vehicle age from ManufacturingDateFormatted
-      const vehicleAge = this.calculateVehicleAge(vehicleDetail.ManufacturingDateFormatted);
-
-      // Get vehicle specification (if available)
-      let vehicleSpecification = null;
-      if (vehicleDetail.Manufacturer && vehicleDetail.Model) {
-        vehicleSpecification = await VehicleSpecification.findOne({
-          where: {
-            naming_make: vehicleDetail.Manufacturer,
-            naming_model: vehicleDetail.Model
-          }
-        });
-      }
-
-      // Transform challan details to match .NET VehicleChallanDetailDto
-      const transformedChallans = challanDetails.map(challan => ({
-        id: challan.Id,
-        challanNumber: challan.ChallanNumber,
-        challanDate: challan.ChallanDate,
-        violationType: challan.ViolationType,
-        amount: challan.Amount ? parseFloat(challan.Amount) : null,
-        status: challan.Status
-      }));
-
-      // Transform vehicle specification to match .NET VehicleSpecificationDto
-      const transformedSpec = vehicleSpecification ? {
-        make: vehicleSpecification.naming_make,
-        model: vehicleSpecification.naming_model,
-        version: vehicleSpecification.naming_version,
-        price: vehicleSpecification.naming_price,
-        keyPrice: vehicleSpecification.keydata_key_price,
-        mileageArai: vehicleSpecification.keydata_key_mileage_arai,
-        engine: vehicleSpecification.keydata_key_engine,
-        transmission: vehicleSpecification.keydata_key_transmission,
-        fuelType: vehicleSpecification.keydata_key_fueltype,
-        seatingCapacity: vehicleSpecification.keydata_key_seatingcapacity,
-        engineDetails: vehicleSpecification.enginetransmission_engine,
-        maxPower: vehicleSpecification.enginetransmission_maxpower,
-        maxTorque: vehicleSpecification.enginetransmission_maxtorque,
-        length: vehicleSpecification.dimensionweight_length,
-        width: vehicleSpecification.dimensionweight_width,
-        height: vehicleSpecification.dimensionweight_height,
-        wheelbase: vehicleSpecification.dimensionweight_wheelbase,
-        bootspace: vehicleSpecification.capacity_bootspace,
-        description: vehicleSpecification.Description,
-        fastTag: ''
-      } : null;
-
-      // Return response matching .NET VehicleHistoryReportDetailDto
+      // GET endpoint uses 'ncrbReportId' instead of 'reportId'
       const response = {
-        ncrbReportAvailable: ncrbReport !== null,
-        ncrbReportId: ncrbReport ? ncrbReport.Id : null,
-        lostVehicle: lostVehicle !== null,
-        vehicleAge: vehicleAge,
-        vehicleDetail: this.transformVehicleDetail(vehicleDetail),
-        vehicleChallanDetails: transformedChallans,
-        vehicleSpecification: transformedSpec,
-        createdAt: userVehicleDetail ? userVehicleDetail.CreatedAt : vehicleDetail.CreatedAt,
-        state: stateMapping ? stateMapping.StateName : ''
+        ...baseResponse,
+        ncrbReportId: baseResponse.reportId
       };
+      delete response.reportId;
 
       return Result.success(response);
     } catch (error) {
