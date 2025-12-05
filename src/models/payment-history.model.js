@@ -39,14 +39,8 @@ const PaymentHistory = sequelize.define('PaymentHistory', {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  VehicleDetailRequestId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'vehicledetailrequests',
-      key: 'Id'
-    }
-  },
+  // Note: VehicleDetailRequestId does NOT exist in this table
+  // The relationship is reversed: VehicleDetailRequest has PaymentHistoryId
   PaymentDate: {
     type: DataTypes.DATE,
     allowNull: false,

@@ -11,6 +11,11 @@ const PhysicalVerification = sequelize.define('physicalverifications', {
     type: DataTypes.INTEGER,
     allowNull: false
   },
+  Name: {
+    type: DataTypes.STRING(50),
+    allowNull: false,
+    defaultValue: ''
+  },
   VehicleDetailId: {
     type: DataTypes.INTEGER,
     allowNull: true
@@ -23,11 +28,49 @@ const PhysicalVerification = sequelize.define('physicalverifications', {
     type: DataTypes.STRING(100),
     allowNull: true
   },
+  Address: {
+    type: DataTypes.STRING(1000),
+    allowNull: false,
+    defaultValue: ''
+  },
+  City: {
+    type: DataTypes.STRING(50),
+    allowNull: false,
+    defaultValue: ''
+  },
+  State: {
+    type: DataTypes.STRING(50),
+    allowNull: false,
+    defaultValue: ''
+  },
+  Pincode: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0
+  },
+  Country: {
+    type: DataTypes.STRING(50),
+    allowNull: false,
+    defaultValue: ''
+  },
+  Description: {
+    type: DataTypes.STRING(1000),
+    allowNull: false,
+    defaultValue: ''
+  },
   ReportPath: {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  AppointmentDate: {
+  Report: {
+    type: DataTypes.BLOB('long'),
+    allowNull: true
+  },
+  ReportGeneratedAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  AppointmentAt: {
     type: DataTypes.DATE,
     allowNull: true
   },

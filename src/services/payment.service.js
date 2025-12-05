@@ -172,6 +172,7 @@ class PaymentService {
 
       const vehicleDetailRequest = await VehicleDetailRequest.create({
         Id: nextVehicleRequestId,
+        UserId: userId,
         PaymentHistoryId: paymentHistoryId,
         RegistrationNumber: registrationNumber,
         Make: request.Make || request.make,
@@ -188,6 +189,8 @@ class PaymentService {
       });
 
       // Update PaymentHistory record
+      // Note: In .NET API, PaymentHistory does NOT have VehicleDetailRequestId column
+      // The relationship is: VehicleDetailRequest has PaymentHistoryId pointing to PaymentHistory
       const paymentHistory = await PaymentHistory.findByPk(paymentHistoryId);
       if (!paymentHistory) {
         return Result.failure('Payment history not found');
@@ -196,7 +199,6 @@ class PaymentService {
       paymentHistory.Status = 1; // Successful
       paymentHistory.Method = paymentMethod;
       paymentHistory.TransactionId = razorpayPaymentId;
-      paymentHistory.VehicleDetailRequestId = vehicleDetailRequest.Id;
       paymentHistory.ModifiedAt = new Date();
       await paymentHistory.save();
 

@@ -7,6 +7,10 @@ const VehicleDetailRequest = sequelize.define('vehicledetailrequests', {
     primaryKey: true,
     autoIncrement: true
   },
+  UserId: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
   PaymentHistoryId: {
     type: DataTypes.INTEGER,
     allowNull: true,
@@ -16,8 +20,8 @@ const VehicleDetailRequest = sequelize.define('vehicledetailrequests', {
     }
   },
   RegistrationNumber: {
-    type: DataTypes.STRING(50),
-    allowNull: false
+    type: DataTypes.STRING(255),
+    allowNull: true
   },
   Make: {
     type: DataTypes.STRING(100),
@@ -57,6 +61,18 @@ const VehicleDetailRequest = sequelize.define('vehicledetailrequests', {
   },
   CustomerType: {
     type: DataTypes.STRING(50),
+    allowNull: true
+  },
+  Status: {
+    type: DataTypes.STRING(100),
+    allowNull: true
+  },
+  RequestData: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  ResponseData: {
+    type: DataTypes.TEXT,
     allowNull: true
   },
   CreatedAt: {
