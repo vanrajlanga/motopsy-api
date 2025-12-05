@@ -4,15 +4,31 @@ const logger = require('../config/logger');
 
 class FaqService {
   /**
+   * Transform FAQ to match .NET API FaqDto format (camelCase)
+   */
+  transformFaq(faq) {
+    const data = faq.toJSON ? faq.toJSON() : faq;
+    return {
+      id: data.Id,
+      question: data.Question,
+      answer: data.Answer,
+      order: data.Order
+    };
+  }
+
+  /**
    * Get all FAQs
+   * Returns List<FaqDto> ordered by CreatedAt
    */
   async getAllAsync() {
     try {
       const faqs = await Faq.findAll({
-        order: [['Id', 'ASC']]
+        order: [['CreatedAt', 'ASC']]
       });
 
-      return Result.success(faqs);
+      // Transform to camelCase
+      const faqDtos = faqs.map(faq => this.transformFaq(faq));
+      return Result.success(faqDtos);
     } catch (error) {
       logger.error('Get FAQs error:', error);
       return Result.failure(error.message || 'Failed to get FAQs');
@@ -20,20 +36,36 @@ class FaqService {
   }
 
   /**
-   * Create FAQ
+   * Create FAQs (accepts array)
+   * Matches .NET API: AddFaqAsync(List<FaqDto> faqs)
    */
-  async createAsync(request) {
+  async createAsync(faqsArray) {
     try {
-      const { question, answer } = request;
+      // Support both single object and array for flexibility
+      const faqs = Array.isArray(faqsArray) ? faqsArray : [faqsArray];
 
-      const faq = await Faq.create({
-        Question: question,
-        Answer: answer,
-        CreatedAt: new Date()
-      });
+      // Create all FAQs
+      const createdFaqs = await Promise.all(faqs.map(async (faqDto) => {
+        // Support both camelCase (API) and PascalCase (.NET) input
+        const question = faqDto.question || faqDto.Question;
+        const answer = faqDto.answer || faqDto.Answer;
+        const order = faqDto.order !== undefined ? faqDto.order : (faqDto.Order !== undefined ? faqDto.Order : 0);
 
-      logger.info(`FAQ created: ${faq.Id}`);
-      return Result.success(faq);
+        const faq = await Faq.create({
+          Question: question,
+          Answer: answer,
+          Order: order,
+          CreatedAt: new Date()
+        });
+
+        return faq;
+      }));
+
+      logger.info(`Created ${createdFaqs.length} FAQ(s)`);
+
+      // Transform to camelCase and return array like .NET API
+      const faqDtos = createdFaqs.map(faq => this.transformFaq(faq));
+      return Result.success(faqDtos);
     } catch (error) {
       logger.error('Create FAQ error:', error);
       return Result.failure(error.message || 'Failed to create FAQ');
@@ -42,23 +74,31 @@ class FaqService {
 
   /**
    * Update FAQ
+   * Matches .NET API: EditFaqByIdAsync(FaqDto faqDto)
    */
   async updateAsync(request) {
     try {
-      const { id, question, answer } = request;
+      // Support both camelCase and PascalCase input
+      const id = request.id || request.Id;
+      const question = request.question || request.Question;
+      const answer = request.answer || request.Answer;
+      const order = request.order !== undefined ? request.order : (request.Order !== undefined ? request.Order : 0);
 
       const faq = await Faq.findByPk(id);
       if (!faq) {
-        return Result.failure('FAQ not found');
+        return Result.failure('Faq not found');
       }
 
       faq.Question = question;
       faq.Answer = answer;
+      faq.Order = order;
       faq.ModifiedAt = new Date();
       await faq.save();
 
       logger.info(`FAQ updated: ${id}`);
-      return Result.success(faq);
+
+      // Return transformed DTO like .NET API
+      return Result.success(this.transformFaq(faq));
     } catch (error) {
       logger.error('Update FAQ error:', error);
       return Result.failure(error.message || 'Failed to update FAQ');
@@ -66,19 +106,23 @@ class FaqService {
   }
 
   /**
-   * Delete FAQ
+   * Delete FAQ by ID
+   * Matches .NET API: DeleteFaqByIdAsync(int faqId)
+   * Returns the deleted ID on success
    */
-  async deleteAsync(id) {
+  async deleteAsync(faqId) {
     try {
-      const faq = await Faq.findByPk(id);
+      const faq = await Faq.findByPk(faqId);
       if (!faq) {
-        return Result.failure('FAQ not found');
+        return Result.failure('Faq not found');
       }
 
       await faq.destroy();
 
-      logger.info(`FAQ deleted: ${id}`);
-      return Result.success({ message: 'FAQ deleted successfully' });
+      logger.info(`FAQ deleted: ${faqId}`);
+
+      // Return the ID like .NET API does
+      return Result.success(faqId);
     } catch (error) {
       logger.error('Delete FAQ error:', error);
       return Result.failure(error.message || 'Failed to delete FAQ');

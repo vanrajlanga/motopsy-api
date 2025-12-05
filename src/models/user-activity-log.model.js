@@ -15,6 +15,10 @@ const UserActivityLog = sequelize.define('UserActivityLogs', {
     type: DataTypes.STRING(500),
     allowNull: true
   },
+  Screen: {
+    type: DataTypes.STRING(500),
+    allowNull: true
+  },
   Details: {
     type: DataTypes.TEXT,
     allowNull: true
@@ -36,5 +40,9 @@ const UserActivityLog = sequelize.define('UserActivityLogs', {
   tableName: 'UserActivityLogs',
   timestamps: false
 });
+
+// Define association with User model
+const User = require('./user.model');
+UserActivityLog.belongsTo(User, { foreignKey: 'UserId', as: 'User' });
 
 module.exports = UserActivityLog;

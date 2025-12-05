@@ -3,7 +3,9 @@ const crypto = require('crypto');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
 const PaymentHistory = require('../models/payment-history.model');
+const VehicleDetailRequest = require('../models/vehicle-detail-request.model');
 const User = require('../models/user.model');
+const userActivityLogService = require('./user-activity-log.service');
 const { sequelize } = require('../config/database');
 require('dotenv').config();
 
@@ -94,6 +96,7 @@ class PaymentService {
 
   /**
    * Verify Razorpay payment signature
+   * Matches .NET API VerifyPayment implementation
    */
   async verifyPayment(request) {
     try {
@@ -101,15 +104,19 @@ class PaymentService {
       logger.info('Verify payment request:', JSON.stringify(request));
 
       // Accept multiple formats: .NET (RazorpayOrderId), camelCase (razorpayOrderId), snake_case (razorpay_order_id)
-      const orderId = request.RazorpayOrderId || request.razorpayOrderId || request.razorpay_order_id || request.orderId;
-      const paymentId = request.RazorpayPaymentId || request.razorpayPaymentId || request.razorpay_payment_id || request.paymentId;
-      const signature = request.RazorpaySignature || request.razorpaySignature || request.razorpay_signature || request.signature;
+      const razorpayOrderId = request.RazorpayOrderId || request.razorpayOrderId || request.razorpay_order_id || request.orderId;
+      const razorpayPaymentId = request.RazorpayPaymentId || request.razorpayPaymentId || request.razorpay_payment_id || request.paymentId;
+      const razorpaySignature = request.RazorpaySignature || request.razorpaySignature || request.razorpay_signature || request.signature;
+      const paymentHistoryId = request.PaymentHistoryId || request.paymentHistoryId;
+      const registrationNumber = request.RegistrationNumber || request.registrationNumber;
 
-      // Validate required fields with specific error messages
+      // Validate required fields
       const missingFields = [];
-      if (!orderId) missingFields.push('razorpayOrderId');
-      if (!paymentId) missingFields.push('razorpayPaymentId');
-      if (!signature) missingFields.push('razorpaySignature');
+      if (!razorpayOrderId) missingFields.push('razorpayOrderId');
+      if (!razorpayPaymentId) missingFields.push('razorpayPaymentId');
+      if (!razorpaySignature) missingFields.push('razorpaySignature');
+      if (!paymentHistoryId) missingFields.push('paymentHistoryId');
+      if (!registrationNumber) missingFields.push('registrationNumber');
 
       if (missingFields.length > 0) {
         const errorMsg = `Missing required fields: ${missingFields.join(', ')}`;
@@ -117,39 +124,92 @@ class PaymentService {
         return Result.failure(errorMsg);
       }
 
+      // Fetch payment details from Razorpay to get payment method
+      const payment = await razorpay.payments.fetch(razorpayPaymentId);
+      const paymentMethodString = payment.method || 'card';
+
+      // Map Razorpay payment method to our enum (0=Card, 1=Netbanking, 2=Wallet, 3=PayLater, 4=UPI)
+      const paymentMethodMap = {
+        'card': 0,
+        'netbanking': 1,
+        'wallet': 2,
+        'paylater': 3,
+        'upi': 4
+      };
+      const paymentMethod = paymentMethodMap[paymentMethodString.toLowerCase()] || 0;
+
       // Create signature for verification
-      const body = orderId + '|' + paymentId;
+      const signaturePayload = `${razorpayOrderId}|${razorpayPaymentId}`;
       const expectedSignature = crypto
         .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-        .update(body.toString())
+        .update(signaturePayload)
         .digest('hex');
 
       // Verify signature
-      const isValid = expectedSignature === signature;
+      const isValid = expectedSignature.toLowerCase() === razorpaySignature.toLowerCase();
+
+      // Get userId from payment history for activity logging
+      const existingPaymentHistory = await PaymentHistory.findByPk(paymentHistoryId);
+      const userId = existingPaymentHistory?.UserId || 0;
 
       if (!isValid) {
-        logger.warn(`Payment verification failed for order: ${orderId}`);
-        return Result.failure('Payment verification failed');
+        logger.warn(`Payment verification failed for order: ${razorpayOrderId}`);
+
+        // Log failed payment activity (matches .NET)
+        if (userId) {
+          await userActivityLogService.logActivityAsync(userId, 'PaymentFailed', 'Home', { ip: '0.0.0.0' });
+        }
+
+        return Result.failure('Signature verification failed.');
       }
 
-      // Fetch payment details from Razorpay
-      const payment = await razorpay.payments.fetch(paymentId);
+      // Create VehicleDetailRequest record
+      const maxVehicleRequest = await VehicleDetailRequest.findOne({
+        attributes: [[sequelize.fn('MAX', sequelize.col('Id')), 'maxId']],
+        raw: true
+      });
+      const nextVehicleRequestId = (maxVehicleRequest && maxVehicleRequest.maxId) ? maxVehicleRequest.maxId + 1 : 1;
 
-      logger.info(`Payment verified successfully: ${paymentId}`);
+      const vehicleDetailRequest = await VehicleDetailRequest.create({
+        Id: nextVehicleRequestId,
+        PaymentHistoryId: paymentHistoryId,
+        RegistrationNumber: registrationNumber,
+        Make: request.Make || request.make,
+        Model: request.Model || request.model,
+        Year: request.Year || request.year,
+        Trim: request.Trim || request.trim,
+        KmsDriven: request.KmsDriven || request.kmsDriven,
+        City: request.City || request.city,
+        NoOfOwners: request.NoOfOwners || request.noOfOwners,
+        Version: request.Version || request.version,
+        TransactionType: request.TransactionType || request.transactionType,
+        CustomerType: request.CustomerType || request.customerType,
+        CreatedAt: new Date()
+      });
 
-      // TODO: Save payment details to database
-      // TODO: Update order status
-      // TODO: Send confirmation email
+      // Update PaymentHistory record
+      const paymentHistory = await PaymentHistory.findByPk(paymentHistoryId);
+      if (!paymentHistory) {
+        return Result.failure('Payment history not found');
+      }
 
+      paymentHistory.Status = 1; // Successful
+      paymentHistory.Method = paymentMethod;
+      paymentHistory.TransactionId = razorpayPaymentId;
+      paymentHistory.VehicleDetailRequestId = vehicleDetailRequest.Id;
+      paymentHistory.ModifiedAt = new Date();
+      await paymentHistory.save();
+
+      logger.info(`Payment verified successfully: ${razorpayPaymentId}, VehicleDetailRequestId: ${vehicleDetailRequest.Id}`);
+
+      // Log successful payment activity (matches .NET)
+      await userActivityLogService.logActivityAsync(paymentHistory.UserId, 'PaymentSuccess', 'Home', { ip: '0.0.0.0' });
+
+      // Return response matching .NET API format
       return Result.success({
-        verified: true,
-        paymentId: paymentId,
-        orderId: orderId,
-        amount: payment.amount,
-        status: payment.status,
-        method: payment.method,
-        email: payment.email,
-        contact: payment.contact
+        success: true,
+        paymentHistoryId: paymentHistory.Id,
+        vehicleDetailRequestId: vehicleDetailRequest.Id
       });
     } catch (error) {
       logger.error('Verify payment error:', error);

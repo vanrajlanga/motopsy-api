@@ -69,10 +69,14 @@ class AccountService {
       // Send email confirmation
       await emailService.sendEmailConfirmationAsync(email, user.Id, emailToken);
 
+      // Return UserDto matching .NET API
       return Result.success({
-        message: 'Registration successful. Please check your email to confirm your account.',
-        userId: user.Id,
-        code: emailToken
+        id: user.Id,
+        name: `${user.FirstName} ${user.LastName}`.trim(),
+        emailAddress: user.Email,
+        phoneNumber: user.PhoneNumber,
+        isAdmin: user.IsAdmin,
+        createdAt: user.CreatedAt
       });
     } catch (error) {
       logger.error('Registration error:', error);
@@ -207,21 +211,27 @@ class AccountService {
       });
 
       if (!user) {
-        // Don't reveal if user exists or not for security
-        return Result.success({ message: 'If your email is registered, you will receive a password reset link.' });
+        // Don't reveal if user exists or not for security - always return success
+        logger.info(`Forgot password requested for non-existent email: ${email}`);
+        return Result.success();
+      }
+
+      // Check if email is confirmed
+      if (!user.EmailConfirmed) {
+        logger.warn(`Forgot password request for unconfirmed email: ${email}`);
+        return Result.success();
       }
 
       // Generate password reset token
       const resetToken = generatePasswordResetToken(email);
 
-      // Send password reset email
-      await emailService.sendPasswordResetAsync(email, resetToken);
+      // Send password reset email with userId and code
+      await emailService.sendPasswordResetAsync(email, user.Id, resetToken);
 
-      logger.info(`Password reset email sent to: ${email}`);
+      logger.info(`Password reset email sent to: ${email}, userId: ${user.Id}`);
 
-      return Result.success({
-        message: 'Password reset link sent to your email'
-      });
+      // Return empty success matching .NET API
+      return Result.success();
     } catch (error) {
       logger.error('Forgot password error:', error);
       return Result.failure(error.message || 'Password reset request failed');
@@ -230,21 +240,37 @@ class AccountService {
 
   /**
    * Reset password
+   * Matches .NET API: accepts { userId, newPassword, confirmPassword, code }
    */
   async resetPasswordAsync(request) {
     try {
-      const { token, newPassword } = request;
+      const { userId, newPassword, confirmPassword, code } = request;
 
-      // Verify token
-      const decoded = verifyPurposeToken(token, 'password-reset');
+      // Validate passwords match
+      if (newPassword !== confirmPassword) {
+        return Result.failure('The password and confirmation password do not match');
+      }
 
-      // Find user
+      // Find user by ID
       const user = await User.findOne({
-        where: { NormalizedEmail: decoded.email.toUpperCase() }
+        where: { Id: userId }
       });
 
       if (!user) {
         return Result.failure('User not found');
+      }
+
+      // Verify the reset code
+      try {
+        const decoded = verifyPurposeToken(code, 'password-reset');
+
+        // Verify the code belongs to this user's email
+        if (decoded.email.toUpperCase() !== user.NormalizedEmail) {
+          return Result.failure('Invalid reset code');
+        }
+      } catch (error) {
+        logger.error('Password reset token verification error:', error);
+        return Result.failure('Invalid or expired reset code');
       }
 
       // Hash new password
@@ -256,28 +282,34 @@ class AccountService {
       user.ModifiedAt = new Date();
       await user.save();
 
-      logger.info(`Password reset for: ${decoded.email}`);
+      logger.info(`Password reset for userId: ${userId}, email: ${user.Email}`);
 
-      return Result.success({ message: 'Password reset successfully' });
+      // Send confirmation email
+      await emailService.sendPasswordResetSuccessAsync(user.Email, user.UserName || user.Email);
+
+      // Return string message matching .NET API (not wrapped in object)
+      return Result.success('Password updated successfully');
     } catch (error) {
       logger.error('Reset password error:', error);
-      return Result.failure('Invalid or expired reset token');
+      return Result.failure('Password reset failed');
     }
   }
 
   /**
    * Contact us
+   * Matches .NET API: accepts { name, email, phoneNumber, registrationNumber (optional), message }
    */
   async contactUsAsync(request) {
     try {
-      const { name, email, message } = request;
+      const { name, email, phoneNumber, registrationNumber, message } = request;
 
       // Send email to admin
-      await emailService.sendContactUsEmailAsync(name, email, message);
+      await emailService.sendContactUsEmailAsync(name, email, phoneNumber, registrationNumber, message);
 
       logger.info(`Contact form email sent from: ${email}`);
 
-      return Result.success({ message: 'Your message has been sent successfully' });
+      // Return empty success matching .NET API
+      return Result.success();
     } catch (error) {
       logger.error('Contact us error:', error);
       return Result.failure(error.message || 'Failed to send message');

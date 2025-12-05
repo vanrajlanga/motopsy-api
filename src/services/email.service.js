@@ -116,7 +116,7 @@ class EmailService {
         }
     }
 
-    async sendPasswordResetAsync(email, token) {
+    async sendPasswordResetAsync(email, userId, code) {
         if (!this.isConfigured || !this.transporter) {
             logger.warn(
                 "Email service not configured. Skipping password reset email send.",
@@ -126,7 +126,7 @@ class EmailService {
         }
 
         try {
-            const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+            const resetUrl = `${process.env.FRONTEND_URL}/account/reset-password?userId=${userId}&code=${encodeURIComponent(code)}`;
 
             const mailOptions = {
                 from: `"Motopsy" <${this.fromEmail}>`,
@@ -177,7 +177,7 @@ class EmailService {
         }
     }
 
-    async sendContactUsEmailAsync(name, email, message) {
+    async sendContactUsEmailAsync(name, email, phoneNumber, registrationNumber, message) {
         if (!this.isConfigured || !this.transporter) {
             logger.warn(
                 "Email service not configured. Skipping contact form email send.",
@@ -202,6 +202,10 @@ class EmailService {
               .content { padding: 20px; background-color: #f9f9f9; }
               .field { margin: 10px 0; }
               .label { font-weight: bold; color: #666; }
+              table { width: 100%; cellpadding: 6; cellspacing: 0; }
+              table tr { padding: 6px 0; }
+              table td { padding: 6px; }
+              table td:first-child { font-weight: bold; }
             </style>
           </head>
           <body>
@@ -210,19 +214,32 @@ class EmailService {
                 <h1>New Contact Form Submission</h1>
               </div>
               <div class="content">
-                <div class="field">
-                  <span class="label">Name:</span> ${name}
-                </div>
-                <div class="field">
-                  <span class="label">Email:</span> ${email}
-                </div>
-                <div class="field">
-                  <span class="label">Message:</span>
-                  <p>${message}</p>
-                </div>
-                <div class="field">
-                  <span class="label">Submitted:</span> ${new Date().toLocaleString()}
-                </div>
+                <p>Hi Admin,</p>
+                <p>A new contact request has been submitted by the user with the following details:</p>
+                <table>
+                  <tr>
+                    <td><strong>Name:</strong></td>
+                    <td>${name}</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Email:</strong></td>
+                    <td>${email}</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Phone:</strong></td>
+                    <td>${phoneNumber || 'Not provided'}</td>
+                  </tr>
+                  ${registrationNumber ? `
+                  <tr>
+                    <td><strong>Registration Number:</strong></td>
+                    <td>${registrationNumber}</td>
+                  </tr>` : ''}
+                  ${message ? `
+                  <tr>
+                    <td><strong>Message:</strong></td>
+                    <td>${message}</td>
+                  </tr>` : ''}
+                </table>
               </div>
             </div>
           </body>
@@ -235,6 +252,61 @@ class EmailService {
             return true;
         } catch (error) {
             logger.error("Send contact form email error:", error);
+            return false;
+        }
+    }
+
+    async sendPasswordResetSuccessAsync(email, userName) {
+        if (!this.isConfigured || !this.transporter) {
+            logger.warn(
+                "Email service not configured. Skipping password reset success email.",
+                { email }
+            );
+            return false;
+        }
+
+        try {
+            const mailOptions = {
+                from: `"Motopsy" <${this.fromEmail}>`,
+                to: email,
+                subject: "Password Reset Successful - Motopsy",
+                html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background-color: #28a745; color: white; padding: 20px; text-align: center; }
+              .content { padding: 20px; background-color: #f9f9f9; }
+              .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>Password Reset Successful</h1>
+              </div>
+              <div class="content">
+                <p>Dear ${userName},</p>
+                <p>We are pleased to inform you that your password has been successfully reset. You can now log in to your account using your new password.</p>
+                <p>Best regards,</p>
+                <p>Motopsy</p>
+              </div>
+              <div class="footer">
+                <p>&copy; ${new Date().getFullYear()} Motopsy. All rights reserved.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `,
+            };
+
+            await this.transporter.sendMail(mailOptions);
+            logger.info(`Password reset success email sent to: ${email}`);
+            return true;
+        } catch (error) {
+            logger.error("Send password reset success email error:", error);
             return false;
         }
     }
@@ -295,6 +367,42 @@ class EmailService {
             return true;
         } catch (error) {
             logger.error("Send vehicle report email error:", error);
+            return false;
+        }
+    }
+
+    /**
+     * Send email with file attachment
+     * Matches .NET: SendEmail with attachment
+     */
+    async sendEmailWithAttachmentAsync(email, subject, htmlContent, fileBytes, filename) {
+        if (!this.isConfigured || !this.transporter) {
+            logger.warn(
+                "Email service not configured. Skipping email with attachment send.",
+                { email, subject }
+            );
+            return false;
+        }
+
+        try {
+            const mailOptions = {
+                from: `"Motopsy" <${this.fromEmail}>`,
+                to: email,
+                subject: subject,
+                html: htmlContent,
+                attachments: [
+                    {
+                        filename: filename,
+                        content: Buffer.from(fileBytes)
+                    }
+                ]
+            };
+
+            await this.transporter.sendMail(mailOptions);
+            logger.info(`Email with attachment sent to: ${email}`);
+            return true;
+        } catch (error) {
+            logger.error("Send email with attachment error:", error);
             return false;
         }
     }

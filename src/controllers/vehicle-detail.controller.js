@@ -44,7 +44,8 @@ class VehicleDetailController extends BaseController {
    */
   async getPendingReports(req, res, next) {
     try {
-      const result = await vehicleDetailService.getPendingReportsAsync();
+      const userEmail = req.user.email;
+      const result = await vehicleDetailService.getPendingReportsAsync(userEmail);
       return this.fromResult(result, res);
     } catch (error) {
       next(error);

@@ -1,7 +1,7 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
-const PaymentHistory = sequelize.define('paymenthistories', {
+const PaymentHistory = sequelize.define('PaymentHistory', {
   Id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
@@ -39,6 +39,14 @@ const PaymentHistory = sequelize.define('paymenthistories', {
     type: DataTypes.STRING(255),
     allowNull: true
   },
+  VehicleDetailRequestId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'vehicledetailrequests',
+      key: 'Id'
+    }
+  },
   PaymentDate: {
     type: DataTypes.DATE,
     allowNull: false,
@@ -57,5 +65,13 @@ const PaymentHistory = sequelize.define('paymenthistories', {
   tableName: 'paymenthistories',
   timestamps: false
 });
+
+// Define association
+PaymentHistory.associate = (models) => {
+  PaymentHistory.belongsTo(models.User, {
+    foreignKey: 'UserId',
+    as: 'User'
+  });
+};
 
 module.exports = PaymentHistory;

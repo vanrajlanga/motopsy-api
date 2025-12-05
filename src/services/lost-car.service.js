@@ -5,6 +5,7 @@ const logger = require('../config/logger');
 class LostCarService {
   /**
    * Check if vehicle is stolen
+   * Matches .NET: Returns Result<bool> - just a boolean value
    */
   async checkStolenStatusAsync(registrationNumber) {
     try {
@@ -25,13 +26,8 @@ class LostCarService {
 
       logger.info(`Stolen status check for ${registrationNumber}: ${isStolen}`);
 
-      return Result.success({
-        registrationNumber: registrationNumber,
-        isStolen: isStolen,
-        message: isStolen
-          ? 'WARNING: This vehicle is reported as stolen/lost'
-          : 'Vehicle not found in stolen vehicle database'
-      });
+      // .NET returns just boolean wrapped in Result
+      return Result.success(isStolen);
     } catch (error) {
       logger.error('Check stolen status error:', error);
       return Result.failure(error.message || 'Failed to check stolen status');

@@ -22,12 +22,12 @@ class ObvService {
     }
   }
 
-  async getEnterpriseUsedPriceRangeAsync(request) {
+  async getEnterpriseUsedPriceRangeAsync(request, userEmail) {
     try {
-      logger.info('Used price range requested');
+      logger.info(`Used price range requested by user: ${userEmail}`);
 
       // Call Droom API to get used price range
-      const priceRangeResult = await droomService.getEnterpriseUsedPriceRangeAsync(request);
+      const priceRangeResult = await droomService.getEnterpriseUsedPriceRangeAsync(request, userEmail);
 
       if (!priceRangeResult.isSuccess) {
         return priceRangeResult;
@@ -40,9 +40,9 @@ class ObvService {
     }
   }
 
-  async getByVehicleDetailIdAsync(vehicleDetailId) {
+  async getByVehicleDetailIdAsync(vehicleDetailId, userEmail) {
     try {
-      logger.info(`Get OBV for vehicle detail ID: ${vehicleDetailId}`);
+      logger.info(`Get OBV for vehicle detail ID: ${vehicleDetailId} by user: ${userEmail}`);
 
       // Get vehicle details from database
       const vehicleDetail = await VehicleDetail.findByPk(vehicleDetailId);

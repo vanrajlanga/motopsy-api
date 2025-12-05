@@ -39,12 +39,13 @@ class FaqController extends BaseController {
   }
 
   /**
-   * DELETE /api/faq - Delete FAQ (admin only)
+   * DELETE /api/faq?faqId={id} - Delete FAQ (admin only)
+   * Matches .NET API: Delete(int faqId)
    */
   async delete(req, res, next) {
     try {
-      const { id } = req.query;
-      const result = await faqService.deleteAsync(id);
+      const { faqId } = req.query;
+      const result = await faqService.deleteAsync(parseInt(faqId));
       return this.fromResult(result, res);
     } catch (error) {
       next(error);

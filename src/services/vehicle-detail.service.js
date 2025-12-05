@@ -1,10 +1,38 @@
 const VehicleDetail = require('../models/vehicle-detail.model');
+const VehicleDetailRequest = require('../models/vehicle-detail-request.model');
+const PaymentHistory = require('../models/payment-history.model');
+const User = require('../models/user.model');
 const { sequelize } = require('../config/database');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
 const surepassService = require('./surepass.service');
 
 class VehicleDetailService {
+  /**
+   * Transform vehicle detail request to FailedVehicleDetailRequestDto
+   * Used for pending and failed reports
+   */
+  transformFailedVehicleDetailRequest(request, user, paymentHistory) {
+    return {
+      id: request.Id,
+      userId: request.PaymentHistoryId ? paymentHistory?.UserId : user?.Id,
+      emailAddress: user?.Email || '',
+      phoneNumber: user?.PhoneNumber || '',
+      paymentDate: paymentHistory?.PaymentDate || request.CreatedAt,
+      registrationNumber: request.RegistrationNumber,
+      make: request.Make,
+      model: request.Model,
+      year: request.Year,
+      trim: request.Trim,
+      kmsDriven: request.KmsDriven,
+      city: request.City,
+      noOfOwners: request.NoOfOwners,
+      version: request.Version,
+      transactionType: request.TransactionType,
+      customerType: request.CustomerType
+    };
+  }
+
   /**
    * Transform vehicle detail from database format (PascalCase) to API format (camelCase)
    * Matches .NET API VehicleDetailDto response format
@@ -176,17 +204,31 @@ class VehicleDetailService {
 
   /**
    * Get failed vehicle detail reports (admin only)
+   * Returns FailedVehicleDetailRequestDto[] for paid requests that failed
    */
   async getPaidVehicleDetailFailedReportsAsync() {
     try {
-      const failedReports = await VehicleDetail.findAll({
-        where: { Status: 'Failed' },
+      // Get vehicle detail requests where payment succeeded but report generation failed
+      const failedRequests = await VehicleDetailRequest.findAll({
+        include: [{
+          model: PaymentHistory,
+          as: 'PaymentHistory',
+          where: { Status: 1 }, // Successful payment
+          required: true
+        }],
+        where: sequelize.literal('NOT EXISTS (SELECT 1 FROM vehicledetails vd WHERE vd.VehicleDetailRequestId = VehicleDetailRequest.Id)'),
         order: [['CreatedAt', 'DESC']],
         limit: 100
       });
 
-      const transformed = failedReports.map(report => this.transformVehicleDetail(report));
-      return Result.success(transformed);
+      // Get user data for each request
+      const transformedRequests = await Promise.all(failedRequests.map(async (request) => {
+        const paymentHistory = request.PaymentHistory;
+        const user = await User.findByPk(paymentHistory.UserId);
+        return this.transformFailedVehicleDetailRequest(request, user, paymentHistory);
+      }));
+
+      return Result.success(transformedRequests);
     } catch (error) {
       logger.error('Get failed reports error:', error);
       return Result.failure(error.message || 'Failed to get failed reports');
@@ -194,18 +236,38 @@ class VehicleDetailService {
   }
 
   /**
-   * Get pending vehicle detail reports
+   * Get pending vehicle detail reports for a user
+   * Returns FailedVehicleDetailRequestDto[] for pending requests
    */
-  async getPendingReportsAsync() {
+  async getPendingReportsAsync(userEmail) {
     try {
-      const pendingReports = await VehicleDetail.findAll({
-        where: { Status: 'Pending' },
+      // Find user
+      const user = await User.findOne({
+        where: { NormalizedEmail: userEmail.toUpperCase() }
+      });
+
+      if (!user) {
+        return Result.failure('User not found');
+      }
+
+      // Get pending vehicle detail requests for this user
+      const pendingRequests = await VehicleDetailRequest.findAll({
+        include: [{
+          model: PaymentHistory,
+          as: 'PaymentHistory',
+          where: { UserId: user.Id },
+          required: true
+        }],
+        where: sequelize.literal('NOT EXISTS (SELECT 1 FROM vehicledetails vd WHERE vd.VehicleDetailRequestId = VehicleDetailRequest.Id)'),
         order: [['CreatedAt', 'DESC']],
         limit: 100
       });
 
-      const transformed = pendingReports.map(report => this.transformVehicleDetail(report));
-      return Result.success(transformed);
+      const transformedRequests = pendingRequests.map(request => {
+        return this.transformFailedVehicleDetailRequest(request, user, request.PaymentHistory);
+      });
+
+      return Result.success(transformedRequests);
     } catch (error) {
       logger.error('Get pending reports error:', error);
       return Result.failure(error.message || 'Failed to get pending reports');

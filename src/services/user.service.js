@@ -3,14 +3,22 @@ const { hashPassword, verifyPassword } = require('../utils/hash.helper');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
 const { Op } = require('sequelize');
+const { toDataSourceResult } = require('../utils/kendo-datasource');
+const userActivityLogService = require('./user-activity-log.service');
 
 class UserService {
   /**
    * Update password
+   * Matches .NET API: accepts { currentPassword, newPassword, confirmPassword }
    */
   async updatePasswordAsync(request, userEmail) {
     try {
-      const { currentPassword, newPassword } = request;
+      const { currentPassword, newPassword, confirmPassword } = request;
+
+      // Validate passwords match
+      if (newPassword !== confirmPassword) {
+        return Result.failure('The password and confirmation password do not match');
+      }
 
       // Find user
       const user = await User.findOne({
@@ -38,7 +46,11 @@ class UserService {
 
       logger.info(`Password updated for: ${userEmail}`);
 
-      return Result.success({ message: 'Password updated successfully' });
+      // Log activity (matches .NET)
+      await userActivityLogService.logActivityAsync(user.Id, 'PasswordUpdate', 'Profile', { ip: '0.0.0.0' });
+
+      // Return string message matching .NET API (not wrapped in object)
+      return Result.success('Password updated successfully');
     } catch (error) {
       logger.error('Update password error:', error);
       return Result.failure(error.message || 'Password update failed');
@@ -47,21 +59,24 @@ class UserService {
 
   /**
    * Get users (with pagination/filtering)
+   * Matches .NET: DataSourceResult with Kendo filtering/sorting
    */
-  getUsers(request) {
+  async getUsers(request) {
     try {
-      // TODO: Implement Kendo DataSourceRequest filtering
-      // For now, return basic user list
-      const { take = 10, skip = 0 } = request;
-
-      const users = User.findAll({
-        attributes: ['Id', 'Email', 'UserName', 'FirstName', 'LastName', 'PhoneNumber', 'EmailConfirmed', 'IsAdmin', 'CreatedAt'],
-        limit: take,
-        offset: skip,
-        order: [['CreatedAt', 'DESC']]
+      const result = await toDataSourceResult(User, request, {
+        baseWhere: { IsAdmin: false },
+        order: [['CreatedAt', 'DESC']],
+        transform: (user) => ({
+          id: user.Id,
+          name: `${user.FirstName || ''} ${user.LastName || ''}`.trim() || user.Email,
+          emailAddress: user.Email,
+          phoneNumber: user.PhoneNumber,
+          isAdmin: user.IsAdmin,
+          createdAt: user.CreatedAt
+        })
       });
 
-      return users;
+      return result;
     } catch (error) {
       logger.error('Get users error:', error);
       throw error;
@@ -69,11 +84,14 @@ class UserService {
   }
 
   /**
-   * Get total user count
+   * Get total user count (excluding admins)
    */
   async getTotalUserCountAsync() {
     try {
-      const count = await User.count();
+      const count = await User.count({
+        where: { IsAdmin: false }
+      });
+      // Return number directly matching .NET API
       return Result.success(count);
     } catch (error) {
       logger.error('Get user count error:', error);
@@ -119,6 +137,7 @@ class UserService {
 
   /**
    * Update user details
+   * Matches .NET API: accepts { firstName, lastName, phoneNumber }
    */
   async updateUserAsync(userEmail, request) {
     try {
@@ -132,26 +151,21 @@ class UserService {
         return Result.failure('User not found');
       }
 
-      // Update user details
-      if (firstName !== undefined) user.FirstName = firstName;
-      if (lastName !== undefined) user.LastName = lastName;
-      if (phoneNumber !== undefined) user.PhoneNumber = phoneNumber;
+      // Update user details (always update all fields like .NET does)
+      user.FirstName = firstName;
+      user.LastName = lastName;
+      user.PhoneNumber = phoneNumber;
       user.ModifiedAt = new Date();
 
       await user.save();
 
       logger.info(`User updated: ${userEmail}`);
 
-      return Result.success({
-        message: 'User updated successfully',
-        user: {
-          id: user.Id,
-          email: user.Email,
-          firstName: user.FirstName,
-          lastName: user.LastName,
-          phoneNumber: user.PhoneNumber
-        }
-      });
+      // Log activity (matches .NET)
+      await userActivityLogService.logActivityAsync(user.Id, 'ProfileUpdate', 'Profile', { ip: '0.0.0.0' });
+
+      // Return empty success matching .NET API
+      return Result.success();
     } catch (error) {
       logger.error('Update user error:', error);
       return Result.failure(error.message || 'User update failed');

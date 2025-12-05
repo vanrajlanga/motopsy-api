@@ -6,36 +6,76 @@ const { sequelize } = require('../config/database');
 
 class DashboardService {
   /**
+   * Get current month earnings
+   * Matches .NET: GetCurrentMonthEarningsAsync
+   */
+  async getCurrentMonthEarningsAsync() {
+    const currentMonth = new Date().getMonth() + 1; // 1-12
+    const currentYear = new Date().getFullYear();
+
+    const result = await PaymentHistory.sum('Amount', {
+      where: {
+        [Op.and]: [
+          sequelize.where(sequelize.fn('MONTH', sequelize.col('PaymentDate')), currentMonth),
+          sequelize.where(sequelize.fn('YEAR', sequelize.col('PaymentDate')), currentYear),
+          { Status: 1 } // Successful
+        ]
+      }
+    });
+
+    return result || 0;
+  }
+
+  /**
+   * Get previous month earnings
+   * Matches .NET: GetPreviousMonthEarningsAsync
+   */
+  async getPreviousMonthEarningsAsync() {
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+    const previousMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const previousYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+
+    const result = await PaymentHistory.sum('Amount', {
+      where: {
+        [Op.and]: [
+          sequelize.where(sequelize.fn('MONTH', sequelize.col('PaymentDate')), previousMonth),
+          sequelize.where(sequelize.fn('YEAR', sequelize.col('PaymentDate')), previousYear),
+          { Status: 1 } // Successful
+        ]
+      }
+    });
+
+    return result || 0;
+  }
+
+  /**
    * Get total monthly earning (admin only)
+   * Returns MonthlyRevenueDto { currentMonthRevenue, monthlyRelativeRevenue }
+   * Matches .NET API: GetMonthlyRevenue
    */
   async getTotalMonthlyEarningAsync() {
     try {
-      const currentMonth = new Date();
-      currentMonth.setDate(1);
-      currentMonth.setHours(0, 0, 0, 0);
+      const currentMonthEarnings = await this.getCurrentMonthEarningsAsync();
+      const prevMonthEarnings = await this.getPreviousMonthEarningsAsync();
 
-      const nextMonth = new Date(currentMonth);
-      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      let monthlyRelativeRevenue;
 
-      const result = await PaymentHistory.findOne({
-        attributes: [
-          [sequelize.fn('SUM', sequelize.col('Amount')), 'totalEarning'],
-          [sequelize.fn('COUNT', sequelize.col('Id')), 'totalTransactions']
-        ],
-        where: {
-          CreatedAt: {
-            [Op.gte]: currentMonth,
-            [Op.lt]: nextMonth
-          },
-          Status: 'Success'
-        },
-        raw: true
-      });
+      // If previous month revenue is 0, assign current month revenue to monthly relative revenue
+      if (prevMonthEarnings === 0) {
+        monthlyRelativeRevenue = currentMonthEarnings;
+      } else {
+        monthlyRelativeRevenue = Math.round(((currentMonthEarnings - prevMonthEarnings) / prevMonthEarnings) * 100 * 100) / 100; // Round to 2 decimal places
+      }
+
+      // Handle NaN
+      if (isNaN(monthlyRelativeRevenue)) {
+        monthlyRelativeRevenue = 0;
+      }
 
       return Result.success({
-        totalEarning: parseFloat(result.totalEarning || 0),
-        totalTransactions: parseInt(result.totalTransactions || 0),
-        month: currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        currentMonthRevenue: currentMonthEarnings,
+        monthlyRelativeRevenue: monthlyRelativeRevenue
       });
     } catch (error) {
       logger.error('Get monthly earning error:', error);
@@ -44,51 +84,84 @@ class DashboardService {
   }
 
   /**
-   * Get revenue report by filter (daily, weekly, monthly, yearly)
+   * Get monthly revenue report for given year
+   * Returns RevenueHistoryDto[] { month, year, revenue }
+   * Matches .NET: GetMonthlyRevenueReportAsync
+   */
+  async getMonthlyRevenueReportAsync(year) {
+    const monthlyPayments = await PaymentHistory.findAll({
+      attributes: [
+        [sequelize.fn('MONTH', sequelize.col('PaymentDate')), 'month'],
+        [sequelize.literal(year.toString()), 'year'],
+        [sequelize.fn('SUM', sequelize.col('Amount')), 'revenue']
+      ],
+      where: {
+        [Op.and]: [
+          sequelize.where(sequelize.fn('YEAR', sequelize.col('PaymentDate')), year),
+          { Status: 1 } // Successful
+        ]
+      },
+      group: [sequelize.fn('MONTH', sequelize.col('PaymentDate'))],
+      order: [[sequelize.fn('MONTH', sequelize.col('PaymentDate')), 'ASC']],
+      raw: true
+    });
+
+    return monthlyPayments.map(item => ({
+      month: item.month,
+      year: item.year,
+      revenue: parseFloat(item.revenue)
+    }));
+  }
+
+  /**
+   * Get yearly revenue report
+   * Returns RevenueHistoryDto[] { year, revenue }
+   * Matches .NET: GetYearlyRevenueReportAsync
+   */
+  async getYearlyRevenueReportAsync() {
+    const yearlyPayments = await PaymentHistory.findAll({
+      attributes: [
+        [sequelize.fn('YEAR', sequelize.col('PaymentDate')), 'year'],
+        [sequelize.fn('SUM', sequelize.col('Amount')), 'revenue']
+      ],
+      where: {
+        Status: 1 // Successful
+      },
+      group: [sequelize.fn('YEAR', sequelize.col('PaymentDate'))],
+      order: [[sequelize.fn('YEAR', sequelize.col('PaymentDate')), 'ASC']],
+      raw: true
+    });
+
+    return yearlyPayments.map(item => ({
+      month: null,
+      year: item.year,
+      revenue: parseFloat(item.revenue)
+    }));
+  }
+
+  /**
+   * Get revenue report by filter (admin only)
+   * Matches .NET API: GetRevenueReportAsync(TimePeriod filter)
+   * TimePeriod enum: Month=0, Year=1
    */
   async getRevenueReportAsync(filter) {
     try {
-      let startDate = new Date();
-      const endDate = new Date();
+      let value;
 
-      switch (filter.toLowerCase()) {
-        case 'daily':
-          startDate.setHours(0, 0, 0, 0);
-          break;
-        case 'weekly':
-          startDate.setDate(startDate.getDate() - 7);
-          break;
-        case 'monthly':
-          startDate.setMonth(startDate.getMonth() - 1);
-          break;
-        case 'yearly':
-          startDate.setFullYear(startDate.getFullYear() - 1);
-          break;
-        default:
-          startDate.setMonth(startDate.getMonth() - 1); // Default to monthly
+      // Support both numeric (0, 1) and string ("Month", "Year", "month", "year")
+      const normalizedFilter = typeof filter === 'string' ? filter.toLowerCase() : filter;
+
+      if (normalizedFilter === 0 || normalizedFilter === 'month') {
+        // Month filter - get monthly report for current year
+        value = await this.getMonthlyRevenueReportAsync(new Date().getFullYear());
+      } else if (normalizedFilter === 1 || normalizedFilter === 'year') {
+        // Year filter - get yearly report
+        value = await this.getYearlyRevenueReportAsync();
+      } else {
+        return Result.failure('Invalid revenue filter value.');
       }
 
-      const payments = await PaymentHistory.findAll({
-        where: {
-          CreatedAt: {
-            [Op.gte]: startDate,
-            [Op.lte]: endDate
-          },
-          Status: 'Success'
-        },
-        order: [['CreatedAt', 'DESC']]
-      });
-
-      const totalRevenue = payments.reduce((sum, payment) => sum + parseFloat(payment.Amount), 0);
-
-      return Result.success({
-        filter: filter,
-        startDate: startDate,
-        endDate: endDate,
-        totalRevenue: totalRevenue,
-        totalTransactions: payments.length,
-        payments: payments
-      });
+      return Result.success(value);
     } catch (error) {
       logger.error('Get revenue report error:', error);
       return Result.failure(error.message || 'Failed to get revenue report');

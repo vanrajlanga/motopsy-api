@@ -23,7 +23,9 @@ class PhysicalVerificationController extends BaseController {
 
   async createAppointment(req, res, next) {
     try {
-      const result = await physicalVerificationService.createAppointmentAsync(req.body);
+      // Pass user email from auth context (matches .NET User.Identity.Name)
+      const userEmail = req.user.email;
+      const result = await physicalVerificationService.createAppointmentAsync(req.body, userEmail);
       return this.fromResult(result, res);
     } catch (error) {
       next(error);
@@ -32,8 +34,9 @@ class PhysicalVerificationController extends BaseController {
 
   async getCount(req, res, next) {
     try {
-      const result = await physicalVerificationService.getCountAsync();
-      return this.fromResult(result, res);
+      const count = await physicalVerificationService.getCountAsync();
+      // .NET returns raw integer, not wrapped in Result
+      return res.status(200).json(count);
     } catch (error) {
       next(error);
     }
@@ -41,8 +44,9 @@ class PhysicalVerificationController extends BaseController {
 
   async getAllVerifications(req, res, next) {
     try {
+      // .NET returns DataSourceResult directly (not wrapped in Result)
       const result = await physicalVerificationService.getAllVerificationsAsync(req.body);
-      return this.fromResult(result, res);
+      return res.status(200).json(result);
     } catch (error) {
       next(error);
     }
@@ -59,8 +63,9 @@ class PhysicalVerificationController extends BaseController {
 
   async getReportById(req, res, next) {
     try {
-      const { id } = req.query;
-      const result = await physicalVerificationService.getReportByIdAsync(parseInt(id));
+      // .NET uses query param 'reportId', not 'id'
+      const { reportId } = req.query;
+      const result = await physicalVerificationService.getReportByIdAsync(parseInt(reportId));
       return this.fromResult(result, res);
     } catch (error) {
       next(error);

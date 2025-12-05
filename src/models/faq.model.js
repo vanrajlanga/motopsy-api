@@ -15,6 +15,11 @@ const Faq = sequelize.define('faqs', {
     type: DataTypes.TEXT,
     allowNull: true
   },
+  Order: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0
+  },
   CreatedAt: {
     type: DataTypes.DATE,
     allowNull: false,

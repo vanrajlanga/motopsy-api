@@ -103,7 +103,7 @@ app.use('/api/vehicleReport', vehicleReportRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/physicalVerification', physicalVerificationRoutes);
 app.use('/api/obv', obvRoutes);
-app.use('/api/useractivitylog', userActivityLogRoutes);
+app.use('/api/UserActivityLog', userActivityLogRoutes);
 
 // 404 handler
 app.use((req, res) => {

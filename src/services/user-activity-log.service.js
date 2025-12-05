@@ -1,24 +1,60 @@
 const UserActivityLog = require('../models/user-activity-log.model');
+const User = require('../models/user.model');
 const { sequelize } = require('../config/database');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
 
 class UserActivityLogService {
+  /**
+   * Get all activity logs grouped by user
+   * Matches .NET API response: List<UserActivityLogResponseDto>
+   * where UserActivityLogResponseDto = { userId, userEmail, activityLogs: ActivityLogDto[] }
+   */
   async getAllAsync() {
     try {
+      // Get all logs with user info
       const logs = await UserActivityLog.findAll({
-        order: [['CreatedAt', 'DESC']],
-        limit: 1000
+        include: [{
+          model: User,
+          as: 'User',
+          attributes: ['Id', 'Email']
+        }],
+        order: [['CreatedAt', 'DESC']]
       });
 
-      return Result.success(logs);
+      // Group by user (matching .NET GroupBy logic)
+      const groupedByUser = {};
+
+      for (const log of logs) {
+        const userId = log.UserId;
+        const userEmail = log.User?.Email || 'Unknown';
+
+        if (!groupedByUser[userId]) {
+          groupedByUser[userId] = {
+            userId: userId,
+            userEmail: userEmail,
+            activityLogs: []
+          };
+        }
+
+        groupedByUser[userId].activityLogs.push({
+          createdAt: log.CreatedAt,
+          logAction: log.Action,
+          logScreen: log.Screen
+        });
+      }
+
+      // Convert to array (matching .NET ToListAsync)
+      const result = Object.values(groupedByUser);
+
+      return Result.success(result);
     } catch (error) {
       logger.error('Get activity logs error:', error);
       return Result.failure(error.message || 'Failed to get activity logs');
     }
   }
 
-  async logActivityAsync(userId, action, details, req) {
+  async logActivityAsync(userId, action, screen, req) {
     try {
       const maxLog = await UserActivityLog.findOne({
         attributes: [[sequelize.fn('MAX', sequelize.col('Id')), 'maxId']],
@@ -30,7 +66,7 @@ class UserActivityLogService {
         Id: nextId,
         UserId: userId,
         Action: action,
-        Details: JSON.stringify(details),
+        Screen: screen,
         IPAddress: req.ip || req.connection.remoteAddress,
         UserAgent: req.get('user-agent'),
         CreatedAt: new Date()

@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "motopsy-api-collection",
 		"name": "Motopsy API - Complete Collection",
-		"description": "Complete API collection for Motopsy Vehicle History Report System\n\nAll 43 endpoints organized by controller.\n\nBase URL: http://localhost:5000\n\nAuthentication: Bearer Token (JWT)\n\nTo use:\n1. First call the login endpoint to get a token\n2. Set the token in the collection variable {{authToken}}\n3. All authenticated endpoints will automatically use the token",
+		"description": "Complete API collection for Motopsy Vehicle History Report System\n\nAll 51 endpoints organized by controller.\n\nBase URL: http://localhost:5000\n\nAuthentication: Bearer Token (JWT)\n\nTo use:\n1. First call the login endpoint to get a token\n2. Set the token in the collection variable {{authToken}}\n3. All authenticated endpoints will automatically use the token",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [
@@ -193,14 +193,23 @@
 								}
 							]
 						},
-						"method": "GET",
-						"header": [],
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"take\": 10,\n  \"skip\": 0,\n  \"sort\": [{\"field\": \"CreatedAt\", \"dir\": \"desc\"}]\n}"
+						},
 						"url": {
 							"raw": "{{baseUrl}}/api/user/get-users",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "user", "get-users"]
 						},
-						"description": "Get all users (Admin only)"
+						"description": "Get all users with Kendo DataSource support (Admin only)"
 					},
 					"response": []
 				},
@@ -307,7 +316,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"currentPassword\": \"OldPassword@123\",\n  \"newPassword\": \"NewPassword@123\"\n}"
+							"raw": "{\n  \"currentPassword\": \"OldPassword@123\",\n  \"newPassword\": \"NewPassword@123\",\n  \"confirmPassword\": \"NewPassword@123\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/user/update-password",
@@ -385,7 +394,55 @@
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "payment", "verify-payment"]
 						},
-						"description": "Verify Razorpay payment signature"
+						"description": "Verify Razorpay payment signature and log activity"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Total Monthly Earning (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payment/total-monthly-earning",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payment", "total-monthly-earning"]
+						},
+						"description": "Get total monthly earning (Admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Pending Payment Count (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payment/pending-payment-count",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payment", "pending-payment-count"]
+						},
+						"description": "Get count of pending payments (Admin only)"
 					},
 					"response": []
 				}
@@ -504,7 +561,7 @@
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "lostCar", "check-stolen", "DL01AB1234"]
 						},
-						"description": "Check if vehicle is stolen (searches 18,784+ records)"
+						"description": "Check if vehicle is stolen - returns boolean (true/false)"
 					},
 					"response": []
 				}
@@ -514,7 +571,31 @@
 			"name": "6. Vehicle Specification",
 			"item": [
 				{
-					"name": "Search Vehicles from Specs",
+					"name": "Get Vehicle Specification by Model",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicleSpecification/Swift",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicleSpecification", "Swift"]
+						},
+						"description": "Get single vehicle specification DTO by model name"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Vehicles from Specs",
 					"request": {
 						"auth": {
 							"type": "bearer",
@@ -535,38 +616,14 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"make\": \"Maruti\",\n  \"model\": \"Swift\",\n  \"fuelType\": \"Petrol\"\n}"
+							"raw": "{\n  \"category\": \"car\",\n  \"make\": \"Maruti\",\n  \"model\": \"Swift\",\n  \"year\": 2020\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/vehicleSpecification/get-vehicles-from-specs",
+							"raw": "{{baseUrl}}/api/vehicleSpecification/vehicles-from-specs",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "vehicleSpecification", "get-vehicles-from-specs"]
+							"path": ["api", "vehicleSpecification", "vehicles-from-specs"]
 						},
-						"description": "Search vehicles from 27,052+ specifications"
-					},
-					"response": []
-				},
-				{
-					"name": "Get Makes and Models",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{authToken}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/api/vehicleSpecification/get-makes-and-models",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "vehicleSpecification", "get-makes-and-models"]
-						},
-						"description": "Get all manufacturers and their models"
+						"description": "Get vehicles from specifications - returns list of makes, models, or years based on provided params"
 					},
 					"response": []
 				}
@@ -588,14 +645,23 @@
 								}
 							]
 						},
-						"method": "GET",
-						"header": [],
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"take\": 10,\n  \"skip\": 0,\n  \"sort\": [{\"field\": \"CreatedAt\", \"dir\": \"desc\"}]\n}"
+						},
 						"url": {
 							"raw": "{{baseUrl}}/api/paymentHistory",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "paymentHistory"]
 						},
-						"description": "Get all payment history (Admin only)"
+						"description": "Get all payment history with Kendo DataSource support (Admin only)"
 					},
 					"response": []
 				}
@@ -727,14 +793,14 @@
 								}
 							]
 						},
-						"method": "GET",
+						"method": "POST",
 						"header": [],
 						"url": {
 							"raw": "{{baseUrl}}/api/vehicleReport/get-vehicle-report/DL01AB1234",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "vehicleReport", "get-vehicle-report", "DL01AB1234"]
 						},
-						"description": "Get comprehensive vehicle report (includes theft check, specs, verification history)"
+						"description": "Get comprehensive vehicle report (includes theft check, specs, verification history) - POST method"
 					},
 					"response": []
 				},
@@ -826,11 +892,41 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/vehicleReport/get-list-of-reports-generated-by-user",
+							"raw": "{{baseUrl}}/api/vehicleReport/get-list-of-reports-generated-by-user?userId=47",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "vehicleReport", "get-list-of-reports-generated-by-user"]
+							"path": ["api", "vehicleReport", "get-list-of-reports-generated-by-user"],
+							"query": [
+								{
+									"key": "userId",
+									"value": "47"
+								}
+							]
 						},
-						"description": "Get all reports generated by logged in user"
+						"description": "Get all reports generated by user (uses query param userId)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Physical Verification Report by Vehicle Report ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicleReport/vehicle-report/1/physical-verification-report",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicleReport", "vehicle-report", "1", "physical-verification-report"]
+						},
+						"description": "Get physical verification report by vehicle report ID"
 					},
 					"response": []
 				},
@@ -853,18 +949,122 @@
 							"mode": "formdata",
 							"formdata": [
 								{
-									"key": "file",
+									"key": "NcrbReport",
 									"type": "file",
 									"src": []
 								}
 							]
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/vehicleReport/upload-ncrb-report",
+							"raw": "{{baseUrl}}/api/vehicleReport/upload-ncrbReport/47",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "vehicleReport", "upload-ncrb-report"]
+							"path": ["api", "vehicleReport", "upload-ncrbReport", "47"]
 						},
-						"description": "Upload NCRB report file (Admin only, PDF/Images, max 10MB)"
+						"description": "Upload NCRB report file with userId path param (Admin only, PDF/Images, max 10MB)"
+					},
+					"response": []
+				},
+				{
+					"name": "Upload and Send Physical Verification Report (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "File",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "PhysicalVerificationId",
+									"value": "1",
+									"type": "text"
+								},
+								{
+									"key": "ToEmail",
+									"value": "user@example.com",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicleReport/upload-and-send-physical-verification-report",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicleReport", "upload-and-send-physical-verification-report"]
+						},
+						"description": "Upload physical verification report and send via email (Admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get NCRB Report by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicleReport/ncrb-report-by-id?ncrbReportId=1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicleReport", "ncrb-report-by-id"],
+							"query": [
+								{
+									"key": "ncrbReportId",
+									"value": "1"
+								}
+							]
+						},
+						"description": "Get NCRB report by ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Physical Verification Report by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicleReport/get-physical-verifications-report-by-id?physicalVerificationId=1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicleReport", "get-physical-verifications-report-by-id"],
+							"query": [
+								{
+									"key": "physicalVerificationId",
+									"value": "1"
+								}
+							]
+						},
+						"description": "Get physical verification report PDF by ID"
 					},
 					"response": []
 				}
@@ -948,14 +1148,14 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"status\": \"Completed\",\n  \"limit\": 10\n}"
+							"raw": "{\n  \"take\": 10,\n  \"skip\": 0,\n  \"sort\": [{\"field\": \"CreatedAt\", \"dir\": \"desc\"}]\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/physicalVerification/get-physical-verifications",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "physicalVerification", "get-physical-verifications"]
 						},
-						"description": "Get physical verifications with filters"
+						"description": "Get physical verifications with Kendo DataSource support"
 					},
 					"response": []
 				},
@@ -1005,7 +1205,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"registrationNumber\": \"DL01AB1234\",\n  \"location\": \"Delhi\",\n  \"appointmentDate\": \"2025-12-15\",\n  \"remarks\": \"Please verify all documents\"\n}"
+							"raw": "{\n  \"name\": \"John Doe\",\n  \"registrationNumber\": \"DL01AB1234\",\n  \"appointmentAt\": \"2025-12-15T10:00:00\",\n  \"status\": \"Pending\",\n  \"address\": \"123 Main Street\",\n  \"city\": \"Delhi\",\n  \"state\": \"Delhi\",\n  \"pincode\": \"110001\",\n  \"country\": \"India\",\n  \"description\": \"Please verify all documents\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/physicalVerification/create-physical-verification-appointment",
@@ -1036,7 +1236,7 @@
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "physicalVerification", "get-physical-verification-count"]
 						},
-						"description": "Get total count of physical verifications (Admin only)"
+						"description": "Get total count of physical verifications - returns raw integer (Admin only)"
 					},
 					"response": []
 				},
@@ -1062,14 +1262,14 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{}"
+							"raw": "{\n  \"take\": 10,\n  \"skip\": 0,\n  \"sort\": [{\"field\": \"CreatedAt\", \"dir\": \"desc\"}]\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/physicalVerification/physical-verifications",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "physicalVerification", "physical-verifications"]
 						},
-						"description": "Get all physical verifications (Admin only)"
+						"description": "Get all physical verifications with Kendo DataSource (Admin only)"
 					},
 					"response": []
 				},
@@ -1089,17 +1289,41 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/physicalVerification/physical-verification-report-by-id?id=1",
+							"raw": "{{baseUrl}}/api/physicalVerification/physical-verification-report-by-id?reportId=1",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "physicalVerification", "physical-verification-report-by-id"],
 							"query": [
 								{
-									"key": "id",
+									"key": "reportId",
 									"value": "1"
 								}
 							]
 						},
-						"description": "Get physical verification report by ID"
+						"description": "Get physical verification report by ID (uses query param reportId)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Verifications by User",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/physicalVerification/by-user",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "physicalVerification", "by-user"]
+						},
+						"description": "Get physical verifications for logged-in user"
 					},
 					"response": []
 				}
@@ -1130,12 +1354,12 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"make\": \"Maruti\",\n  \"model\": \"Swift\",\n  \"year\": 2020,\n  \"variant\": \"VXI\"\n}"
+							"raw": "{\n  \"category\": \"car\",\n  \"make\": \"Maruti\",\n  \"model\": \"Swift\",\n  \"year\": 2020\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/obv/get-enterprise-catalog",
+							"raw": "{{baseUrl}}/api/obv/enterprise-catalog",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "obv", "get-enterprise-catalog"]
+							"path": ["api", "obv", "enterprise-catalog"]
 						},
 						"description": "Get enterprise catalog from Droom API"
 					},
@@ -1163,12 +1387,12 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"make\": \"Maruti\",\n  \"model\": \"Swift\",\n  \"year\": 2020,\n  \"variant\": \"VXI\",\n  \"city\": \"Delhi\",\n  \"kilometers\": 50000,\n  \"registrationYear\": 2020\n}"
+							"raw": "{\n  \"category\": \"car\",\n  \"make\": \"Maruti\",\n  \"model\": \"Swift\",\n  \"year\": 2020,\n  \"variant\": \"VXI\",\n  \"city\": \"Delhi\",\n  \"kmsDriven\": 50000,\n  \"noOfOwners\": 1\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/obv/get-enterprise-used-price-range",
+							"raw": "{{baseUrl}}/api/obv/enterprise-used-price-range",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "obv", "get-enterprise-used-price-range"]
+							"path": ["api", "obv", "enterprise-used-price-range"]
 						},
 						"description": "Get used price range from Droom API"
 					},
@@ -1190,9 +1414,9 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/obv/get-by-vehicle-detail-id?vehicleDetailId=1",
+							"raw": "{{baseUrl}}/api/obv/enterprise-used-price-range-by-vehicle-detail-id?vehicleDetailId=1",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "obv", "get-by-vehicle-detail-id"],
+							"path": ["api", "obv", "enterprise-used-price-range-by-vehicle-detail-id"],
 							"query": [
 								{
 									"key": "vehicleDetailId",
@@ -1225,11 +1449,11 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/useractivitylog",
+							"raw": "{{baseUrl}}/api/UserActivityLog",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "useractivitylog"]
+							"path": ["api", "UserActivityLog"]
 						},
-						"description": "Get all user activity logs (Admin only, last 1000 records)"
+						"description": "Get all user activity logs grouped by user (Admin only)"
 					},
 					"response": []
 				}
