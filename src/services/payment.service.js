@@ -65,36 +65,35 @@ class PaymentService {
    */
   async verifyPayment(request) {
     try {
-      const {
-        razorpay_order_id,
-        razorpay_payment_id,
-        razorpay_signature
-      } = request;
+      // Accept both .NET format (orderId, paymentId, signature) and Razorpay format (razorpay_*)
+      const orderId = request.orderId || request.razorpay_order_id;
+      const paymentId = request.paymentId || request.razorpay_payment_id;
+      const signature = request.signature || request.razorpay_signature;
 
       // Validate required fields
-      if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      if (!orderId || !paymentId || !signature) {
         return Result.failure('Missing payment verification parameters');
       }
 
       // Create signature for verification
-      const body = razorpay_order_id + '|' + razorpay_payment_id;
+      const body = orderId + '|' + paymentId;
       const expectedSignature = crypto
         .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
         .update(body.toString())
         .digest('hex');
 
       // Verify signature
-      const isValid = expectedSignature === razorpay_signature;
+      const isValid = expectedSignature === signature;
 
       if (!isValid) {
-        logger.warn(`Payment verification failed for order: ${razorpay_order_id}`);
+        logger.warn(`Payment verification failed for order: ${orderId}`);
         return Result.failure('Payment verification failed');
       }
 
       // Fetch payment details from Razorpay
-      const payment = await razorpay.payments.fetch(razorpay_payment_id);
+      const payment = await razorpay.payments.fetch(paymentId);
 
-      logger.info(`Payment verified successfully: ${razorpay_payment_id}`);
+      logger.info(`Payment verified successfully: ${paymentId}`);
 
       // TODO: Save payment details to database
       // TODO: Update order status
@@ -102,8 +101,8 @@ class PaymentService {
 
       return Result.success({
         verified: true,
-        paymentId: razorpay_payment_id,
-        orderId: razorpay_order_id,
+        paymentId: paymentId,
+        orderId: orderId,
         amount: payment.amount,
         status: payment.status,
         method: payment.method,

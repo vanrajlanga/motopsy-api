@@ -93,14 +93,24 @@ class UserService {
 
       const user = await User.findOne({
         where: { NormalizedEmail: userEmail.toUpperCase() },
-        attributes: ['Id', 'Email', 'UserName', 'FirstName', 'LastName', 'PhoneNumber', 'EmailConfirmed', 'IsAdmin']
+        attributes: ['Id', 'Email', 'FirstName', 'LastName', 'PhoneNumber', 'IsAdmin', 'CreatedAt']
       });
 
       if (!user) {
         return Result.failure('User not found');
       }
 
-      return Result.success(user);
+      // Transform to match .NET API response format
+      const response = {
+        id: user.Id,
+        name: `${user.FirstName || ''} ${user.LastName || ''}`.trim() || user.Email,
+        emailAddress: user.Email,
+        phoneNumber: user.PhoneNumber,
+        isAdmin: user.IsAdmin,
+        createdAt: user.CreatedAt
+      };
+
+      return Result.success(response);
     } catch (error) {
       logger.error('Get logged in user error:', error);
       return Result.failure(error.message || 'Failed to get user details');
