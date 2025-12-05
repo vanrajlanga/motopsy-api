@@ -150,7 +150,14 @@ class VehicleDetailService {
 
       if (vehicleDetail) {
         logger.info(`Vehicle details found in database: ${registrationNumber}`);
-        return Result.success(this.transformVehicleDetail(vehicleDetail));
+        // Return wrapped response matching .NET GetVehicleDetailsByRcNumberResponse
+        return Result.success({
+          vehicleDetail: this.transformVehicleDetail(vehicleDetail),
+          challanDetails: {
+            challans: [],
+            blacklist: []
+          }
+        });
       }
 
       // Call Surepass API to fetch RC details
@@ -190,7 +197,14 @@ class VehicleDetailService {
       });
 
       logger.info(`Vehicle details fetched and saved: ${registrationNumber}`);
-      return Result.success(this.transformVehicleDetail(vehicleDetail));
+      // Return wrapped response matching .NET GetVehicleDetailsByRcNumberResponse
+      return Result.success({
+        vehicleDetail: this.transformVehicleDetail(vehicleDetail),
+        challanDetails: {
+          challans: [],
+          blacklist: []
+        }
+      });
     } catch (error) {
       logger.error('Get vehicle details error:', error);
       return Result.failure(error.message || 'Failed to get vehicle details');
