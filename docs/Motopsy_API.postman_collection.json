@@ -378,7 +378,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"orderId\": \"order_xyz123\",\n  \"paymentId\": \"pay_abc456\",\n  \"signature\": \"signature_string\"\n}"
+							"raw": "{\n  \"razorpayPaymentId\": \"pay_RnwRtsc1B7fMqn\",\n  \"razorpayOrderId\": \"order_RnwRgshcDbk76q\",\n  \"razorpaySignature\": \"d3ad5221bf000b7fe7266065243189f00cad04f8e115f090215e9309f09df52e\",\n  \"paymentHistoryId\": 2,\n  \"registrationNumber\": \"GJ03MR4048\",\n  \"make\": null,\n  \"model\": null,\n  \"year\": null,\n  \"trim\": null,\n  \"kmsDriven\": null,\n  \"city\": null,\n  \"noOfOwners\": null,\n  \"version\": null,\n  \"transactionType\": null,\n  \"customerType\": null\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/payment/verify-payment",

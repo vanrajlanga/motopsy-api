@@ -100,16 +100,16 @@ class PaymentService {
       // Log request for debugging
       logger.info('Verify payment request:', JSON.stringify(request));
 
-      // Accept both .NET format (orderId, paymentId, signature) and Razorpay format (razorpay_*)
-      const orderId = request.orderId || request.razorpay_order_id;
-      const paymentId = request.paymentId || request.razorpay_payment_id;
-      const signature = request.signature || request.razorpay_signature;
+      // Accept multiple formats: .NET (RazorpayOrderId), camelCase (razorpayOrderId), snake_case (razorpay_order_id)
+      const orderId = request.RazorpayOrderId || request.razorpayOrderId || request.razorpay_order_id || request.orderId;
+      const paymentId = request.RazorpayPaymentId || request.razorpayPaymentId || request.razorpay_payment_id || request.paymentId;
+      const signature = request.RazorpaySignature || request.razorpaySignature || request.razorpay_signature || request.signature;
 
       // Validate required fields with specific error messages
       const missingFields = [];
-      if (!orderId) missingFields.push('orderId/razorpay_order_id');
-      if (!paymentId) missingFields.push('paymentId/razorpay_payment_id');
-      if (!signature) missingFields.push('signature/razorpay_signature');
+      if (!orderId) missingFields.push('razorpayOrderId');
+      if (!paymentId) missingFields.push('razorpayPaymentId');
+      if (!signature) missingFields.push('razorpaySignature');
 
       if (missingFields.length > 0) {
         const errorMsg = `Missing required fields: ${missingFields.join(', ')}`;
