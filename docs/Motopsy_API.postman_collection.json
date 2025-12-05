@@ -626,7 +626,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"registrationNumber\": \"DL01AB1234\",\n  \"userId\": 47\n}"
+							"raw": "{\n  \"registrationNumber\": \"DL01AB1234\",\n  \"make\": \"MARUTI SUZUKI\",\n  \"model\": \"SWIFT\",\n  \"version\": \"VXI\",\n  \"vehicleDetailRequestId\": 0,\n  \"userId\": 47\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/vehicle-detail",
