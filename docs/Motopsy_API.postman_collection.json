@@ -1,0 +1,1253 @@
+{
+	"info": {
+		"_postman_id": "motopsy-api-collection",
+		"name": "Motopsy API - Complete Collection",
+		"description": "Complete API collection for Motopsy Vehicle History Report System\n\nAll 43 endpoints organized by controller.\n\nBase URL: http://localhost:5000\n\nAuthentication: Bearer Token (JWT)\n\nTo use:\n1. First call the login endpoint to get a token\n2. Set the token in the collection variable {{authToken}}\n3. All authenticated endpoints will automatically use the token",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000",
+			"type": "string"
+		},
+		{
+			"key": "authToken",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "1. Account",
+			"item": [
+				{
+					"name": "Register",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"testuser@example.com\",\n  \"password\": \"Test@123456\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"phoneNumber\": \"9876543210\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/account/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "account", "register"]
+						},
+						"description": "Register a new user account"
+					},
+					"response": []
+				},
+				{
+					"name": "Confirm Email",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": 47,\n  \"code\": \"your-email-confirmation-code-here\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/account/email/confirm",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "account", "email", "confirm"]
+						},
+						"description": "Confirm user email address using userId and confirmation code"
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.accessToken) {",
+									"        pm.collectionVariables.set(\"authToken\", jsonData.data.accessToken);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"newuser@motopsy.com\",\n  \"password\": \"Test@123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/account/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "account", "login"]
+						},
+						"description": "Login and get JWT token (automatically saved to collection variable)"
+					},
+					"response": []
+				},
+				{
+					"name": "Forgot Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"testuser@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/account/forgot-password",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "account", "forgot-password"]
+						},
+						"description": "Request password reset email"
+					},
+					"response": []
+				},
+				{
+					"name": "Reset Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"token\": \"your-reset-token-here\",\n  \"newPassword\": \"NewPassword@123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/account/reset-password",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "account", "reset-password"]
+						},
+						"description": "Reset password with token"
+					},
+					"response": []
+				},
+				{
+					"name": "Contact Us",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"message\": \"I have a question about your service.\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/account/contact-us",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "account", "contact-us"]
+						},
+						"description": "Send contact form message"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2. User",
+			"item": [
+				{
+					"name": "Get All Users (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/user/get-users",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "user", "get-users"]
+						},
+						"description": "Get all users (Admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Total User Count (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/user/total-user-count",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "user", "total-user-count"]
+						},
+						"description": "Get total count of users (Admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Logged In User",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/user/get-logged-in-user",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "user", "get-logged-in-user"]
+						},
+						"description": "Get current logged in user details"
+					},
+					"response": []
+				},
+				{
+					"name": "Update User",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"Updated\",\n  \"lastName\": \"Name\",\n  \"phoneNumber\": \"9876543210\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/user/update-user",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "user", "update-user"]
+						},
+						"description": "Update user profile"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Password",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"currentPassword\": \"OldPassword@123\",\n  \"newPassword\": \"NewPassword@123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/user/update-password",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "user", "update-password"]
+						},
+						"description": "Update user password"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "3. Payment",
+			"item": [
+				{
+					"name": "Create Razorpay Order",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"amount\": 799,\n  \"currency\": \"INR\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/payment/create-order",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payment", "create-order"]
+						},
+						"description": "Create Razorpay payment order"
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Payment",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"orderId\": \"order_xyz123\",\n  \"paymentId\": \"pay_abc456\",\n  \"signature\": \"signature_string\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/payment/verify-payment",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payment", "verify-payment"]
+						},
+						"description": "Verify Razorpay payment signature"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "4. FAQ",
+			"item": [
+				{
+					"name": "Get All FAQs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/faq",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "faq"]
+						},
+						"description": "Get all frequently asked questions"
+					},
+					"response": []
+				},
+				{
+					"name": "Get FAQ by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/faq/6",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "faq", "6"]
+						},
+						"description": "Get specific FAQ by ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Create FAQ (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"question\": \"What is vehicle history report?\",\n  \"answer\": \"A vehicle history report provides comprehensive information about a vehicle's past.\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/faq",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "faq"]
+						},
+						"description": "Create new FAQ (Admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete FAQ (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/faq/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "faq", "1"]
+						},
+						"description": "Delete FAQ by ID (Admin only)"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "5. Lost Car",
+			"item": [
+				{
+					"name": "Check Stolen Status",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/lostCar/check-stolen/DL01AB1234",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "lostCar", "check-stolen", "DL01AB1234"]
+						},
+						"description": "Check if vehicle is stolen (searches 18,784+ records)"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "6. Vehicle Specification",
+			"item": [
+				{
+					"name": "Search Vehicles from Specs",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"make\": \"Maruti\",\n  \"model\": \"Swift\",\n  \"fuelType\": \"Petrol\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicleSpecification/get-vehicles-from-specs",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicleSpecification", "get-vehicles-from-specs"]
+						},
+						"description": "Search vehicles from 27,052+ specifications"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Makes and Models",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicleSpecification/get-makes-and-models",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicleSpecification", "get-makes-and-models"]
+						},
+						"description": "Get all manufacturers and their models"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "7. Payment History",
+			"item": [
+				{
+					"name": "Get Payment History (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/paymentHistory",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "paymentHistory"]
+						},
+						"description": "Get all payment history (Admin only)"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "8. Vehicle Detail",
+			"item": [
+				{
+					"name": "Get Vehicle Details by RC",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"registrationNumber\": \"DL01AB1234\",\n  \"userId\": 47\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicle-detail",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicle-detail"]
+						},
+						"description": "Get vehicle details using Surepass API (RC verification)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Vehicle Detail by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicle-detail/vehicle-detail-by-id/1/47",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicle-detail", "vehicle-detail-by-id", "1", "47"]
+						},
+						"description": "Get vehicle detail by ID and user ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Failed Reports (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicle-detail/paid-vehicle-detail-failed-reports",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicle-detail", "paid-vehicle-detail-failed-reports"]
+						},
+						"description": "Get all failed vehicle detail reports (Admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Pending Reports",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicle-detail/pending-reports",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicle-detail", "pending-reports"]
+						},
+						"description": "Get all pending vehicle detail reports"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "9. Vehicle Report",
+			"item": [
+				{
+					"name": "Get Vehicle Report",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicleReport/get-vehicle-report/DL01AB1234",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicleReport", "get-vehicle-report", "DL01AB1234"]
+						},
+						"description": "Get comprehensive vehicle report (includes theft check, specs, verification history)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Vehicle History Report (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicleReport/get-vehicle-history-report",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicleReport", "get-vehicle-history-report"]
+						},
+						"description": "Get all vehicle history reports (Admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Physical Verification Reports (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicleReport/get-physical-verification-reports",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicleReport", "get-physical-verification-reports"]
+						},
+						"description": "Get all physical verification reports (Admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Report Count (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicleReport/get-vehicle-history-report-count",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicleReport", "get-vehicle-history-report-count"]
+						},
+						"description": "Get total count of vehicle history reports (Admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Reports",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicleReport/get-list-of-reports-generated-by-user",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicleReport", "get-list-of-reports-generated-by-user"]
+						},
+						"description": "Get all reports generated by logged in user"
+					},
+					"response": []
+				},
+				{
+					"name": "Upload NCRB Report (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/vehicleReport/upload-ncrb-report",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "vehicleReport", "upload-ncrb-report"]
+						},
+						"description": "Upload NCRB report file (Admin only, PDF/Images, max 10MB)"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "10. Dashboard",
+			"item": [
+				{
+					"name": "Get Monthly Earning (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/dashboard/total-monthly-earning",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "dashboard", "total-monthly-earning"]
+						},
+						"description": "Get total monthly earning (Admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Revenue Report (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/dashboard/revenue-report/monthly",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "dashboard", "revenue-report", "monthly"]
+						},
+						"description": "Get revenue report by filter (daily/weekly/monthly/yearly) (Admin only)"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "11. Physical Verification",
+			"item": [
+				{
+					"name": "Get Physical Verifications",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"Completed\",\n  \"limit\": 10\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/physicalVerification/get-physical-verifications",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "physicalVerification", "get-physical-verifications"]
+						},
+						"description": "Get physical verifications with filters"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Verification by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/physicalVerification/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "physicalVerification", "1"]
+						},
+						"description": "Get physical verification by ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Verification Appointment",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"registrationNumber\": \"DL01AB1234\",\n  \"location\": \"Delhi\",\n  \"appointmentDate\": \"2025-12-15\",\n  \"remarks\": \"Please verify all documents\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/physicalVerification/create-physical-verification-appointment",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "physicalVerification", "create-physical-verification-appointment"]
+						},
+						"description": "Create new physical verification appointment"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Verification Count (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/physicalVerification/get-physical-verification-count",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "physicalVerification", "get-physical-verification-count"]
+						},
+						"description": "Get total count of physical verifications (Admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Verifications (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/physicalVerification/physical-verifications",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "physicalVerification", "physical-verifications"]
+						},
+						"description": "Get all physical verifications (Admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Report by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/physicalVerification/physical-verification-report-by-id?id=1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "physicalVerification", "physical-verification-report-by-id"],
+							"query": [
+								{
+									"key": "id",
+									"value": "1"
+								}
+							]
+						},
+						"description": "Get physical verification report by ID"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "12. OBV (Online Bike/Car Valuation)",
+			"item": [
+				{
+					"name": "Get Enterprise Catalog",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"make\": \"Maruti\",\n  \"model\": \"Swift\",\n  \"year\": 2020,\n  \"variant\": \"VXI\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/obv/get-enterprise-catalog",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "obv", "get-enterprise-catalog"]
+						},
+						"description": "Get enterprise catalog from Droom API"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Used Price Range",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"make\": \"Maruti\",\n  \"model\": \"Swift\",\n  \"year\": 2020,\n  \"variant\": \"VXI\",\n  \"city\": \"Delhi\",\n  \"kilometers\": 50000,\n  \"registrationYear\": 2020\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/obv/get-enterprise-used-price-range",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "obv", "get-enterprise-used-price-range"]
+						},
+						"description": "Get used price range from Droom API"
+					},
+					"response": []
+				},
+				{
+					"name": "Get OBV by Vehicle Detail ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/obv/get-by-vehicle-detail-id?vehicleDetailId=1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "obv", "get-by-vehicle-detail-id"],
+							"query": [
+								{
+									"key": "vehicleDetailId",
+									"value": "1"
+								}
+							]
+						},
+						"description": "Get OBV (Online Bike/Car Valuation) by vehicle detail ID"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "13. User Activity Log",
+			"item": [
+				{
+					"name": "Get All Activity Logs (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/useractivitylog",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "useractivitylog"]
+						},
+						"description": "Get all user activity logs (Admin only, last 1000 records)"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/health",
+					"host": ["{{baseUrl}}"],
+					"path": ["health"]
+				},
+				"description": "Check if API server is running"
+			},
+			"response": []
+		}
+	]
+}
