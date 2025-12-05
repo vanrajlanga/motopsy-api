@@ -23,13 +23,18 @@ const authenticate = (req, res, next) => {
     // Verify token
     const decoded = verifyToken(token);
 
+    // Extract email from unique_name (matching .NET format)
+    const email = decoded.unique_name || decoded.email;
+    const userId = decoded.sub || decoded.userId;
+    const isAdmin = decoded.isAdmin === 'True' || decoded.isAdmin === true;
+
     // Attach user info to request
     req.user = {
-      email: decoded.email,
-      userId: decoded.userId,
-      isAdmin: decoded.isAdmin,
+      email: email,
+      userId: userId,
+      isAdmin: isAdmin,
       identity: {
-        name: decoded.email
+        name: email
       }
     };
 
@@ -76,12 +81,17 @@ const optionalAuth = (req, res, next) => {
       const token = authHeader.substring(7);
       const decoded = verifyToken(token);
 
+      // Extract email from unique_name (matching .NET format)
+      const email = decoded.unique_name || decoded.email;
+      const userId = decoded.sub || decoded.userId;
+      const isAdmin = decoded.isAdmin === 'True' || decoded.isAdmin === true;
+
       req.user = {
-        email: decoded.email,
-        userId: decoded.userId,
-        isAdmin: decoded.isAdmin,
+        email: email,
+        userId: userId,
+        isAdmin: isAdmin,
         identity: {
-          name: decoded.email
+          name: email
         }
       };
     }

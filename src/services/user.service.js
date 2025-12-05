@@ -86,6 +86,11 @@ class UserService {
    */
   async getLoggedInUserAsync(userEmail) {
     try {
+      // Validate userEmail
+      if (!userEmail) {
+        return Result.failure('User email is required');
+      }
+
       const user = await User.findOne({
         where: { NormalizedEmail: userEmail.toUpperCase() },
         attributes: ['Id', 'Email', 'UserName', 'FirstName', 'LastName', 'PhoneNumber', 'EmailConfirmed', 'IsAdmin']
