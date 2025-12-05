@@ -2,6 +2,12 @@ const VehicleDetail = require('../models/vehicle-detail.model');
 const VehicleDetailRequest = require('../models/vehicle-detail-request.model');
 const PaymentHistory = require('../models/payment-history.model');
 const User = require('../models/user.model');
+const VehicleChallanDetail = require('../models/vehicle-challan-detail.model');
+const NcrbReport = require('../models/ncrb-report.model');
+const StateMapping = require('../models/state-mapping.model');
+const UserVehicleDetail = require('../models/user-vehicle-detail.model');
+const LostVehicle = require('../models/lost-vehicle.model');
+const VehicleSpecification = require('../models/vehicle-specification.model');
 const { sequelize } = require('../config/database');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
@@ -213,24 +219,158 @@ class VehicleDetailService {
 
   /**
    * Get vehicle detail by ID and user ID
+   * Returns VehicleHistoryReportDetailDto matching .NET API
    */
   async getVehicleDetailByIdAsync(id, userId) {
     try {
-      const vehicleDetail = await VehicleDetail.findOne({
-        where: {
-          Id: id,
-          UserId: userId
-        }
-      });
+      // Get vehicle detail by ID (not restricted by userId in .NET)
+      const vehicleDetail = await VehicleDetail.findByPk(id);
 
       if (!vehicleDetail) {
         return Result.failure('Vehicle detail not found');
       }
 
-      return Result.success(this.transformVehicleDetail(vehicleDetail));
+      // Get challan details for this vehicle
+      const challanDetails = await VehicleChallanDetail.findAll({
+        where: { VehicleDetailId: id },
+        order: [['ChallanDate', 'DESC']]
+      });
+
+      // Check if vehicle is lost
+      const lostVehicle = await LostVehicle.findOne({
+        where: { RegistrationNumber: vehicleDetail.RegistrationNumber }
+      });
+
+      // Get NCRB report if exists
+      const ncrbReport = await NcrbReport.findOne({
+        where: { VehicleDetailId: id }
+      });
+
+      // Get state from registration number
+      const stateCode = vehicleDetail.RegistrationNumber ? vehicleDetail.RegistrationNumber.substring(0, 2) : '';
+      const stateMapping = await StateMapping.findOne({
+        where: { StateCode: stateCode }
+      });
+
+      // Get user vehicle detail for createdAt timestamp
+      const userVehicleDetail = await UserVehicleDetail.findOne({
+        where: { VehicleDetailId: id, UserId: userId }
+      });
+
+      // Calculate vehicle age from ManufacturingDateFormatted
+      const vehicleAge = this.calculateVehicleAge(vehicleDetail.ManufacturingDateFormatted);
+
+      // Get vehicle specification (if available)
+      let vehicleSpecification = null;
+      if (vehicleDetail.Manufacturer && vehicleDetail.Model) {
+        vehicleSpecification = await VehicleSpecification.findOne({
+          where: {
+            naming_make: vehicleDetail.Manufacturer,
+            naming_model: vehicleDetail.Model
+          }
+        });
+      }
+
+      // Transform challan details to match .NET VehicleChallanDetailDto
+      const transformedChallans = challanDetails.map(challan => ({
+        id: challan.Id,
+        challanNumber: challan.ChallanNumber,
+        challanDate: challan.ChallanDate,
+        violationType: challan.ViolationType,
+        amount: challan.Amount ? parseFloat(challan.Amount) : null,
+        status: challan.Status
+      }));
+
+      // Transform vehicle specification to match .NET VehicleSpecificationDto
+      const transformedSpec = vehicleSpecification ? {
+        make: vehicleSpecification.naming_make,
+        model: vehicleSpecification.naming_model,
+        version: vehicleSpecification.naming_version,
+        price: vehicleSpecification.naming_price,
+        keyPrice: vehicleSpecification.keydata_key_price,
+        mileageArai: vehicleSpecification.keydata_key_mileage_arai,
+        engine: vehicleSpecification.keydata_key_engine,
+        transmission: vehicleSpecification.keydata_key_transmission,
+        fuelType: vehicleSpecification.keydata_key_fueltype,
+        seatingCapacity: vehicleSpecification.keydata_key_seatingcapacity,
+        engineDetails: vehicleSpecification.enginetransmission_engine,
+        maxPower: vehicleSpecification.enginetransmission_maxpower,
+        maxTorque: vehicleSpecification.enginetransmission_maxtorque,
+        length: vehicleSpecification.dimensionweight_length,
+        width: vehicleSpecification.dimensionweight_width,
+        height: vehicleSpecification.dimensionweight_height,
+        wheelbase: vehicleSpecification.dimensionweight_wheelbase,
+        bootspace: vehicleSpecification.capacity_bootspace,
+        description: vehicleSpecification.Description,
+        fastTag: ''
+      } : null;
+
+      // Return response matching .NET VehicleHistoryReportDetailDto
+      const response = {
+        ncrbReportAvailable: ncrbReport !== null,
+        ncrbReportId: ncrbReport ? ncrbReport.Id : null,
+        lostVehicle: lostVehicle !== null,
+        vehicleAge: vehicleAge,
+        vehicleDetail: this.transformVehicleDetail(vehicleDetail),
+        vehicleChallanDetails: transformedChallans,
+        vehicleSpecification: transformedSpec,
+        createdAt: userVehicleDetail ? userVehicleDetail.CreatedAt : vehicleDetail.CreatedAt,
+        state: stateMapping ? stateMapping.StateName : ''
+      };
+
+      return Result.success(response);
     } catch (error) {
       logger.error('Get vehicle detail by ID error:', error);
       return Result.failure(error.message || 'Failed to get vehicle detail');
+    }
+  }
+
+  /**
+   * Calculate vehicle age from manufacturing date formatted string
+   * Matches .NET GetCurrentAgeOfVehicle method
+   */
+  calculateVehicleAge(manufacturingDateFormatted) {
+    if (!manufacturingDateFormatted) {
+      return '';
+    }
+
+    try {
+      // Parse date - format could be "MM/YYYY" or similar
+      let manufacturingDate;
+      if (manufacturingDateFormatted.includes('/')) {
+        const parts = manufacturingDateFormatted.split('/');
+        if (parts.length === 2) {
+          // MM/YYYY format
+          manufacturingDate = new Date(parseInt(parts[1]), parseInt(parts[0]) - 1, 1);
+        }
+      } else {
+        manufacturingDate = new Date(manufacturingDateFormatted);
+      }
+
+      if (isNaN(manufacturingDate.getTime())) {
+        return '';
+      }
+
+      const now = new Date();
+      let years = now.getFullYear() - manufacturingDate.getFullYear();
+      let months = now.getMonth() - manufacturingDate.getMonth();
+
+      if (months < 0) {
+        years--;
+        months += 12;
+      }
+
+      if (years > 0 && months > 0) {
+        return `${years} year${years > 1 ? 's' : ''} ${months} month${months > 1 ? 's' : ''}`;
+      } else if (years > 0) {
+        return `${years} year${years > 1 ? 's' : ''}`;
+      } else if (months > 0) {
+        return `${months} month${months > 1 ? 's' : ''}`;
+      }
+      return '';
+    } catch (error) {
+      logger.error('Error calculating vehicle age:', error);
+      return '';
     }
   }
 
