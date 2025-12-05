@@ -109,8 +109,10 @@ class VehicleDetailService {
    * Get vehicle details by registration number (RC number)
    * This would normally call external API (Surepass/Droom)
    * Matches .NET API GetVehicleDetailsByRcNumberRequest format
+   * @param {Object} request - The request object with vehicle details
+   * @param {string} userEmail - User email from auth context (matches .NET User.Identity.Name)
    */
-  async getVehicleDetailsByRCAsync(request) {
+  async getVehicleDetailsByRCAsync(request, userEmail) {
     try {
       const {
         registrationNumber,
@@ -124,6 +126,22 @@ class VehicleDetailService {
       if (!registrationNumber) {
         return Result.failure('Registration number is required');
       }
+
+      // Get user - matches .NET logic: if userId not provided, get user from email
+      let user;
+      if (!userId || userId === 0) {
+        user = await User.findOne({
+          where: { NormalizedEmail: userEmail.toUpperCase() }
+        });
+      } else {
+        user = await User.findByPk(userId);
+      }
+
+      if (!user) {
+        return Result.failure('User not found');
+      }
+
+      const resolvedUserId = user.Id;
 
       // Check if vehicle details already exist in database
       let vehicleDetail = await VehicleDetail.findOne({
@@ -152,7 +170,7 @@ class VehicleDetailService {
 
       vehicleDetail = await VehicleDetail.create({
         Id: nextId,
-        UserId: userId,
+        UserId: resolvedUserId,
         RegistrationNumber: rcData.registrationNumber,
         OwnerName: rcData.ownerName,
         VehicleClass: rcData.vehicleClass,

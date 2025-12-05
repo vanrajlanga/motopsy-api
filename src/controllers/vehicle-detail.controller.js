@@ -4,10 +4,13 @@ const vehicleDetailService = require('../services/vehicle-detail.service');
 class VehicleDetailController extends BaseController {
   /**
    * POST /api/vehicle-detail - Get vehicle details by RC number
+   * Matches .NET: GetVehicleDetailsByRcNumber(request, User.Identity.Name)
    */
   async getVehicleDetails(req, res, next) {
     try {
-      const result = await vehicleDetailService.getVehicleDetailsByRCAsync(req.body);
+      // Pass user email from auth context (matches .NET User.Identity.Name)
+      const userEmail = req.user.email;
+      const result = await vehicleDetailService.getVehicleDetailsByRCAsync(req.body, userEmail);
       return this.fromResult(result, res);
     } catch (error) {
       next(error);
