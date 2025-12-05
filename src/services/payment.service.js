@@ -2,6 +2,9 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
+const PaymentHistory = require('../models/payment-history.model');
+const User = require('../models/user.model');
+const { sequelize } = require('../config/database');
 require('dotenv').config();
 
 // Initialize Razorpay instance
@@ -13,6 +16,7 @@ const razorpay = new Razorpay({
 class PaymentService {
   /**
    * Create Razorpay order
+   * Matches .NET API CreateOrder implementation
    */
   async createOrder(request, userEmail) {
     try {
@@ -23,36 +27,64 @@ class PaymentService {
         return Result.failure('Amount is required');
       }
 
-      if (!paymentFor && paymentFor !== 0) {
+      if (paymentFor === undefined || paymentFor === null) {
         return Result.failure('PaymentFor is required');
       }
 
-      // Use provided amount or default from config
-      const orderAmount = amount || parseInt(process.env.RAZORPAY_AMOUNT) || 799;
+      // Validate amount matches configured amount
+      const configuredAmount = parseInt(process.env.RAZORPAY_AMOUNT) || 799;
+      if (amount !== configuredAmount) {
+        return Result.failure('Amount does not match');
+      }
 
+      // Find user
+      const user = await User.findOne({
+        where: { NormalizedEmail: userEmail.toUpperCase() }
+      });
+
+      if (!user) {
+        return Result.failure('User not found');
+      }
+
+      // Create Razorpay order
       const options = {
-        amount: orderAmount * 100, // Amount in paise (multiply by 100)
+        amount: amount * 100, // Amount in paise (multiply by 100)
         currency: currency,
-        receipt: `order_${Date.now()}`,
-        payment_capture: 1, // Auto capture
-        notes: {
-          paymentFor: paymentFor,
-          userEmail: userEmail
-        }
+        payment_capture: 1 // Auto capture
       };
 
       const order = await razorpay.orders.create(options);
 
-      logger.info(`Razorpay order created for ${userEmail}: ${order.id}, paymentFor: ${paymentFor}`);
+      if (!order || !order.id) {
+        logger.error('Razorpay order creation returned null or invalid order');
+        return Result.failure('Failed to create payment order');
+      }
 
+      // Get next available ID for PaymentHistory
+      const maxPayment = await PaymentHistory.findOne({
+        attributes: [[sequelize.fn('MAX', sequelize.col('Id')), 'maxId']],
+        raw: true
+      });
+      const nextId = (maxPayment && maxPayment.maxId) ? maxPayment.maxId + 1 : 1;
+
+      // Create PaymentHistory record
+      const paymentHistory = await PaymentHistory.create({
+        Id: nextId,
+        UserId: user.Id,
+        Amount: amount,
+        PaymentFor: paymentFor,
+        Status: 0, // Pending
+        OrderId: order.id,
+        PaymentDate: new Date(),
+        CreatedAt: new Date()
+      });
+
+      logger.info(`Razorpay order created for ${userEmail}: ${order.id}, paymentFor: ${paymentFor}, paymentHistoryId: ${paymentHistory.Id}`);
+
+      // Return response matching .NET API format
       return Result.success({
         orderId: order.id,
-        amount: order.amount,
-        currency: order.currency,
-        receipt: order.receipt,
-        status: order.status,
-        paymentFor: paymentFor,
-        createdAt: order.created_at
+        paymentHistoryId: paymentHistory.Id
       });
     } catch (error) {
       logger.error('Create order error:', error);
@@ -65,14 +97,24 @@ class PaymentService {
    */
   async verifyPayment(request) {
     try {
+      // Log request for debugging
+      logger.info('Verify payment request:', JSON.stringify(request));
+
       // Accept both .NET format (orderId, paymentId, signature) and Razorpay format (razorpay_*)
       const orderId = request.orderId || request.razorpay_order_id;
       const paymentId = request.paymentId || request.razorpay_payment_id;
       const signature = request.signature || request.razorpay_signature;
 
-      // Validate required fields
-      if (!orderId || !paymentId || !signature) {
-        return Result.failure('Missing payment verification parameters');
+      // Validate required fields with specific error messages
+      const missingFields = [];
+      if (!orderId) missingFields.push('orderId/razorpay_order_id');
+      if (!paymentId) missingFields.push('paymentId/razorpay_payment_id');
+      if (!signature) missingFields.push('signature/razorpay_signature');
+
+      if (missingFields.length > 0) {
+        const errorMsg = `Missing required fields: ${missingFields.join(', ')}`;
+        logger.error(`Payment verification error: ${errorMsg}`);
+        return Result.failure(errorMsg);
       }
 
       // Create signature for verification

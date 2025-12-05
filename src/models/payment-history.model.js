@@ -15,21 +15,34 @@ const PaymentHistory = sequelize.define('paymenthistories', {
     type: DataTypes.DECIMAL(18, 2),
     allowNull: false
   },
-  OrderId: {
-    type: DataTypes.STRING(255),
-    allowNull: true
+  PaymentFor: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    comment: '0=VehicleHistoryReport, 1=PhysicalVerification'
   },
-  PaymentId: {
-    type: DataTypes.STRING(255),
-    allowNull: true
-  },
-  Signature: {
-    type: DataTypes.STRING(500),
-    allowNull: true
+  Method: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: '0=Card, 1=Netbanking, 2=Wallet, 3=PayLater, 4=UPI'
   },
   Status: {
-    type: DataTypes.STRING(50),
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    comment: '0=Pending, 1=Successful, 2=Failed, 3=NotVerified, 4=Refunded'
+  },
+  OrderId: {
+    type: DataTypes.STRING(255),
+    allowNull: false
+  },
+  TransactionId: {
+    type: DataTypes.STRING(255),
     allowNull: true
+  },
+  PaymentDate: {
+    type: DataTypes.DATE,
+    allowNull: false,
+    defaultValue: DataTypes.NOW
   },
   CreatedAt: {
     type: DataTypes.DATE,

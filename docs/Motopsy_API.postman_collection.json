@@ -345,7 +345,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"amount\": 799,\n  \"currency\": \"INR\"\n}"
+							"raw": "{\n  \"amount\": 799,\n  \"paymentFor\": 0\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/payment/create-order",
