@@ -40,34 +40,54 @@ class VehicleDetailService {
   }
 
   /**
+   * Mask sensitive string data - matches .NET HideSensitiveStringHelper
+   * Shows first 5 and last 5 characters, masks the middle
+   */
+  maskSensitiveString(str) {
+    if (!str || str.length <= 10) return str;
+    const first = str.substring(0, 5);
+    const last = str.substring(str.length - 5);
+    const masked = '*'.repeat(Math.min(str.length - 10, 10));
+    return `${first}${masked}${last}`;
+  }
+
+  /**
    * Transform vehicle detail from database format (PascalCase) to API format (camelCase)
-   * Matches .NET API VehicleDetailDto response format
+   * Matches .NET API VehicleDetailDto response format with sensitive data masking
    */
   transformVehicleDetail(vehicleDetail) {
     if (!vehicleDetail) return null;
 
     const data = vehicleDetail.toJSON ? vehicleDetail.toJSON() : vehicleDetail;
 
+    // Mask sensitive fields - matches .NET HideSensitiveStringsInVehicleDetails
+    const maskedOwnerName = this.maskSensitiveString(data.OwnerName);
+    const maskedFatherName = this.maskSensitiveString(data.FatherName);
+    const maskedPresentAddress = this.maskSensitiveString(data.PresentAddress);
+    const maskedPermanentAddress = this.maskSensitiveString(data.PermanentAddress);
+    const maskedMobileNumber = data.MobileNumber ?
+      data.MobileNumber.substring(0, 2) + '******' + data.MobileNumber.slice(-2) : null;
+
     return {
       id: data.Id,
       clientId: data.ClientId || '',
       rcNumber: data.RegistrationNumber,
       registrationDate: data.RegistrationDate,
-      ownerName: data.OwnerName,
-      fatherName: data.FatherName || null,
-      presentAddress: data.PresentAddress || null,
-      permanentAddress: data.PermanentAddress || null,
-      mobileNumber: data.MobileNumber || null,
+      ownerName: maskedOwnerName,
+      fatherName: maskedFatherName || null,
+      presentAddress: maskedPresentAddress || null,
+      permanentAddress: maskedPermanentAddress || null,
+      mobileNumber: maskedMobileNumber || null,
       vehicleCategory: data.VehicleCategory || null,
       vehicleChassisNumber: data.ChassisNumber,
       vehicleEngineNumber: data.EngineNumber,
-      makerDescription: data.Manufacturer || null,
-      makerModel: data.Model || null,
+      makerDescription: data.MakerDescription || data.Manufacturer || null,
+      makerModel: data.MakerModel || data.Model || null,
       bodyType: data.BodyType || null,
       fuelType: data.FuelType,
       color: data.Color || '',
       normsType: data.NormsType || null,
-      fitUpTo: data.FitnessValidUpto || '',
+      fitUpTo: data.FitUpTo || '',
       financer: data.Financer || null,
       financed: data.Financed || false,
       insuranceCompany: data.InsuranceCompany || null,
@@ -90,7 +110,7 @@ class VehicleDetailService {
       unladenWeight: data.UnladenWeight || null,
       vehicleCategoryDescription: data.VehicleCategoryDescription || null,
       puccNumber: data.PUCCNumber || null,
-      puccUpto: data.PUCValidUpto || null,
+      puccUpto: data.PUCCUpto || null,
       permitNumber: data.PermitNumber || null,
       permitIssueDate: data.PermitIssueDate || null,
       permitValidFrom: data.PermitValidFrom || null,
@@ -160,14 +180,14 @@ class VehicleDetailService {
         return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId));
       }
 
-      // Call Surepass API to fetch RC details
-      const rcResult = await surepassService.verifyRCAsync(registrationNumber);
+      // Call Surepass API to fetch full RC details (uses rc-full endpoint)
+      const rcResult = await surepassService.getRegistrationDetailsAsync(registrationNumber);
 
       if (!rcResult.isSuccess) {
         return Result.failure(rcResult.error);
       }
 
-      // Save vehicle details to database
+      // Save vehicle details to database with ALL fields from Surepass
       const rcData = rcResult.value;
       const maxVehicle = await VehicleDetail.findOne({
         attributes: [[sequelize.fn('MAX', sequelize.col('Id')), 'maxId']],
@@ -175,28 +195,109 @@ class VehicleDetailService {
       });
       const nextId = (maxVehicle && maxVehicle.maxId) ? maxVehicle.maxId + 1 : 1;
 
+      // Parse registration date
+      let registrationDate = null;
+      if (rcData.registrationDate) {
+        try {
+          registrationDate = new Date(rcData.registrationDate);
+          if (isNaN(registrationDate.getTime())) {
+            registrationDate = null;
+          }
+        } catch (e) {
+          registrationDate = null;
+        }
+      }
+
       vehicleDetail = await VehicleDetail.create({
         Id: nextId,
         UserId: resolvedUserId,
-        RegistrationNumber: rcData.registrationNumber,
+        VehicleDetailRequestId: vehicleDetailRequestId || null,
+        // All Surepass rc-full fields
+        ClientId: rcData.clientId,
+        RegistrationNumber: rcData.rcNumber,
+        RegistrationDate: registrationDate,
         OwnerName: rcData.ownerName,
-        VehicleClass: rcData.vehicleClass,
+        FatherName: rcData.fatherName,
+        PresentAddress: rcData.presentAddress,
+        PermanentAddress: rcData.permanentAddress,
+        MobileNumber: rcData.mobileNumber,
+        VehicleCategory: rcData.vehicleCategory,
+        ChassisNumber: rcData.vehicleChassisNumber,
+        EngineNumber: rcData.vehicleEngineNumber,
+        MakerDescription: rcData.makerDescription,
+        MakerModel: rcData.makerModel,
+        // Also set legacy fields for backward compatibility
+        Manufacturer: rcData.makerDescription,
+        Model: rcData.makerModel,
+        BodyType: rcData.bodyType,
         FuelType: rcData.fuelType,
-        Manufacturer: rcData.manufacturer,
-        Model: rcData.model,
-        RegistrationDate: rcData.registrationDate,
-        RegisteredAt: rcData.registeredAt,
-        ChassisNumber: rcData.chassisNumber,
-        EngineNumber: rcData.engineNumber,
+        Color: rcData.color,
+        NormsType: rcData.normsType,
+        FitUpTo: rcData.fitUpTo,
+        Financer: rcData.financer,
+        Financed: rcData.financed,
         InsuranceCompany: rcData.insuranceCompany,
-        InsuranceValidUpto: rcData.insuranceValidUpto,
-        FitnessValidUpto: rcData.fitnessValidUpto,
-        PUCValidUpto: rcData.pucValidUpto,
+        InsurancePolicyNumber: rcData.insurancePolicyNumber,
+        InsuranceValidUpto: rcData.insuranceUpto,
+        ManufacturingDate: rcData.manufacturingDate,
+        ManufacturingDateFormatted: rcData.manufacturingDateFormatted,
+        RegisteredAt: rcData.registeredAt,
+        LatestBy: rcData.latestBy,
+        LessInfo: rcData.lessInfo,
+        TaxUpto: rcData.taxUpto,
+        TaxPaidUpto: rcData.taxPaidUpto,
+        CubicCapacity: rcData.cubicCapacity,
+        VehicleGrossWeight: rcData.vehicleGrossWeight,
+        NoCylinders: rcData.noCylinders,
+        SeatCapacity: rcData.seatCapacity,
+        SleeperCapacity: rcData.sleeperCapacity,
+        StandingCapacity: rcData.standingCapacity,
+        Wheelbase: rcData.wheelbase,
+        UnladenWeight: rcData.unladenWeight,
+        VehicleCategoryDescription: rcData.vehicleCategoryDescription,
+        PUCCNumber: rcData.puccNumber,
+        PUCCUpto: rcData.puccUpto,
+        PermitNumber: rcData.permitNumber,
+        PermitIssueDate: rcData.permitIssueDate,
+        PermitValidFrom: rcData.permitValidFrom,
+        PermitValidUpto: rcData.permitValidUpto,
+        PermitType: rcData.permitType,
+        NationalPermitNumber: rcData.nationalPermitNumber,
+        NationalPermitUpto: rcData.nationalPermitUpto,
+        NationalPermitIssuedBy: rcData.nationalPermitIssuedBy,
+        NonUseStatus: rcData.nonUseStatus,
+        NonUseFrom: rcData.nonUseFrom,
+        NonUseTo: rcData.nonUseTo,
+        BlacklistStatus: rcData.blacklistStatus,
+        NocDetails: rcData.nocDetails,
+        OwnerNumber: rcData.ownerNumber,
+        RcStatus: rcData.rcStatus,
+        MaskedName: rcData.maskedName,
+        ChallanDetails: rcData.challanDetails,
+        Variant: rcData.variant,
         Status: 'Completed',
         CreatedAt: new Date()
       });
 
-      logger.info(`Vehicle details fetched and saved: ${registrationNumber}`);
+      logger.info(`Vehicle details fetched and saved with all fields: ${registrationNumber}`);
+
+      // Also fetch and save challan details
+      if (rcData.vehicleChassisNumber && rcData.vehicleEngineNumber) {
+        try {
+          const challanResult = await surepassService.getChallanDetailsAsync(
+            rcData.vehicleChassisNumber,
+            rcData.vehicleEngineNumber,
+            registrationNumber
+          );
+          if (challanResult.isSuccess && challanResult.value.challans.length > 0) {
+            await this.saveChallanDetails(vehicleDetail.Id, challanResult.value.challans);
+          }
+        } catch (challanError) {
+          logger.error('Error fetching challan details:', challanError);
+          // Continue without challans - not critical
+        }
+      }
+
       // Return full response matching frontend expectations
       return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId));
     } catch (error) {
@@ -328,6 +429,52 @@ class VehicleDetailService {
     } catch (error) {
       logger.error('Get vehicle detail by ID error:', error);
       return Result.failure(error.message || 'Failed to get vehicle detail');
+    }
+  }
+
+  /**
+   * Save challan details from Surepass API
+   * Matches .NET ChallanService.SaveChallanDetailsAsync
+   */
+  async saveChallanDetails(vehicleDetailId, challans) {
+    try {
+      for (const challan of challans) {
+        // Check if challan already exists
+        const existing = await VehicleChallanDetail.findOne({
+          where: {
+            VehicleDetailId: vehicleDetailId,
+            ChallanNumber: challan.challan_number
+          }
+        });
+
+        if (!existing) {
+          const maxChallan = await VehicleChallanDetail.findOne({
+            attributes: [[sequelize.fn('MAX', sequelize.col('Id')), 'maxId']],
+            raw: true
+          });
+          const nextId = (maxChallan && maxChallan.maxId) ? maxChallan.maxId + 1 : 1;
+
+          await VehicleChallanDetail.create({
+            Id: nextId,
+            VehicleDetailId: vehicleDetailId,
+            ChallanNumber: challan.challan_number,
+            ChallanDate: challan.challan_date,
+            ChallanPlace: challan.challan_place,
+            State: challan.state,
+            Rto: challan.rto,
+            OffenseDetails: challan.offense_details,
+            AccusedName: challan.accused_name,
+            Amount: challan.amount,
+            Status: challan.challan_status,
+            CourtChallan: challan.court_challan,
+            UpstreamCode: challan.upstream_code,
+            CreatedAt: new Date()
+          });
+        }
+      }
+      logger.info(`Saved ${challans.length} challan details for vehicle ${vehicleDetailId}`);
+    } catch (error) {
+      logger.error('Error saving challan details:', error);
     }
   }
 

@@ -13,14 +13,16 @@ class SurepassService {
   }
 
   /**
-   * Verify RC (Registration Certificate) details
+   * Get full RC (Registration Certificate) details
+   * Uses rc-full endpoint for complete vehicle information (50+ fields)
+   * Matches .NET API ISurepassService.GetRegistrationDetailsAsync()
    */
-  async verifyRCAsync(registrationNumber) {
+  async getRegistrationDetailsAsync(registrationNumber) {
     try {
-      logger.info(`Surepass RC verification for: ${registrationNumber}`);
+      logger.info(`Surepass RC full details for: ${registrationNumber}`);
 
       const response = await axios.post(
-        `${this.apiUrl}/rc/rc`,
+        `${this.apiUrl}/rc/rc-full`,
         {
           id_number: registrationNumber.replace(/\s/g, '').toUpperCase()
         },
@@ -30,29 +32,74 @@ class SurepassService {
       if (response.data.success) {
         const data = response.data.data;
 
+        // Map all fields from Surepass API (matches .NET VehicleRcResponse)
         return Result.success({
-          verified: true,
-          registrationNumber: data.rc_number,
-          ownerName: data.owner_name,
-          vehicleClass: data.vehicle_class,
-          fuelType: data.fuel_type,
-          manufacturer: data.maker_model,
-          model: data.model,
+          clientId: data.client_id || '',
+          rcNumber: data.rc_number,
           registrationDate: data.registration_date,
-          registeredAt: data.registered_at,
-          chassisNumber: data.chassis_number,
-          engineNumber: data.engine_number,
-          insuranceCompany: data.insurance_company,
-          insuranceValidUpto: data.insurance_upto,
-          fitnessValidUpto: data.fitness_upto,
-          pucValidUpto: data.puc_upto,
+          ownerName: data.owner_name,
+          fatherName: data.father_name || null,
+          presentAddress: data.present_address || null,
+          permanentAddress: data.permanent_address || null,
+          mobileNumber: data.mobile_number || null,
+          vehicleCategory: data.vehicle_category || null,
+          vehicleChassisNumber: data.vehicle_chasi_number || null,
+          vehicleEngineNumber: data.vehicle_engine_number || null,
+          makerDescription: data.maker_description || null,
+          makerModel: data.maker_model || null,
+          bodyType: data.body_type || null,
+          fuelType: data.fuel_type || null,
+          color: data.color || '',
+          normsType: data.norms_type || null,
+          fitUpTo: data.fit_up_to || null,
+          financer: data.financer || null,
+          financed: data.financed || false,
+          insuranceCompany: data.insurance_company || null,
+          insurancePolicyNumber: data.insurance_policy_number || null,
+          insuranceUpto: data.insurance_upto || null,
+          manufacturingDate: data.manufacturing_date || null,
+          manufacturingDateFormatted: data.manufacturing_date_formatted || null,
+          registeredAt: data.registered_at || null,
+          latestBy: data.latest_by || null,
+          lessInfo: data.less_info || false,
+          taxUpto: data.tax_upto || null,
+          taxPaidUpto: data.tax_paid_upto || null,
+          cubicCapacity: data.cubic_capacity || null,
+          vehicleGrossWeight: data.vehicle_gross_weight || null,
+          noCylinders: data.no_cylinders || null,
+          seatCapacity: data.seat_capacity || null,
+          sleeperCapacity: data.sleeper_capacity || null,
+          standingCapacity: data.standing_capacity || null,
+          wheelbase: data.wheelbase || null,
+          unladenWeight: data.unladen_weight || null,
+          vehicleCategoryDescription: data.vehicle_category_description || null,
+          puccNumber: data.pucc_number || null,
+          puccUpto: data.pucc_upto || null,
+          permitNumber: data.permit_number || null,
+          permitIssueDate: data.permit_issue_date || null,
+          permitValidFrom: data.permit_valid_from || null,
+          permitValidUpto: data.permit_valid_upto || null,
+          permitType: data.permit_type || null,
+          nationalPermitNumber: data.national_permit_number || null,
+          nationalPermitUpto: data.national_permit_upto || null,
+          nationalPermitIssuedBy: data.national_permit_issued_by || null,
+          nonUseStatus: data.non_use_status || null,
+          nonUseFrom: data.non_use_from || null,
+          nonUseTo: data.non_use_to || null,
+          blacklistStatus: data.blacklist_status || null,
+          nocDetails: data.noc_details || null,
+          ownerNumber: data.owner_number || null,
+          rcStatus: data.rc_status || null,
+          maskedName: data.masked_name || null,
+          challanDetails: data.challan_details || null,
+          variant: data.variant || null,
           rawData: data
         });
       } else {
         return Result.failure(response.data.message || 'RC verification failed');
       }
     } catch (error) {
-      logger.error('Surepass RC verification error:', error);
+      logger.error('Surepass RC full details error:', error);
 
       if (error.response) {
         return Result.failure(error.response.data.message || 'RC verification failed');
@@ -60,6 +107,59 @@ class SurepassService {
 
       return Result.failure(error.message || 'RC verification service unavailable');
     }
+  }
+
+  /**
+   * Get challan details for a vehicle
+   * Matches .NET API ISurepassService.GetChallanDetailsAsync()
+   */
+  async getChallanDetailsAsync(chassisNumber, engineNumber, registrationNumber) {
+    try {
+      logger.info(`Surepass challan details for: ${registrationNumber}`);
+
+      const response = await axios.post(
+        `${this.apiUrl}/rc/rc-related/challan-details`,
+        {
+          chassis_no: chassisNumber,
+          engine_no: engineNumber,
+          rc_number: registrationNumber.replace(/\s/g, '').toUpperCase()
+        },
+        { headers: this.headers }
+      );
+
+      if (response.data.success) {
+        const data = response.data.data;
+        return Result.success({
+          challans: data.challans || [],
+          totalPending: data.total_pending || 0,
+          totalAmount: data.total_amount || 0
+        });
+      } else {
+        // Challan not found is not an error - return empty array
+        return Result.success({
+          challans: [],
+          totalPending: 0,
+          totalAmount: 0
+        });
+      }
+    } catch (error) {
+      logger.error('Surepass challan details error:', error);
+      // Return empty challans on error (not critical)
+      return Result.success({
+        challans: [],
+        totalPending: 0,
+        totalAmount: 0
+      });
+    }
+  }
+
+  /**
+   * Verify RC (Registration Certificate) details - basic endpoint
+   * @deprecated Use getRegistrationDetailsAsync for full details
+   */
+  async verifyRCAsync(registrationNumber) {
+    // Redirect to full details endpoint
+    return this.getRegistrationDetailsAsync(registrationNumber);
   }
 
   /**

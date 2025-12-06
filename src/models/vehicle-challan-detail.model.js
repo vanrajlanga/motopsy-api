@@ -1,6 +1,10 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
+/**
+ * VehicleChallanDetail model - matches .NET VehicleChallanDetail entity
+ * Contains all fields from Surepass challan API response
+ */
 const VehicleChallanDetail = sequelize.define('vehiclechallandetails', {
   Id: {
     type: DataTypes.INTEGER,
@@ -16,10 +20,26 @@ const VehicleChallanDetail = sequelize.define('vehiclechallandetails', {
     allowNull: true
   },
   ChallanDate: {
-    type: DataTypes.DATE,
+    type: DataTypes.STRING(100),
     allowNull: true
   },
-  ViolationType: {
+  ChallanPlace: {
+    type: DataTypes.STRING(500),
+    allowNull: true
+  },
+  State: {
+    type: DataTypes.STRING(100),
+    allowNull: true
+  },
+  Rto: {
+    type: DataTypes.STRING(255),
+    allowNull: true
+  },
+  OffenseDetails: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  AccusedName: {
     type: DataTypes.STRING(500),
     allowNull: true
   },
@@ -29,6 +49,20 @@ const VehicleChallanDetail = sequelize.define('vehiclechallandetails', {
   },
   Status: {
     type: DataTypes.STRING(100),
+    allowNull: true
+  },
+  CourtChallan: {
+    type: DataTypes.BOOLEAN,
+    allowNull: true,
+    defaultValue: false
+  },
+  UpstreamCode: {
+    type: DataTypes.STRING(100),
+    allowNull: true
+  },
+  // Legacy field for backward compatibility
+  ViolationType: {
+    type: DataTypes.STRING(500),
     allowNull: true
   },
   CreatedAt: {
