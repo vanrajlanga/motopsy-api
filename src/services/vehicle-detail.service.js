@@ -726,14 +726,31 @@ class VehicleDetailService {
   /**
    * Extract model name from description
    * E.g., "SELTOS G1.5 6MT HTE" -> "Seltos"
+   * E.g., "TATA PUNCH ADV 1.2P MT BS6PH2" -> "Punch" (skip brand name)
    */
   extractModelFromDescription(description) {
     if (!description) return null;
 
-    // Common model name patterns - get first word
-    const firstWord = description.split(/\s+/)[0];
-    // Capitalize properly (e.g., "SELTOS" -> "Seltos")
-    return firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
+    const words = description.split(/\s+/);
+    if (words.length === 0) return null;
+
+    // Brand names that appear in MakerModel - if first word matches, use second word
+    const brandPrefixes = ['TATA', 'MARUTI', 'MAHINDRA', 'HYUNDAI', 'HONDA', 'TOYOTA',
+                           'FORD', 'VOLKSWAGEN', 'SKODA', 'RENAULT', 'NISSAN', 'MG',
+                           'JEEP', 'MERCEDES', 'BMW', 'AUDI', 'JAGUAR', 'CHEVROLET',
+                           'FIAT', 'DATSUN', 'ISUZU', 'FORCE', 'EICHER', 'HERO',
+                           'BAJAJ', 'TVS', 'ROYAL', 'YAMAHA', 'SUZUKI', 'KAWASAKI',
+                           'KTM', 'HARLEY', 'DUCATI', 'TRIUMPH', 'BENELLI', 'APRILIA'];
+
+    let modelWord = words[0];
+
+    // Check if first word is a brand prefix - if so, use second word as model
+    if (words.length > 1 && brandPrefixes.includes(words[0].toUpperCase())) {
+      modelWord = words[1];
+    }
+
+    // Capitalize properly (e.g., "SELTOS" -> "Seltos", "PUNCH" -> "Punch")
+    return modelWord.charAt(0).toUpperCase() + modelWord.slice(1).toLowerCase();
   }
 
   /**
