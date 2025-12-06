@@ -3,8 +3,10 @@ const logger = require('../config/logger');
 const resaleValueService = require('./resale-value.service');
 const surepassService = require('./surepass.service');
 const VehicleDetail = require('../models/vehicle-detail.model');
+const VehicleSpecification = require('../models/vehicle-specification.model');
 const User = require('../models/user.model');
 const StateMapping = require('../models/state-mapping.model');
+const { Op } = require('sequelize');
 
 class ObvService {
   /**
@@ -126,8 +128,97 @@ class ObvService {
   }
 
   /**
+   * Parse price string to number
+   * Handles Indian number formats like "? 10,49,000.00" (10.49 lakh) or "Rs. 10,00,000" or "1000000"
+   * Note: Indian format uses commas every 2 digits after first 3 (e.g., 10,49,000 = 1049000)
+   */
+  parsePriceString(priceStr) {
+    if (!priceStr) return null;
+
+    // Remove currency symbols and spaces first
+    let cleanedPrice = priceStr
+      .replace(/[₹?]/g, '')        // Remove rupee symbols (? is often used for ₹)
+      .replace(/Rs\.?/gi, '')      // Remove "Rs" or "Rs."
+      .replace(/\s/g, '')          // Remove spaces
+      .trim();
+
+    // Remove all commas (Indian format: 10,49,000.00 -> 1049000.00)
+    cleanedPrice = cleanedPrice.replace(/,/g, '');
+
+    const price = parseFloat(cleanedPrice);
+    return isNaN(price) ? null : price;
+  }
+
+  /**
+   * Look up ex-showroom price from VehicleSpecification table
+   * Uses fuzzy matching on make, model, and optionally variant
+   */
+  async lookupPriceFromSpecifications(make, model, variant = null) {
+    try {
+      logger.info(`Looking up price from specifications: ${make} ${model} ${variant || ''}`);
+
+      // Build search conditions
+      const whereConditions = {
+        price_breakdown_ex_showroom_price: {
+          [Op.and]: [
+            { [Op.ne]: null },
+            { [Op.ne]: '' }
+          ]
+        }
+      };
+
+      // Try exact make match first
+      let specs = await VehicleSpecification.findAll({
+        where: {
+          ...whereConditions,
+          naming_make: {
+            [Op.like]: `%${make}%`
+          },
+          naming_model: {
+            [Op.like]: `%${model}%`
+          }
+        },
+        limit: 10,
+        order: [['Id', 'DESC']] // Get latest entries first
+      });
+
+      // If variant provided, filter further
+      if (specs.length > 0 && variant) {
+        const variantSpecs = specs.filter(s =>
+          s.naming_version && s.naming_version.toLowerCase().includes(variant.toLowerCase())
+        );
+        if (variantSpecs.length > 0) {
+          specs = variantSpecs;
+        }
+      }
+
+      if (specs.length === 0) {
+        logger.info(`No specifications found for ${make} ${model}`);
+        return null;
+      }
+
+      // Get the first matching spec's price
+      const spec = specs[0];
+      const priceStr = spec.price_breakdown_ex_showroom_price;
+      const price = this.parsePriceString(priceStr);
+
+      if (price) {
+        logger.info(`Found ex-showroom price from specifications: ₹${price} for ${spec.naming_make} ${spec.naming_model} ${spec.naming_version}`);
+        return price;
+      }
+
+      return null;
+    } catch (error) {
+      logger.error('Error looking up price from specifications:', error);
+      return null;
+    }
+  }
+
+  /**
    * Fetch and store ex-showroom price if not already stored
-   * Only calls Surepass API if ExShowroomPrice is null
+   * 1. First checks if already stored in VehicleDetail
+   * 2. Then looks up from VehicleSpecification table
+   * 3. Falls back to Surepass API if not found locally
    */
   async fetchAndStoreExShowroomPrice(vehicleDetail) {
     try {
@@ -151,18 +242,27 @@ class ObvService {
 
       logger.info(`Fetching ex-showroom price for ${make} ${model} ${variant}...`);
 
-      // Call Surepass Vehicle Price Check API
-      const priceResult = await surepassService.getVehiclePriceAsync({
-        vehicleName: make,
-        model: model,
-        variant: variant,
-        color: color,
-        fuelType: fuelType
-      });
+      // Step 1: Try to look up from VehicleSpecification table (local database)
+      let exShowroomPrice = await this.lookupPriceFromSpecifications(make, model, variant);
 
-      if (priceResult.isSuccess && priceResult.value.exShowroomPrice) {
-        const exShowroomPrice = parseFloat(priceResult.value.exShowroomPrice);
+      // Step 2: If not found locally, try Surepass API as fallback
+      if (!exShowroomPrice) {
+        logger.info(`Price not found in local DB, trying Surepass API for ${make} ${model}...`);
 
+        const priceResult = await surepassService.getVehiclePriceAsync({
+          vehicleName: make,
+          model: model,
+          variant: variant,
+          color: color,
+          fuelType: fuelType
+        });
+
+        if (priceResult.isSuccess && priceResult.value.exShowroomPrice) {
+          exShowroomPrice = parseFloat(priceResult.value.exShowroomPrice);
+        }
+      }
+
+      if (exShowroomPrice) {
         // Store in database
         await VehicleDetail.update(
           { ExShowroomPrice: exShowroomPrice },
@@ -238,6 +338,40 @@ class ObvService {
       if (!year) {
         logger.warn('Year not available for price range calculation');
         return Result.success(null);
+      }
+
+      // If originalPrice not provided, try to fetch from local DB first, then Surepass API
+      if (!originalPrice || originalPrice <= 0) {
+        logger.info(`Original price not provided, attempting to fetch for ${make} ${model}...`);
+
+        // Step 1: Try local VehicleSpecification lookup
+        originalPrice = await this.lookupPriceFromSpecifications(make, model, trim);
+
+        // Step 2: If not found locally, try Surepass API as fallback
+        if (!originalPrice) {
+          logger.info(`Price not found in local DB, trying Surepass API for ${make} ${model}...`);
+
+          const priceResult = await surepassService.getVehiclePriceAsync({
+            vehicleName: make,
+            model: model,
+            variant: trim || '',
+            color: '',
+            fuelType: ''
+          });
+
+          if (priceResult.isSuccess && priceResult.value.exShowroomPrice) {
+            originalPrice = parseFloat(priceResult.value.exShowroomPrice);
+            logger.info(`Fetched ex-showroom price from Surepass: ₹${originalPrice}`);
+          }
+        }
+
+        // Store in database if we have vehicleDetail and found a price
+        if (originalPrice && vehicleDetail) {
+          await VehicleDetail.update(
+            { ExShowroomPrice: originalPrice },
+            { where: { Id: vehicleDetail.Id } }
+          );
+        }
       }
 
       // If still no original price, cannot calculate

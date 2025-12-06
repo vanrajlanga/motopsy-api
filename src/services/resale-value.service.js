@@ -267,7 +267,11 @@ class ResaleValueService {
     if (!ownerNumber || ownerNumber < 1) return 0;
 
     const owner = Math.min(ownerNumber, 5);
-    return this.ownerPenalties[owner] || 0.10;
+    // Use hasOwnProperty check because ownerPenalties[1] = 0, and 0 || 0.10 = 0.10 (bug!)
+    if (this.ownerPenalties.hasOwnProperty(owner)) {
+      return this.ownerPenalties[owner];
+    }
+    return 0.10; // Default for unknown owner numbers
   }
 
   /**
