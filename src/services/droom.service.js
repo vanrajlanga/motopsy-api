@@ -38,7 +38,8 @@ class DroomService {
         {
           headers: {
             'Content-Type': 'application/json'
-          }
+          },
+          timeout: 15000 // 15 second timeout for auth
         }
       );
 
@@ -58,12 +59,18 @@ class DroomService {
    * Get enterprise catalog (list of vehicles)
    * Matches .NET API format using form-urlencoded
    */
-  async getEnterpriseCatalogAsync(request) {
+  async getEnterpriseCatalogAsync(request, retryCount = 0) {
     try {
+      // Check if Droom credentials are configured
+      if (!this.clientId || !this.clientSecret || !this.username || !this.password) {
+        logger.warn('Droom API credentials not configured');
+        return Result.failure('Droom API credentials not configured');
+      }
+
       const token = await this.authenticateAsync();
       const { category, make, model, year } = request;
 
-      logger.info(`Fetching Droom enterprise catalog for ${make} ${model}...`);
+      logger.info(`Fetching Droom enterprise catalog for category=${category}, make=${make}, model=${model}...`);
 
       // Build form data matching .NET API
       const formData = new URLSearchParams();
@@ -79,25 +86,32 @@ class DroomService {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/x-www-form-urlencoded'
-          }
+          },
+          timeout: 30000 // 30 second timeout
         }
       );
 
-      // Check for auth error
+      // Check for auth error - only retry once
       if (response.data && response.data.message &&
-          response.data.message.includes('authorization header is mandatory')) {
+          response.data.message.includes('authorization header is mandatory') &&
+          retryCount < 1) {
         this.accessToken = null;
         this.tokenExpiry = null;
-        return this.getEnterpriseCatalogAsync(request);
+        return this.getEnterpriseCatalogAsync(request, retryCount + 1);
       }
 
       if (response.data) {
+        logger.info(`Droom catalog response: ${JSON.stringify(response.data).substring(0, 200)}...`);
         return Result.success(response.data);
       }
 
       return Result.failure('No vehicles found in catalog');
     } catch (error) {
       logger.error('Droom get catalog error:', error.response?.data || error.message);
+
+      if (error.code === 'ECONNABORTED') {
+        return Result.failure('Droom API request timed out');
+      }
 
       if (error.response) {
         return Result.failure(error.response.data?.message || 'Failed to fetch catalog');
