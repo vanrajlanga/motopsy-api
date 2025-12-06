@@ -2,6 +2,7 @@ const Result = require('../utils/result');
 const logger = require('../config/logger');
 const resaleValueService = require('./resale-value.service');
 const surepassService = require('./surepass.service');
+const droomService = require('./droom.service');
 const VehicleDetail = require('../models/vehicle-detail.model');
 const VehicleSpecification = require('../models/vehicle-specification.model');
 const User = require('../models/user.model');
@@ -478,6 +479,14 @@ class ObvService {
       logger.error('Get OBV by vehicle detail ID error:', error);
       return Result.failure(error.message || 'Failed to get OBV');
     }
+  }
+
+  /**
+   * Get enterprise catalog (list of vehicles)
+   * Delegates to Droom service
+   */
+  async getEnterpriseCatalogAsync(request) {
+    return droomService.getEnterpriseCatalogAsync(request);
   }
 }
 
