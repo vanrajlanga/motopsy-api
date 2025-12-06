@@ -123,6 +123,15 @@ ALTER TABLE vehiclechallandetails MODIFY COLUMN ChallanDate VARCHAR(100) NULL;
 ALTER TABLE VehicleDetails MODIFY COLUMN BlacklistStatus TEXT NULL;
 
 -- ============================================
+-- 7. VehicleDetails - Add ExShowroomPrice for resale value calculation
+-- Added: 2025-12-06
+-- Stores original ex-showroom price from Surepass Vehicle Price Check API
+-- Used for custom resale value calculation (replacing Droom API)
+-- ============================================
+ALTER TABLE VehicleDetails
+ADD COLUMN IF NOT EXISTS ExShowroomPrice DECIMAL(12,2) NULL;
+
+-- ============================================
 -- Verification Queries
 -- ============================================
 -- DESCRIBE UserActivityLogs;

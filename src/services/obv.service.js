@@ -1,6 +1,7 @@
 const Result = require('../utils/result');
 const logger = require('../config/logger');
-const droomService = require('./droom.service');
+const resaleValueService = require('./resale-value.service');
+const surepassService = require('./surepass.service');
 const VehicleDetail = require('../models/vehicle-detail.model');
 const User = require('../models/user.model');
 const StateMapping = require('../models/state-mapping.model');
@@ -8,7 +9,7 @@ const StateMapping = require('../models/state-mapping.model');
 class ObvService {
   /**
    * Make name mapping - same as vehicle-detail.service.js
-   * Maps Surepass MakerDescription to Droom make name
+   * Maps Surepass MakerDescription to make name
    */
   extractMakeFromDescription(description) {
     if (!description) return null;
@@ -86,6 +87,23 @@ class ObvService {
   }
 
   /**
+   * Extract state from city string
+   * E.g., "RAJKOT, Gujarat" -> "Gujarat"
+   */
+  extractStateFromCity(city) {
+    if (!city) return null;
+
+    // Check if city contains comma (e.g., "RAJKOT, Gujarat")
+    if (city.includes(',')) {
+      const parts = city.split(',');
+      return parts[parts.length - 1].trim();
+    }
+
+    // Return as-is if no comma
+    return city.trim();
+  }
+
+  /**
    * Extract year from ManufacturingDateFormatted or RegistrationDate
    */
   extractYear(vehicleDetail) {
@@ -107,39 +125,79 @@ class ObvService {
     return null;
   }
 
-  async getEnterpriseCatalogAsync(request) {
+  /**
+   * Fetch and store ex-showroom price if not already stored
+   * Only calls Surepass API if ExShowroomPrice is null
+   */
+  async fetchAndStoreExShowroomPrice(vehicleDetail) {
     try {
-      logger.info('Enterprise catalog requested');
-
-      // Call Droom API to get enterprise catalog
-      const catalogResult = await droomService.getEnterpriseCatalogAsync(request);
-
-      if (!catalogResult.isSuccess) {
-        return catalogResult;
+      // Check if price already stored
+      if (vehicleDetail.ExShowroomPrice && parseFloat(vehicleDetail.ExShowroomPrice) > 0) {
+        logger.info(`Ex-showroom price already stored: ₹${vehicleDetail.ExShowroomPrice}`);
+        return parseFloat(vehicleDetail.ExShowroomPrice);
       }
 
-      return Result.success(catalogResult.value);
+      // Extract vehicle info for price lookup
+      const make = this.extractMakeFromDescription(vehicleDetail.MakerDescription || vehicleDetail.Manufacturer);
+      const model = this.extractModelFromDescription(vehicleDetail.MakerModel || vehicleDetail.Model);
+      const variant = vehicleDetail.Variant || '';
+      const fuelType = vehicleDetail.FuelType || '';
+      const color = vehicleDetail.Color || '';
+
+      if (!make || !model) {
+        logger.warn('Cannot fetch price: make/model not available');
+        return null;
+      }
+
+      logger.info(`Fetching ex-showroom price for ${make} ${model} ${variant}...`);
+
+      // Call Surepass Vehicle Price Check API
+      const priceResult = await surepassService.getVehiclePriceAsync({
+        vehicleName: make,
+        model: model,
+        variant: variant,
+        color: color,
+        fuelType: fuelType
+      });
+
+      if (priceResult.isSuccess && priceResult.value.exShowroomPrice) {
+        const exShowroomPrice = parseFloat(priceResult.value.exShowroomPrice);
+
+        // Store in database
+        await VehicleDetail.update(
+          { ExShowroomPrice: exShowroomPrice },
+          { where: { Id: vehicleDetail.Id } }
+        );
+
+        logger.info(`Stored ex-showroom price: ₹${exShowroomPrice} for vehicle ${vehicleDetail.Id}`);
+        return exShowroomPrice;
+      }
+
+      logger.warn(`Could not fetch ex-showroom price for ${make} ${model}`);
+      return null;
     } catch (error) {
-      logger.error('Get enterprise catalog error:', error);
-      return Result.failure(error.message || 'Failed to get enterprise catalog');
+      logger.error('Error fetching/storing ex-showroom price:', error);
+      return null;
     }
   }
 
   /**
-   * Get enterprise used price range - matches .NET ObvService.GetEnterpriseUsedPriceRangeAsync
-   * Uses provided make/model or extracts from vehicleDetail if vehicleDetailId is provided
+   * Get enterprise used price range using custom calculation
+   * Replaces Droom API with internal algorithm
    */
   async getEnterpriseUsedPriceRangeAsync(request, userEmail) {
     try {
       logger.info(`Used price range requested by user: ${userEmail}`);
 
-      let { make, model, year, trim, kmsDriven, city, noOfOwners, vehicleDetailId, transactionType, customerType } = request;
+      let { make, model, year, trim, kmsDriven, city, noOfOwners, vehicleDetailId, originalPrice } = request;
+      let vehicleDetail = null;
+      let stateCode = null;
 
-      // If vehicleDetailId provided but make/model missing, extract from vehicle detail
-      if (vehicleDetailId && (!make || !model)) {
-        const vehicleDetail = await VehicleDetail.findByPk(vehicleDetailId);
+      // If vehicleDetailId provided, fetch vehicle details
+      if (vehicleDetailId) {
+        vehicleDetail = await VehicleDetail.findByPk(vehicleDetailId);
         if (vehicleDetail) {
-          // Use provided values first, then extract from Surepass data
+          // Extract values from vehicle detail if not provided
           if (!make) {
             make = this.extractMakeFromDescription(vehicleDetail.MakerDescription || vehicleDetail.Manufacturer);
           }
@@ -152,14 +210,21 @@ class ObvService {
           if (!trim) {
             trim = vehicleDetail.Variant || '';
           }
+          if (!noOfOwners) {
+            noOfOwners = vehicleDetail.OwnerNumber || '1';
+          }
+
+          // Get state code from registration number
+          stateCode = vehicleDetail.RegistrationNumber ? vehicleDetail.RegistrationNumber.substring(0, 2) : '';
+
           if (!city) {
-            // Get city from registration number state code
-            const stateCode = vehicleDetail.RegistrationNumber ? vehicleDetail.RegistrationNumber.substring(0, 2) : '';
             const stateMapping = await StateMapping.findOne({ where: { StateCode: stateCode } });
             city = stateMapping ? stateMapping.StateCapital : 'Delhi';
           }
-          if (!noOfOwners) {
-            noOfOwners = vehicleDetail.OwnerNumber || '1';
+
+          // Fetch ex-showroom price if not provided
+          if (!originalPrice) {
+            originalPrice = await this.fetchAndStoreExShowroomPrice(vehicleDetail);
           }
         }
       }
@@ -167,34 +232,41 @@ class ObvService {
       // Validate required fields
       if (!make || !model) {
         logger.warn('Make or model not available for price range calculation');
-        return Result.success(null); // Return null like .NET does when data is missing
-      }
-
-      // Check if kmsDriven is provided (required by Droom API)
-      if (!kmsDriven) {
-        logger.warn('KmsDriven not provided, skipping Droom API call');
         return Result.success(null);
       }
 
-      // Call Droom API to get used price range
-      const priceRangeResult = await droomService.getEnterpriseUsedPriceRangeAsync({
-        make,
-        model,
-        year,
-        trim,
-        kmsDriven,
-        city: city || 'Delhi',
-        noOfOwners: noOfOwners || '1',
-        transactionType: transactionType || 'b',
-        customerType: customerType || 'individual'
+      if (!year) {
+        logger.warn('Year not available for price range calculation');
+        return Result.success(null);
+      }
+
+      // If still no original price, cannot calculate
+      if (!originalPrice || originalPrice <= 0) {
+        logger.warn('Original price not available for price range calculation');
+        return Result.success(null);
+      }
+
+      // Extract state from city if provided (e.g., "RAJKOT, Gujarat" -> "Gujarat")
+      const state = this.extractStateFromCity(city);
+
+      // Calculate resale value using custom algorithm
+      const resaleResult = resaleValueService.calculateResaleValue({
+        originalPrice: parseFloat(originalPrice),
+        make: make,
+        year: year,
+        kmsDriven: kmsDriven ? parseInt(kmsDriven) : null, // Use provided value, null if not provided
+        state: state,
+        stateCode: stateCode,
+        city: city,
+        noOfOwners: noOfOwners || '1'
       });
 
-      if (!priceRangeResult.isSuccess) {
-        logger.warn(`Droom API error: ${priceRangeResult.error}`);
+      if (!resaleResult.isSuccess) {
+        logger.warn(`Resale calculation failed: ${resaleResult.error}`);
         return Result.success(null);
       }
 
-      return Result.success(priceRangeResult.value);
+      return Result.success(resaleResult.value);
     } catch (error) {
       logger.error('Get used price range error:', error);
       return Result.failure(error.message || 'Failed to get used price range');
@@ -202,8 +274,8 @@ class ObvService {
   }
 
   /**
-   * Get price range by vehicle detail ID - matches .NET ObvService.GetEnterpriseUsedPriceRangeByVehicleDetailIdAsync
-   * First checks database cache, then falls back to Droom API
+   * Get price range by vehicle detail ID
+   * Uses custom calculation algorithm
    */
   async getByVehicleDetailIdAsync(vehicleDetailId, userEmail) {
     try {
@@ -235,33 +307,39 @@ class ObvService {
         return Result.success(null);
       }
 
-      // Get city from state code
+      // Get state code from registration number
       const stateCode = vehicleDetail.RegistrationNumber ? vehicleDetail.RegistrationNumber.substring(0, 2) : '';
       const stateMapping = await StateMapping.findOne({ where: { StateCode: stateCode } });
       const city = stateMapping ? stateMapping.StateCapital : 'Delhi';
+      const state = stateMapping ? stateMapping.StateName : null;
 
-      // Prepare vehicle data for Droom API
-      const vehicleData = {
-        make: make,
-        model: model,
-        year: year,
-        trim: vehicleDetail.Variant || '',
-        kmsDriven: '50000', // Default if not known
-        city: city,
-        noOfOwners: vehicleDetail.OwnerNumber || '1',
-        transactionType: 'b',
-        customerType: 'individual'
-      };
+      // Fetch/get ex-showroom price
+      const originalPrice = await this.fetchAndStoreExShowroomPrice(vehicleDetail);
 
-      // Call Droom API to get used price range
-      const priceRangeResult = await droomService.getEnterpriseUsedPriceRangeAsync(vehicleData);
-
-      if (!priceRangeResult.isSuccess) {
-        logger.warn(`Droom API error for vehicle ${vehicleDetailId}: ${priceRangeResult.error}`);
+      if (!originalPrice) {
+        logger.warn(`No ex-showroom price available for vehicle ${vehicleDetailId}`);
         return Result.success(null);
       }
 
-      return Result.success(priceRangeResult.value);
+      // Calculate resale value using custom algorithm
+      // Note: kmsDriven is null here as we don't have it from vehicle details alone
+      const resaleResult = resaleValueService.calculateResaleValue({
+        originalPrice: originalPrice,
+        make: make,
+        year: year,
+        kmsDriven: null, // Not available from vehicle details, will use neutral (no penalty)
+        state: state,
+        stateCode: stateCode,
+        city: city,
+        noOfOwners: vehicleDetail.OwnerNumber || '1'
+      });
+
+      if (!resaleResult.isSuccess) {
+        logger.warn(`Resale calculation failed for vehicle ${vehicleDetailId}: ${resaleResult.error}`);
+        return Result.success(null);
+      }
+
+      return Result.success(resaleResult.value);
     } catch (error) {
       logger.error('Get OBV by vehicle detail ID error:', error);
       return Result.failure(error.message || 'Failed to get OBV');

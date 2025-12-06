@@ -367,6 +367,62 @@ class SurepassService {
   }
 
   /**
+   * Get Vehicle Price (Ex-showroom, On-road price)
+   * Uses Surepass Vehicle Price Check API
+   * Input: vehicleName, model, variant, color, fuelType
+   * Output: showroomPrice, onRoadPrice, taxes
+   */
+  async getVehiclePriceAsync(vehicleData) {
+    try {
+      const { vehicleName, model, variant, color, fuelType } = vehicleData;
+
+      logger.info(`Surepass Vehicle Price Check for: ${vehicleName} ${model} ${variant}`);
+
+      const response = await axios.post(
+        `${this.apiUrl}/vehicle-price-check`,
+        {
+          vehicle_name: vehicleName,
+          model: model,
+          variant: variant,
+          color: color || '',
+          fuel_type: fuelType || ''
+        },
+        {
+          headers: this.headers,
+          timeout: 30000
+        }
+      );
+
+      if (response.data.success) {
+        const data = response.data.data;
+
+        return Result.success({
+          vehicleName: data.vehicle_name || vehicleName,
+          model: data.model || model,
+          variant: data.variant || variant,
+          exShowroomPrice: data.ex_showroom_price || data.showroom_price || null,
+          onRoadPrice: data.on_road_price || null,
+          roadTax: data.road_tax || null,
+          insurance: data.insurance || null,
+          otherCharges: data.other_charges || null,
+          rawData: data
+        });
+      } else {
+        logger.warn(`Surepass Vehicle Price Check failed: ${response.data.message}`);
+        return Result.failure(response.data.message || 'Vehicle price check failed');
+      }
+    } catch (error) {
+      logger.error('Surepass Vehicle Price Check error:', error.response?.data || error.message);
+
+      if (error.response) {
+        return Result.failure(error.response.data?.message || 'Vehicle price check failed');
+      }
+
+      return Result.failure(error.message || 'Vehicle price check service unavailable');
+    }
+  }
+
+  /**
    * Bank Account Verification
    */
   async verifyBankAccountAsync(accountNumber, ifscCode) {

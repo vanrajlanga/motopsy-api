@@ -271,6 +271,11 @@ const VehicleDetail = sequelize.define('VehicleDetails', {
     type: DataTypes.STRING(255),
     allowNull: true
   },
+  // Ex-showroom price for resale value calculation
+  ExShowroomPrice: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: true
+  },
   // Legacy fields
   FitnessUpto: {
     type: DataTypes.DATE,
