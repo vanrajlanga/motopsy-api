@@ -63,7 +63,7 @@ class EmailService {
         try {
             const confirmationUrl = `${
                 process.env.FRONTEND_URL
-            }/account/confirm-email?userId=${userId}&code=${encodeURIComponent(
+            }/#/account/confirm-email?userId=${userId}&code=${encodeURIComponent(
                 code
             )}`;
 
@@ -126,7 +126,7 @@ class EmailService {
         }
 
         try {
-            const resetUrl = `${process.env.FRONTEND_URL}/account/reset-password?userId=${userId}&code=${encodeURIComponent(code)}`;
+            const resetUrl = `${process.env.FRONTEND_URL}/#/account/reset-password?userId=${userId}&code=${encodeURIComponent(code)}`;
 
             const mailOptions = {
                 from: `"Motopsy" <${this.fromEmail}>`,
