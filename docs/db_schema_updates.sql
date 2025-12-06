@@ -89,7 +89,7 @@ ADD COLUMN IF NOT EXISTS NationalPermitIssuedBy VARCHAR(255) NULL,
 ADD COLUMN IF NOT EXISTS NonUseStatus VARCHAR(100) NULL,
 ADD COLUMN IF NOT EXISTS NonUseFrom VARCHAR(100) NULL,
 ADD COLUMN IF NOT EXISTS NonUseTo VARCHAR(100) NULL,
-ADD COLUMN IF NOT EXISTS BlacklistStatus VARCHAR(100) NULL,
+ADD COLUMN IF NOT EXISTS BlacklistStatus TEXT NULL,
 ADD COLUMN IF NOT EXISTS NocDetails TEXT NULL,
 ADD COLUMN IF NOT EXISTS OwnerNumber VARCHAR(20) NULL,
 ADD COLUMN IF NOT EXISTS RcStatus VARCHAR(100) NULL,
@@ -114,6 +114,13 @@ ADD COLUMN IF NOT EXISTS UpstreamCode VARCHAR(100) NULL;
 
 -- Update ChallanDate to VARCHAR to store date strings from Surepass
 ALTER TABLE vehiclechallandetails MODIFY COLUMN ChallanDate VARCHAR(100) NULL;
+
+-- ============================================
+-- 6. VehicleDetails - Fix column sizes for long values
+-- Added: 2025-12-06
+-- BlacklistStatus can contain very long messages from Surepass
+-- ============================================
+ALTER TABLE VehicleDetails MODIFY COLUMN BlacklistStatus TEXT NULL;
 
 -- ============================================
 -- Verification Queries

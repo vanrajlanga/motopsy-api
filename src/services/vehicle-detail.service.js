@@ -343,50 +343,21 @@ class VehicleDetailService {
     // Calculate vehicle age from ManufacturingDateFormatted
     const vehicleAge = this.calculateVehicleAge(vehicleDetail.ManufacturingDateFormatted);
 
-    // Get vehicle specification (if available)
-    let vehicleSpecification = null;
-    if (vehicleDetail.Manufacturer && vehicleDetail.Model) {
-      vehicleSpecification = await VehicleSpecification.findOne({
-        where: {
-          naming_make: vehicleDetail.Manufacturer,
-          naming_model: vehicleDetail.Model
-        }
-      });
-    }
+    // Get vehicle specification using smart matching
+    let vehicleSpecification = await this.findVehicleSpecification(vehicleDetail);
 
     // Transform challan details to match .NET VehicleChallanDetailDto
     const transformedChallans = challanDetails.map(challan => ({
       id: challan.Id,
       challanNumber: challan.ChallanNumber,
       challanDate: challan.ChallanDate,
-      violationType: challan.ViolationType,
+      violationType: challan.ViolationType || challan.OffenseDetails,
       amount: challan.Amount ? parseFloat(challan.Amount) : null,
       status: challan.Status
     }));
 
-    // Transform vehicle specification to match .NET VehicleSpecificationDto
-    const transformedSpec = vehicleSpecification ? {
-      make: vehicleSpecification.naming_make,
-      model: vehicleSpecification.naming_model,
-      version: vehicleSpecification.naming_version,
-      price: vehicleSpecification.naming_price,
-      keyPrice: vehicleSpecification.keydata_key_price,
-      mileageArai: vehicleSpecification.keydata_key_mileage_arai,
-      engine: vehicleSpecification.keydata_key_engine,
-      transmission: vehicleSpecification.keydata_key_transmission,
-      fuelType: vehicleSpecification.keydata_key_fueltype,
-      seatingCapacity: vehicleSpecification.keydata_key_seatingcapacity,
-      engineDetails: vehicleSpecification.enginetransmission_engine,
-      maxPower: vehicleSpecification.enginetransmission_maxpower,
-      maxTorque: vehicleSpecification.enginetransmission_maxtorque,
-      length: vehicleSpecification.dimensionweight_length,
-      width: vehicleSpecification.dimensionweight_width,
-      height: vehicleSpecification.dimensionweight_height,
-      wheelbase: vehicleSpecification.dimensionweight_wheelbase,
-      bootspace: vehicleSpecification.capacity_bootspace,
-      description: vehicleSpecification.Description,
-      fastTag: ''
-    } : null;
+    // Transform vehicle specification to match frontend VehicleSpecificationInterface (92+ fields)
+    const transformedSpec = vehicleSpecification ? this.transformVehicleSpecification(vehicleSpecification) : null;
 
     // Return response matching frontend expectations
     return {
@@ -597,6 +568,299 @@ class VehicleDetailService {
       logger.error('Get pending reports error:', error);
       return Result.failure(error.message || 'Failed to get pending reports');
     }
+  }
+  /**
+   * Find vehicle specification using smart matching
+   * Matches .NET VehicleSpecificationRepository.GetVehicleSpecificationByVehicleDetails
+   * @param {Object} vehicleDetail - Vehicle detail with MakerDescription/MakerModel
+   * @param {string} requestMake - Make from request (optional)
+   * @param {string} requestModel - Model from request (optional)
+   * @param {string} requestVersion - Version from request (optional)
+   */
+  async findVehicleSpecification(vehicleDetail, requestMake = null, requestModel = null, requestVersion = null) {
+    try {
+      const { Op } = require('sequelize');
+
+      // Priority 1: Use request params if provided (like .NET does)
+      let make = requestMake;
+      let model = requestModel;
+      let version = requestVersion;
+
+      // Priority 2: Extract from vehicle detail if request params not provided
+      if (!make && vehicleDetail) {
+        // Extract make from MakerDescription (e.g., "KIA INDIA PRIVATE LIMITED" -> "Kia")
+        const makerDesc = vehicleDetail.MakerDescription || vehicleDetail.Manufacturer || '';
+        make = this.extractMakeFromDescription(makerDesc);
+      }
+
+      if (!model && vehicleDetail) {
+        // Extract model from MakerModel (e.g., "SELTOS G1.5 6MT HTE" -> "Seltos")
+        const makerModel = vehicleDetail.MakerModel || vehicleDetail.Model || '';
+        model = this.extractModelFromDescription(makerModel);
+      }
+
+      if (!make || !model) {
+        logger.info('Cannot find specification: make or model not available');
+        return null;
+      }
+
+      logger.info(`Finding specification for: make=${make}, model=${model}, version=${version}`);
+
+      // Find candidates matching make and model (case-insensitive)
+      const candidates = await VehicleSpecification.findAll({
+        where: {
+          naming_make: { [Op.like]: make },
+          naming_model: { [Op.like]: `%${model}%` }
+        },
+        limit: 100
+      });
+
+      if (candidates.length === 0) {
+        logger.info(`No specifications found for make=${make}, model=${model}`);
+        return null;
+      }
+
+      logger.info(`Found ${candidates.length} specification candidates`);
+
+      // If version provided, do fuzzy matching (like .NET does)
+      if (version) {
+        const versionParts = version.split(/\s+/).filter(p => p.length > 0);
+        let bestMatch = null;
+        let bestScore = 0;
+
+        for (const candidate of candidates) {
+          if (!candidate.naming_version) continue;
+
+          const candidateParts = candidate.naming_version.split(/\s+/).filter(p => p.length > 0);
+          let score = 0;
+
+          for (let i = 0; i < Math.min(versionParts.length, candidateParts.length); i++) {
+            if (versionParts[i].toLowerCase() === candidateParts[i].toLowerCase()) {
+              score++;
+            } else {
+              break;
+            }
+          }
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestMatch = candidate;
+          }
+        }
+
+        return bestMatch || candidates[0];
+      }
+
+      // No version - return first match
+      return candidates[0];
+    } catch (error) {
+      logger.error('Error finding vehicle specification:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Extract manufacturer name from description
+   * E.g., "KIA INDIA PRIVATE LIMITED" -> "Kia"
+   * E.g., "MARUTI SUZUKI INDIA LIMITED" -> "Maruti Suzuki"
+   */
+  extractMakeFromDescription(description) {
+    if (!description) return null;
+
+    const makeMap = {
+      'KIA': 'Kia',
+      'MARUTI': 'Maruti Suzuki',
+      'HYUNDAI': 'Hyundai',
+      'TATA': 'Tata',
+      'MAHINDRA': 'Mahindra',
+      'HONDA': 'Honda',
+      'TOYOTA': 'Toyota',
+      'FORD': 'Ford',
+      'VOLKSWAGEN': 'Volkswagen',
+      'SKODA': 'Skoda',
+      'RENAULT': 'Renault',
+      'NISSAN': 'Nissan',
+      'MG': 'MG',
+      'JEEP': 'Jeep',
+      'MERCEDES': 'Mercedes-Benz',
+      'BMW': 'BMW',
+      'AUDI': 'Audi',
+      'JAGUAR': 'Jaguar',
+      'LAND ROVER': 'Land Rover',
+      'PORSCHE': 'Porsche',
+      'LEXUS': 'Lexus',
+      'VOLVO': 'Volvo',
+      'MINI': 'Mini',
+      'BAJAJ': 'Bajaj',
+      'HERO': 'Hero',
+      'TVS': 'TVS',
+      'ROYAL ENFIELD': 'Royal Enfield',
+      'YAMAHA': 'Yamaha',
+      'SUZUKI': 'Suzuki',
+      'KAWASAKI': 'Kawasaki',
+      'KTM': 'KTM',
+      'HARLEY': 'Harley-Davidson',
+      'DUCATI': 'Ducati',
+      'TRIUMPH': 'Triumph',
+      'BENELLI': 'Benelli',
+      'APRILIA': 'Aprilia',
+      'PIAGGIO': 'Piaggio',
+      'VESPA': 'Vespa',
+      'ATHER': 'Ather',
+      'OLA': 'Ola Electric',
+      'SIMPLE': 'Simple Energy'
+    };
+
+    const upper = description.toUpperCase();
+    for (const [key, value] of Object.entries(makeMap)) {
+      if (upper.includes(key)) {
+        return value;
+      }
+    }
+
+    // Return first word capitalized if no match
+    const firstWord = description.split(/\s+/)[0];
+    return firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
+  }
+
+  /**
+   * Extract model name from description
+   * E.g., "SELTOS G1.5 6MT HTE" -> "Seltos"
+   */
+  extractModelFromDescription(description) {
+    if (!description) return null;
+
+    // Common model name patterns - get first word
+    const firstWord = description.split(/\s+/)[0];
+    // Capitalize properly (e.g., "SELTOS" -> "Seltos")
+    return firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
+  }
+
+  /**
+   * Transform vehicle specification to match frontend VehicleSpecificationInterface
+   * Maps all 92+ fields expected by the Angular frontend
+   */
+  transformVehicleSpecification(spec) {
+    if (!spec) return null;
+
+    const data = spec.toJSON ? spec.toJSON() : spec;
+
+    return {
+      // Basic Info
+      model: data.naming_model,
+      bodystyle: data.naming_bodystyle,
+      version: data.naming_version,
+      colorName: data.colors_color_name,
+
+      // Comfort & Convenience
+      adjustableClusterBrightness: data.instrumentation_adjustable_cluster_brightness,
+      airConditioner: data.comfort_and_convenience_air_conditioner,
+      bluetoothComatibility: data.ent_info_comm_bluetooth_compatibility,
+      auxCompatibility: data.ent_info_comm_aux_compatibility,
+      bootlidOpener: data.doors_windows_mirrors_wipers_bootild_opener,
+      cupHolders: data.storage_cup_holders,
+      display: data.ent_info_comm_display,
+      driverArmsrest: data.seats_and_upholstery_driver_armrest,
+      fastTag: data.price_breakdown_fast_tag,
+      frontAc: data.comfort_and_convenience_front_ac,
+      headrests: data.seats_and_upholstery_headrests,
+      heater: data.comfort_and_convenience_heater,
+      interiorDoorHandles: data.doors_windows_mirrors_wipers_interior_door_handles,
+      interiorsColours: data.seats_and_upholstery_interiors_colours,
+      keylessStartButtonStart: data.comfort_and_convenience_keyless_start_button_start,
+      rearArmrest: data.seats_and_upholstery_rear_armrest,
+
+      // Safety
+      airbags: data.safety_airbags,
+      antilockBarkingSystemAbs: data.barking_and_traction_antilock_barking_system_abs,
+      automaticEmergencyBrakingAeb: data.safety_automatic_emergency_braking_aeb,
+      automaticHeadLamps: data.lighting_automatic_head_lamps,
+      brakeAssistBa: data.barking_and_traction_brake_assist_ba,
+      centralLocking: data.locks_and_security_central_locking,
+      checkVehicleStatusViaApp: data.telematics_check_vehicle_status_via_app,
+      childSafetylock: data.locks_and_security_child_safety_lock,
+      doorAjarWarning: data.instrumentation_door_ajar_warning,
+      findMyCar: data.telematics_find_my_car,
+      laneDepartureWarning: data.safety_lane_deprature_warning,
+      overspeedWarning: data.safety_overspeed_warning,
+      parkingAssist: data.comfort_and_convenience_parking_assist,
+      parkingSensors: data.comfort_and_convenience_parking_sensors,
+      safetyForwardCollisionWarningFcw: data.safety_forward_collision_warning_fcw,
+      seatbeltWarning: data.safety_seatbelt_warning,
+      speedSensingDoorlock: data.locks_and_security_speed_sensing_doorlock,
+
+      // Exterior
+      bodyColouredBumpers: data.exterior_body_coloured_bumpers,
+      roofMountedAntenna: data.exterior_roof_mounted_antenna,
+      sunroofMoonroof: data.exterior_sunroof_moonroof,
+      wheels: data.suspension_brakes_steeringandtyres_wheels,
+
+      // Instrumentation
+      averageSpeed: data.instrumentation_average_speed,
+      gearIndicator: data.instrumentation_gear_indicator,
+      lowFuelLevelWarning: data.instrumentation_low_fuel_level_warning,
+      ncapRating: data.safety_ncap_rating,
+      remoteCarLockUnlockViaApp: data.telematics_remote_car_lock_unlock_via_app,
+      shiftIndicator: data.instrumentation_shift_indicator,
+      driveTrain: data.enginetransmission_drivetrain,
+
+      // Engine & Transmission
+      battery: data.enginetransmission_battery,
+      electricMotor: data.enginetransmission_electric_motor,
+      engine: data.keydata_key_engine || data.enginetransmission_engine,
+      engineType: data.enginetransmission_engine_type,
+      engineTransmissionMileageArai: data.enginetransmission_mileage_arai || data.keydata_key_mileage_arai,
+      maxpower: data.enginetransmission_maxpower,
+      maxpowerRpm: data.enginetransmission_maxpowerRPM,
+      maxtorque: data.enginetransmission_maxtorque,
+      transmission: data.keydata_key_transmission || data.enginetrans_transmission,
+      transmissionDetails: data.enginetrans_transmission,
+
+      // Dimension & Weight
+      groundClearance: data.dimensionweight_groundclearance,
+      height: data.dimensionweight_height,
+      kerbweight: data.dimensionweight_kerbweight,
+      length: data.dimensionweight_length,
+      wheelbase: data.dimensionweight_wheelbase,
+      width: data.dimensionweight_width,
+
+      // Braking
+      frontBrakeType: data.suspension_brakes_steeringandtyres_front_brake_type,
+      rearBrakeType: data.suspension_brakes_steeringandtyres_rear_brake_type,
+
+      // Suspension & Steering
+      rearSuspension: data.suspension_brakes_steeringandtyres_rear_suspension,
+
+      // Tyres
+      frontTyres: data.suspension_brakes_steeringandtyres_front_tyres,
+      rearTyres: data.suspension_brakes_steeringandtyres_rear_tyres,
+      spareWheels: data.suspension_brakes_steeringandtyres_spare_wheels,
+
+      // Lightings
+      cabinLamps: data.lighting_cabin_lamps,
+      daytimeRunningLights: data.lighting_daytime_running_lights,
+      emergencyBrakeLightFlashing: data.safety_emergency_brake_light_flashing,
+      fogLights: data.lighting_fog_lights,
+      rearDefogger: data.doors_windows_mirrors_wipers_rear_defogger,
+      rearWiper: data.doors_windows_mirrors_wipers_rear_wiper,
+      tailLights: data.lighting_tail_lights,
+
+      // Entertainment & Communication
+      amFmRadio: data.ent_info_comm_am_fm_radio,
+      batteryWarrnatyInKms: data.manufacturer_warranty_battery_warranty_in_kms,
+      smartConnectivity: data.ent_info_comm_smart_connectivity,
+      speakers: data.ent_info_comm_speakers,
+      usbCompatibility: data.ent_info_comm_usb_compatibility,
+      voiceCommand: data.ent_info_comm_voice_command,
+      wirelessCharger: data.ent_info_comm_wireless_charger,
+
+      // Capacity
+      bootspace: data.capacity_bootspace,
+      doors: data.capacity_doors,
+      fuelTankCapacity: data.capacity_fuel_tank_capacity,
+      noOfSeatingRows: data.capacity_no_of_seating_rows,
+      seatingCapacity: data.capacity_seating_capacity || data.keydata_key_seatingcapacity
+    };
   }
 }
 
