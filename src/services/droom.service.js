@@ -30,6 +30,7 @@ class DroomService {
       const response = await axios.post(
         `${this.apiUrl}/v1/oauth/token`,
         {
+          grant_type: 'password',
           client_id: this.clientId,
           client_secret: this.clientSecret,
           username: this.username,
