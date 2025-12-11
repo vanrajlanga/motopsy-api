@@ -546,7 +546,7 @@ class VehicleDetailService {
           where: { Status: 1 }, // Successful payment
           required: true
         }],
-        where: sequelize.literal('NOT EXISTS (SELECT 1 FROM vehicledetails vd WHERE vd.VehicleDetailRequestId = VehicleDetailRequest.Id)'),
+        where: sequelize.literal('NOT EXISTS (SELECT 1 FROM VehicleDetails vd WHERE vd.VehicleDetailRequestId = vehicledetailrequests.Id)'),
         order: [['CreatedAt', 'DESC']],
         limit: 100
       });
@@ -588,7 +588,7 @@ class VehicleDetailService {
           where: { UserId: user.Id },
           required: true
         }],
-        where: sequelize.literal('NOT EXISTS (SELECT 1 FROM vehicledetails vd WHERE vd.VehicleDetailRequestId = VehicleDetailRequest.Id)'),
+        where: sequelize.literal('NOT EXISTS (SELECT 1 FROM VehicleDetails vd WHERE vd.VehicleDetailRequestId = vehicledetailrequests.Id)'),
         order: [['CreatedAt', 'DESC']],
         limit: 100
       });
