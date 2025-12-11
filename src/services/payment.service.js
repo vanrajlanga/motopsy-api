@@ -15,17 +15,62 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET
 });
 
+// Valid coupon codes configuration
+const COUPON_CODES = {
+  'motopsy99': {
+    discountPercentage: 99,
+    description: '99% discount'
+  }
+};
+
 class PaymentService {
+  /**
+   * Validate coupon code and return discount details
+   */
+  async validateCoupon(couponCode) {
+    try {
+      if (!couponCode) {
+        return Result.failure('Coupon code is required');
+      }
+
+      const normalizedCode = couponCode.toLowerCase().trim();
+      const coupon = COUPON_CODES[normalizedCode];
+
+      if (!coupon) {
+        return Result.failure('Invalid coupon code');
+      }
+
+      const originalAmount = parseInt(process.env.RAZORPAY_AMOUNT) || 199;
+      const discountAmount = Math.floor(originalAmount * (coupon.discountPercentage / 100));
+      const finalAmount = originalAmount - discountAmount;
+
+      logger.info(`Coupon validated: ${normalizedCode}, discount: ${coupon.discountPercentage}%, original: ${originalAmount}, final: ${finalAmount}`);
+
+      return Result.success({
+        valid: true,
+        couponCode: normalizedCode,
+        discountPercentage: coupon.discountPercentage,
+        originalAmount: originalAmount,
+        discountAmount: discountAmount,
+        finalAmount: finalAmount,
+        description: coupon.description
+      });
+    } catch (error) {
+      logger.error('Validate coupon error:', error);
+      return Result.failure(error.message || 'Failed to validate coupon');
+    }
+  }
+
   /**
    * Create Razorpay order
    * Matches .NET API CreateOrder implementation
    */
   async createOrder(request, userEmail) {
     try {
-      const { amount, paymentFor, currency = 'INR' } = request;
+      const { amount, paymentFor, currency = 'INR', couponCode } = request;
 
       // Validate required fields
-      if (!amount) {
+      if (!amount && amount !== 0) {
         return Result.failure('Amount is required');
       }
 
@@ -33,10 +78,31 @@ class PaymentService {
         return Result.failure('PaymentFor is required');
       }
 
-      // Validate amount matches configured amount
-      const configuredAmount = parseInt(process.env.RAZORPAY_AMOUNT) || 799;
-      if (amount !== configuredAmount) {
-        return Result.failure('Amount does not match');
+      // Validate amount - either matches configured amount or matches discounted amount with valid coupon
+      const configuredAmount = parseInt(process.env.RAZORPAY_AMOUNT) || 199;
+
+      if (couponCode) {
+        // Validate coupon and check if amount matches discounted price
+        const normalizedCode = couponCode.toLowerCase().trim();
+        const coupon = COUPON_CODES[normalizedCode];
+
+        if (!coupon) {
+          return Result.failure('Invalid coupon code');
+        }
+
+        const discountAmount = Math.floor(configuredAmount * (coupon.discountPercentage / 100));
+        const expectedAmount = configuredAmount - discountAmount;
+
+        if (amount !== expectedAmount) {
+          return Result.failure('Amount does not match with applied coupon');
+        }
+
+        logger.info(`Order created with coupon: ${normalizedCode}, amount: ${amount}`);
+      } else {
+        // No coupon - amount must match configured amount
+        if (amount !== configuredAmount) {
+          return Result.failure('Amount does not match');
+        }
       }
 
       // Find user

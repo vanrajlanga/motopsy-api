@@ -27,6 +27,20 @@ class PaymentController extends ApiController {
       next(error);
     }
   }
+
+  /**
+   * POST /api/payment/validate-coupon
+   * Validate coupon code and return discount details
+   */
+  async validateCoupon(req, res, next) {
+    try {
+      const { couponCode } = req.body;
+      const result = await paymentService.validateCoupon(couponCode);
+      return this.fromResult(result, res);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new PaymentController();
