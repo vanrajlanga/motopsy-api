@@ -169,28 +169,27 @@ class VehicleDetailService {
 
       const resolvedUserId = user.Id;
 
-      // Check if THIS USER already has this vehicle's details
-      let vehicleDetail = await VehicleDetail.findOne({
-        where: {
-          RegistrationNumber: registrationNumber,
-          UserId: resolvedUserId
-        }
-      });
+      // Check if entry already exists for THIS specific VehicleDetailRequestId
+      // Each payment creates a unique VehicleDetailRequestId, so each payment should create a new entry
+      if (vehicleDetailRequestId) {
+        let vehicleDetail = await VehicleDetail.findOne({
+          where: { VehicleDetailRequestId: vehicleDetailRequestId }
+        });
 
-      if (vehicleDetail) {
-        logger.info(`Vehicle details found in database for this user: ${registrationNumber}`);
-        // Return full response matching frontend expectations
-        return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId));
+        if (vehicleDetail) {
+          logger.info(`Vehicle details already exist for this request: ${vehicleDetailRequestId}`);
+          return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId));
+        }
       }
 
-      // Check if vehicle details exist for ANY user (to avoid calling API again)
+      // Check if vehicle details exist for ANY user (to avoid calling Surepass API again)
       const existingVehicleDetail = await VehicleDetail.findOne({
         where: { RegistrationNumber: registrationNumber }
       });
 
       if (existingVehicleDetail) {
-        // Vehicle data exists but for different user - replicate entry for new user
-        logger.info(`Vehicle details found for another user, replicating for user ${resolvedUserId}: ${registrationNumber}`);
+        // Vehicle data exists - replicate entry for this new request/payment
+        logger.info(`Vehicle details found, creating new entry for request ${vehicleDetailRequestId}: ${registrationNumber}`);
 
         const maxVehicle = await VehicleDetail.findOne({
           attributes: [[sequelize.fn('MAX', sequelize.col('Id')), 'maxId']],
@@ -198,11 +197,11 @@ class VehicleDetailService {
         });
         const nextId = (maxVehicle && maxVehicle.maxId) ? maxVehicle.maxId + 1 : 1;
 
-        // Create new entry for this user with same vehicle data
+        // Create new entry for this request with same vehicle data
         const existingData = existingVehicleDetail.toJSON();
         delete existingData.Id; // Remove old ID
 
-        vehicleDetail = await VehicleDetail.create({
+        const vehicleDetail = await VehicleDetail.create({
           ...existingData,
           Id: nextId,
           UserId: resolvedUserId,
@@ -210,7 +209,7 @@ class VehicleDetailService {
           CreatedAt: new Date()
         });
 
-        logger.info(`Vehicle details replicated for user ${resolvedUserId}: ${registrationNumber}`);
+        logger.info(`Vehicle details created for request ${vehicleDetailRequestId}, user ${resolvedUserId}: ${registrationNumber}`);
         return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId));
       }
 
