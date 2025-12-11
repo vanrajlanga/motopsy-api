@@ -118,6 +118,7 @@ class VehicleReportService {
   /**
    * Get vehicle history reports by user
    * Matches .NET: GetVehicleHistoryReportsAsync(userName)
+   * Returns VehicleHistoryReportDto[] format
    */
   async getVehicleHistoryReportsAsync(userEmail) {
     try {
@@ -131,14 +132,13 @@ class VehicleReportService {
         order: [['CreatedAt', 'DESC']]
       });
 
-      // Transform to VehicleHistoryReportDto
+      // Transform to VehicleHistoryReportDto - matches .NET API format
       const vehicleHistoryReports = reports.map(r => ({
-        id: r.Id,
+        vehicleHistoryReportId: r.Id,
+        vehicleReportId: r.Id,
         registrationNumber: r.RegistrationNumber,
-        manufacturer: r.Manufacturer,
-        model: r.Model,
-        yearOfManufacture: r.YearOfManufacture,
-        fuelType: r.FuelType,
+        makerDescription: r.MakerDescription || r.Manufacturer || '',
+        makerModel: r.MakerModel || r.Model || '',
         createdAt: r.CreatedAt
       }));
 
