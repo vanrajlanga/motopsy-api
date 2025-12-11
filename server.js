@@ -3,6 +3,9 @@ const app = require('./app');
 const { testConnection } = require('./src/config/database');
 const logger = require('./src/config/logger');
 
+// Import models to setup associations
+require('./src/models');
+
 const PORT = process.env.PORT || 5000;
 
 // Test database connection and start server

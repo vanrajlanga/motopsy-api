@@ -89,12 +89,4 @@ const VehicleDetailRequest = sequelize.define('vehicledetailrequests', {
   timestamps: false
 });
 
-// Define association
-VehicleDetailRequest.associate = (models) => {
-  VehicleDetailRequest.belongsTo(models.PaymentHistory, {
-    foreignKey: 'PaymentHistoryId',
-    as: 'PaymentHistory'
-  });
-};
-
 module.exports = VehicleDetailRequest;
