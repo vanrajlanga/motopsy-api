@@ -13,7 +13,7 @@ const UserActivityLog = require('./user-activity-log.model');
 // VehicleDetailRequest belongs to PaymentHistory
 if (!VehicleDetailRequest.associations.PaymentHistory) {
   VehicleDetailRequest.belongsTo(PaymentHistory, {
-    foreignKey: 'PaymentHistoryId',
+    foreignKey: 'payment_history_id',
     as: 'PaymentHistory'
   });
 }
@@ -21,7 +21,7 @@ if (!VehicleDetailRequest.associations.PaymentHistory) {
 // PaymentHistory has many VehicleDetailRequests
 if (!PaymentHistory.associations.VehicleDetailRequests) {
   PaymentHistory.hasMany(VehicleDetailRequest, {
-    foreignKey: 'PaymentHistoryId',
+    foreignKey: 'payment_history_id',
     as: 'VehicleDetailRequests'
   });
 }

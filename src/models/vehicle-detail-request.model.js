@@ -86,7 +86,8 @@ const VehicleDetailRequest = sequelize.define('vehicle_detail_requests', {
   }
 }, {
   tableName: 'vehicle_detail_requests',
-  timestamps: false
+  timestamps: false,
+  underscored: false
 });
 
 module.exports = VehicleDetailRequest;
