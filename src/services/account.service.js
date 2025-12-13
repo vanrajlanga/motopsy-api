@@ -72,9 +72,9 @@ class AccountService {
       // Return UserDto matching .NET API
       return Result.success({
         id: user.id,
-        name: `${user.first_name} ${user.last_name}`.trim(),
+        name: [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email,
         emailAddress: user.email,
-        phoneNumber: user.phone_number,
+        phoneNumber: user.phone_number || null,
         isAdmin: user.is_admin,
         createdAt: user.created_at
       });

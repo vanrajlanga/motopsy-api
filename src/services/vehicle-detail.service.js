@@ -398,7 +398,7 @@ class VehicleDetailService {
       vehicleChallanDetails: transformedChallans,
       vehicleSpecification: transformedSpec,
       ncrbReportAvailable: ncrbReport !== null,
-      reportId: ncrbReport ? ncrbReport.id : null,
+      ncrbReportId: ncrbReport ? ncrbReport.id : null,
       lostVehicle: lostVehicle !== null,
       createdAt: userVehicleDetail ? userVehicleDetail.created_at : vehicleDetail.created_at,
       vehicleAge: vehicleAge,
@@ -420,14 +420,7 @@ class VehicleDetailService {
       }
 
       // Build the response using shared method
-      const baseResponse = await this.buildVehicleDetailResponse(vehicleDetail, userId);
-
-      // GET endpoint uses 'ncrbReportId' instead of 'reportId'
-      const response = {
-        ...baseResponse,
-        ncrbReportId: baseResponse.reportId
-      };
-      delete response.reportId;
+      const response = await this.buildVehicleDetailResponse(vehicleDetail, userId);
 
       return Result.success(response);
     } catch (error) {

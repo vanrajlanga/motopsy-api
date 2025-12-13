@@ -12,7 +12,7 @@ const VehicleSpecification = sequelize.define('vehicle_specifications', {
     autoIncrement: false
   },
   // Naming & Basic Info
-  naming_version_id: DataTypes.TEXT,
+  naming_versionId: DataTypes.TEXT,
   naming_source_url: DataTypes.TEXT,
   naming_make: DataTypes.TEXT,
   naming_model: DataTypes.TEXT,
@@ -38,9 +38,9 @@ const VehicleSpecification = sequelize.define('vehicle_specifications', {
   enginetransmission_acceoeration_0_100_kmph: DataTypes.TEXT,
   enginetransmission_fueltype: DataTypes.TEXT,
   enginetransmission_maxpower: DataTypes.TEXT,
-  enginetransmission_maxpower_rpm: DataTypes.TEXT,
+  enginetransmission_maxpowerRPM: DataTypes.TEXT,
   enginetransmission_maxtorque: DataTypes.TEXT,
-  enginetransmission_maxtorque_rpm: DataTypes.TEXT,
+  enginetransmission_maxtorqueRPM: DataTypes.TEXT,
   enginetransmission_performanceonalternatefuel: DataTypes.TEXT,
   enginetransmission_maxengineperformance: DataTypes.TEXT,
   enginetransmission_maxmotorperformance: DataTypes.TEXT,
@@ -300,7 +300,8 @@ const VehicleSpecification = sequelize.define('vehicle_specifications', {
   description: DataTypes.TEXT
 }, {
   tableName: 'vehicle_specifications',
-  timestamps: false
+  timestamps: false,
+  underscored: false  // Override global setting - this table has mixed column naming
 });
 
 module.exports = VehicleSpecification;

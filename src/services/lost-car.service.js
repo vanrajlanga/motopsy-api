@@ -18,7 +18,7 @@ class LostCarService {
 
       const stolenVehicle = await LostVehicle.findOne({
         where: {
-          RegistrationNumber: cleanRegNo
+          registration_number: cleanRegNo
         }
       });
 

@@ -110,17 +110,17 @@ class ObvService {
    * Extract year from ManufacturingDateFormatted or RegistrationDate
    */
   extractYear(vehicleDetail) {
-    // Try ManufacturingDateFormatted first (e.g., "06/2021")
-    if (vehicleDetail.ManufacturingDateFormatted) {
-      const parts = vehicleDetail.ManufacturingDateFormatted.split('/');
+    // Try manufacturing_date_formatted first (e.g., "06/2021")
+    if (vehicleDetail.manufacturing_date_formatted) {
+      const parts = vehicleDetail.manufacturing_date_formatted.split('/');
       if (parts.length === 2) {
         return parts[1]; // Return year part
       }
     }
-    // Fallback to RegistrationDate
-    if (vehicleDetail.RegistrationDate) {
+    // Fallback to registration_date
+    if (vehicleDetail.registration_date) {
       try {
-        return new Date(vehicleDetail.RegistrationDate).getFullYear().toString();
+        return new Date(vehicleDetail.registration_date).getFullYear().toString();
       } catch (e) {
         return null;
       }
@@ -180,7 +180,7 @@ class ObvService {
           }
         },
         limit: 10,
-        order: [['Id', 'DESC']] // Get latest entries first
+        order: [['id', 'DESC']] // Get latest entries first
       });
 
       // If variant provided, filter further
@@ -224,17 +224,17 @@ class ObvService {
   async fetchAndStoreExShowroomPrice(vehicleDetail) {
     try {
       // Check if price already stored
-      if (vehicleDetail.ExShowroomPrice && parseFloat(vehicleDetail.ExShowroomPrice) > 0) {
-        logger.info(`Ex-showroom price already stored: ₹${vehicleDetail.ExShowroomPrice}`);
-        return parseFloat(vehicleDetail.ExShowroomPrice);
+      if (vehicleDetail.ex_showroom_price && parseFloat(vehicleDetail.ex_showroom_price) > 0) {
+        logger.info(`Ex-showroom price already stored: ₹${vehicleDetail.ex_showroom_price}`);
+        return parseFloat(vehicleDetail.ex_showroom_price);
       }
 
       // Extract vehicle info for price lookup
-      const make = this.extractMakeFromDescription(vehicleDetail.MakerDescription || vehicleDetail.Manufacturer);
-      const model = this.extractModelFromDescription(vehicleDetail.MakerModel || vehicleDetail.Model);
-      const variant = vehicleDetail.Variant || '';
-      const fuelType = vehicleDetail.FuelType || '';
-      const color = vehicleDetail.Color || '';
+      const make = this.extractMakeFromDescription(vehicleDetail.maker_description || vehicleDetail.manufacturer);
+      const model = this.extractModelFromDescription(vehicleDetail.maker_model || vehicleDetail.model);
+      const variant = vehicleDetail.variant || '';
+      const fuelType = vehicleDetail.fuel_type || '';
+      const color = vehicleDetail.color || '';
 
       if (!make || !model) {
         logger.warn('Cannot fetch price: make/model not available');
@@ -266,11 +266,11 @@ class ObvService {
       if (exShowroomPrice) {
         // Store in database
         await VehicleDetail.update(
-          { ExShowroomPrice: exShowroomPrice },
-          { where: { Id: vehicleDetail.Id } }
+          { ex_showroom_price: exShowroomPrice },
+          { where: { id: vehicleDetail.id } }
         );
 
-        logger.info(`Stored ex-showroom price: ₹${exShowroomPrice} for vehicle ${vehicleDetail.Id}`);
+        logger.info(`Stored ex-showroom price: ₹${exShowroomPrice} for vehicle ${vehicleDetail.id}`);
         return exShowroomPrice;
       }
 
@@ -300,27 +300,27 @@ class ObvService {
         if (vehicleDetail) {
           // Extract values from vehicle detail if not provided
           if (!make) {
-            make = this.extractMakeFromDescription(vehicleDetail.MakerDescription || vehicleDetail.Manufacturer);
+            make = this.extractMakeFromDescription(vehicleDetail.maker_description || vehicleDetail.manufacturer);
           }
           if (!model) {
-            model = this.extractModelFromDescription(vehicleDetail.MakerModel || vehicleDetail.Model);
+            model = this.extractModelFromDescription(vehicleDetail.maker_model || vehicleDetail.model);
           }
           if (!year) {
             year = this.extractYear(vehicleDetail);
           }
           if (!trim) {
-            trim = vehicleDetail.Variant || '';
+            trim = vehicleDetail.variant || '';
           }
           if (!noOfOwners) {
-            noOfOwners = vehicleDetail.OwnerNumber || '1';
+            noOfOwners = vehicleDetail.owner_number || '1';
           }
 
           // Get state code from registration number
-          stateCode = vehicleDetail.RegistrationNumber ? vehicleDetail.RegistrationNumber.substring(0, 2) : '';
+          stateCode = vehicleDetail.registration_number ? vehicleDetail.registration_number.substring(0, 2) : '';
 
           if (!city) {
-            const stateMapping = await StateMapping.findOne({ where: { StateCode: stateCode } });
-            city = stateMapping ? stateMapping.StateCapital : 'Delhi';
+            const stateMapping = await StateMapping.findOne({ where: { state_code: stateCode } });
+            city = stateMapping ? stateMapping.state_capital : 'Delhi';
           }
 
           // Fetch ex-showroom price if not provided
@@ -369,8 +369,8 @@ class ObvService {
         // Store in database if we have vehicleDetail and found a price
         if (originalPrice && vehicleDetail) {
           await VehicleDetail.update(
-            { ExShowroomPrice: originalPrice },
-            { where: { Id: vehicleDetail.Id } }
+            { ex_showroom_price: originalPrice },
+            { where: { id: vehicleDetail.id } }
           );
         }
       }
@@ -418,7 +418,7 @@ class ObvService {
 
       // Get user
       const user = await User.findOne({
-        where: { NormalizedEmail: userEmail.toUpperCase() }
+        where: { normalized_email: userEmail.toUpperCase() }
       });
 
       if (!user) {
@@ -433,8 +433,8 @@ class ObvService {
       }
 
       // Extract make/model from Surepass data
-      const make = this.extractMakeFromDescription(vehicleDetail.MakerDescription || vehicleDetail.Manufacturer);
-      const model = this.extractModelFromDescription(vehicleDetail.MakerModel || vehicleDetail.Model);
+      const make = this.extractMakeFromDescription(vehicleDetail.maker_description || vehicleDetail.manufacturer);
+      const model = this.extractModelFromDescription(vehicleDetail.maker_model || vehicleDetail.model);
       const year = this.extractYear(vehicleDetail);
 
       if (!make || !model) {
@@ -443,10 +443,10 @@ class ObvService {
       }
 
       // Get state code from registration number
-      const stateCode = vehicleDetail.RegistrationNumber ? vehicleDetail.RegistrationNumber.substring(0, 2) : '';
-      const stateMapping = await StateMapping.findOne({ where: { StateCode: stateCode } });
-      const city = stateMapping ? stateMapping.StateCapital : 'Delhi';
-      const state = stateMapping ? stateMapping.StateName : null;
+      const stateCode = vehicleDetail.registration_number ? vehicleDetail.registration_number.substring(0, 2) : '';
+      const stateMapping = await StateMapping.findOne({ where: { state_code: stateCode } });
+      const city = stateMapping ? stateMapping.state_capital : 'Delhi';
+      const state = stateMapping ? stateMapping.state_name : null;
 
       // Fetch/get ex-showroom price
       const originalPrice = await this.fetchAndStoreExShowroomPrice(vehicleDetail);
@@ -466,7 +466,7 @@ class ObvService {
         state: state,
         stateCode: stateCode,
         city: city,
-        noOfOwners: vehicleDetail.OwnerNumber || '1'
+        noOfOwners: vehicleDetail.owner_number || '1'
       });
 
       if (!resaleResult.isSuccess) {

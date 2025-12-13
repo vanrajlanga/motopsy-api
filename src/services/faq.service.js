@@ -9,10 +9,10 @@ class FaqService {
   transformFaq(faq) {
     const data = faq.toJSON ? faq.toJSON() : faq;
     return {
-      id: data.Id,
-      question: data.Question,
-      answer: data.Answer,
-      order: data.Order
+      id: data.id,
+      question: data.question,
+      answer: data.answer,
+      order: data.order
     };
   }
 
@@ -23,7 +23,7 @@ class FaqService {
   async getAllAsync() {
     try {
       const faqs = await Faq.findAll({
-        order: [['CreatedAt', 'ASC']]
+        order: [['created_at', 'ASC']]
       });
 
       // Transform to camelCase
@@ -52,10 +52,10 @@ class FaqService {
         const order = faqDto.order !== undefined ? faqDto.order : (faqDto.Order !== undefined ? faqDto.Order : 0);
 
         const faq = await Faq.create({
-          Question: question,
-          Answer: answer,
-          Order: order,
-          CreatedAt: new Date()
+          question: question,
+          answer: answer,
+          order: order,
+          created_at: new Date()
         });
 
         return faq;
@@ -89,10 +89,10 @@ class FaqService {
         return Result.failure('Faq not found');
       }
 
-      faq.Question = question;
-      faq.Answer = answer;
-      faq.Order = order;
-      faq.ModifiedAt = new Date();
+      faq.question = question;
+      faq.answer = answer;
+      faq.order = order;
+      faq.modified_at = new Date();
       await faq.save();
 
       logger.info(`FAQ updated: ${id}`);

@@ -7,11 +7,11 @@ const upload = require('../middlewares/upload.middleware');
 // .NET uses POST for get-vehicle-report
 router.post('/get-vehicle-report/:registrationNumber', authenticate, vehicleReportController.getVehicleReport.bind(vehicleReportController));
 
-// Physical verification report by vehicle report ID
-router.get('/vehicle-report/:physicalVerificationId/physical-verification-report', authenticate, vehicleReportController.getPhysicalVerificationReportByVehicleReportId.bind(vehicleReportController));
+// Physical verification report by vehicle report ID (public - matches .NET - no [Authorize])
+router.get('/vehicle-report/:physicalVerificationId/physical-verification-report', vehicleReportController.getPhysicalVerificationReportByVehicleReportId.bind(vehicleReportController));
 
-// Upload NCRB report with userId path param (matches .NET)
-router.post('/upload-ncrbReport/:userId', authenticate, upload.single('NcrbReport'), vehicleReportController.uploadNcrbReport.bind(vehicleReportController));
+// Upload NCRB report with userId path param (public - matches .NET - no [Authorize])
+router.post('/upload-ncrbReport/:userId', upload.single('NcrbReport'), vehicleReportController.uploadNcrbReport.bind(vehicleReportController));
 
 // Get vehicle history reports (uses User.Identity.Name)
 router.get('/get-vehicle-history-report', authenticate, vehicleReportController.getVehicleHistoryReport.bind(vehicleReportController));

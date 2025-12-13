@@ -20,7 +20,7 @@ class VehicleReportService {
 
       // Get vehicle details from database
       const vehicleDetail = await VehicleDetail.findOne({
-        where: { RegistrationNumber: cleanRegNo }
+        where: { registration_number: cleanRegNo }
       });
 
       if (!vehicleDetail) {
@@ -46,15 +46,15 @@ class VehicleReportService {
   async getPhysicalVerificationReportByVehicleReportIdAsync(vehicleReportId) {
     try {
       const report = await PhysicalVerification.findOne({
-        where: { Id: vehicleReportId },
-        attributes: ['Report']
+        where: { id: vehicleReportId },
+        attributes: ['report']
       });
 
-      if (!report || !report.Report) {
+      if (!report || !report.report) {
         return Result.success(null);
       }
 
-      return Result.success(report.Report);
+      return Result.success(report.report);
     } catch (error) {
       logger.error('Get physical verification report error:', error);
       return Result.failure(error.message || 'Failed to get report');
@@ -83,15 +83,15 @@ class VehicleReportService {
       // Check if NcrbReport exists for this vehicle detail
       // For now, we'll store in a simple way - in production, you'd want a separate NcrbReport table
       await vehicleDetail.update({
-        NcrbReportData: fileBytes,
-        NcrbReportFileName: dto.ncrbReport.originalname,
-        NcrbReportUpdatedAt: new Date()
+        ncrb_report_data: fileBytes,
+        ncrb_report_file_name: dto.ncrbReport.originalname,
+        ncrb_report_updated_at: new Date()
       });
 
       // Send email if requested
       if (dto.sendMail) {
         const message = `
-          <p>Dear ${user.UserName},</p>
+          <p>Dear ${user.user_name},</p>
           <p>Thank you for your recent purchase of a Vehicle History Report from Motopsy.com.</p>
           <p>We are pleased to confirm that the NCRB Vehicle NOC, which is an integral part of your Vehicle History Report, is attached to this email.</p>
           <p>We are grateful for your patronage and look forward to serving you again in the future.</p>
@@ -100,7 +100,7 @@ class VehicleReportService {
           <p>Motopsy.com</p>`;
 
         await emailService.sendEmailWithAttachmentAsync(
-          user.Email,
+          user.email,
           'NCRB Report',
           message,
           fileBytes,
@@ -122,24 +122,24 @@ class VehicleReportService {
    */
   async getVehicleHistoryReportsAsync(userEmail) {
     try {
-      const user = await User.findOne({ where: { Email: userEmail } });
+      const user = await User.findOne({ where: { email: userEmail } });
       if (!user) {
         return Result.failure('Not found');
       }
 
       const reports = await VehicleDetail.findAll({
-        where: { UserId: user.Id },
-        order: [['CreatedAt', 'DESC']]
+        where: { user_id: user.id },
+        order: [['created_at', 'DESC']]
       });
 
       // Transform to VehicleHistoryReportDto - matches .NET API format
       const vehicleHistoryReports = reports.map(r => ({
-        vehicleHistoryReportId: r.Id,
-        vehicleReportId: r.Id,
-        registrationNumber: r.RegistrationNumber,
-        makerDescription: r.MakerDescription || r.Manufacturer || '',
-        makerModel: r.MakerModel || r.Model || '',
-        createdAt: r.CreatedAt
+        vehicleHistoryReportId: r.id,
+        vehicleReportId: r.id,
+        registrationNumber: r.registration_number,
+        makerDescription: r.maker_description || r.manufacturer || '',
+        makerModel: r.maker_model || r.model || '',
+        createdAt: r.created_at
       }));
 
       return Result.success(vehicleHistoryReports);
@@ -155,24 +155,21 @@ class VehicleReportService {
    */
   async getPhysicalVerificationReportsByUserAsync(userEmail) {
     try {
-      const user = await User.findOne({ where: { Email: userEmail } });
+      const user = await User.findOne({ where: { email: userEmail } });
       if (!user) {
         return Result.failure('Not found');
       }
 
       const reports = await PhysicalVerification.findAll({
-        where: { UserId: user.Id },
-        order: [['CreatedAt', 'DESC']]
+        where: { user_id: user.id },
+        order: [['created_at', 'DESC']]
       });
 
-      // Transform to GetPhysicalVerificationReportsResponse
+      // Transform to GetPhysicalVerificationReportsResponse (matches .NET API exactly)
       const physicalVerificationReports = reports.map(r => ({
-        id: r.Id,
-        registrationNumber: r.RegistrationNumber,
-        status: r.Status,
-        appointmentAt: r.AppointmentAt,
-        createdAt: r.CreatedAt,
-        reportGeneratedAt: r.ReportGeneratedAt
+        id: r.id,
+        registrationNumber: r.registration_number,
+        status: r.status
       }));
 
       return Result.success(physicalVerificationReports);
@@ -203,11 +200,11 @@ class VehicleReportService {
   async getPhysicalVerificationReportByIdAsync(id) {
     try {
       const report = await PhysicalVerification.findOne({
-        where: { Id: id },
-        attributes: ['Report']
+        where: { id: id },
+        attributes: ['report']
       });
 
-      return report?.Report || null;
+      return report?.report || null;
     } catch (error) {
       logger.error('Get physical verification report by ID error:', error);
       throw error;
@@ -226,28 +223,28 @@ class VehicleReportService {
       }
 
       const userVehicleHistoryReports = await VehicleDetail.findAll({
-        where: { UserId: user.Id },
-        order: [['CreatedAt', 'DESC']]
+        where: { user_id: user.id },
+        order: [['created_at', 'DESC']]
       });
 
       const userPhysicalVerifications = await PhysicalVerification.findAll({
-        where: { UserId: user.Id }
+        where: { user_id: user.id }
       });
 
       // Map to VehicleDetailWithReportDto
       const vehicleDetailWithReports = userVehicleHistoryReports.map(uvr => {
         const pvForVehicle = userPhysicalVerifications.find(
-          x => x.RegistrationNumber === uvr.RegistrationNumber
+          x => x.registration_number === uvr.registration_number
         );
 
         return {
-          registrationNumber: uvr.RegistrationNumber,
-          vehicleDetailId: uvr.Id,
+          registrationNumber: uvr.registration_number,
+          vehicleDetailId: uvr.id,
           physicalVerificationReport: !!pvForVehicle,
-          ncrbReport: !!uvr.NcrbReportData,
-          ncrbReportId: uvr.NcrbReportData ? uvr.Id : null,
-          physicalVerificationReportId: pvForVehicle?.Id || null,
-          generatedDate: uvr.CreatedAt
+          ncrbReport: !!uvr.ncrb_report_data,
+          ncrbReportId: uvr.ncrb_report_data ? uvr.id : null,
+          physicalVerificationReportId: pvForVehicle?.id || null,
+          generatedDate: uvr.created_at
         };
       });
 
@@ -272,23 +269,23 @@ class VehicleReportService {
       // Upload report (store file bytes)
       const fileBytes = request.file.buffer;
       await physicalVerification.update({
-        Report: fileBytes,
-        ReportGeneratedAt: new Date(),
-        Status: 'Complete'
+        report: fileBytes,
+        report_generated_at: new Date(),
+        status: 'Complete'
       });
 
       // Send email if requested
       if (request.sendMail) {
-        const user = await User.findByPk(physicalVerification.UserId);
+        const user = await User.findByPk(physicalVerification.user_id);
         if (user) {
           const message = `
-            <p>Dear ${user.UserName},</p>
+            <p>Dear ${user.user_name},</p>
             <p>Your Physical Verification Report is ready.</p>
             <p>Best regards,</p>
             <p>Motopsy</p>`;
 
           await emailService.sendEmailWithAttachmentAsync(
-            user.Email,
+            user.email,
             'Physical Verification Report',
             message,
             fileBytes,
@@ -312,11 +309,11 @@ class VehicleReportService {
     try {
       // Find vehicle detail that has this NCRB report
       const vehicleDetail = await VehicleDetail.findOne({
-        where: { Id: reportId },
-        attributes: ['NcrbReportData']
+        where: { id: reportId },
+        attributes: ['ncrb_report_data']
       });
 
-      return vehicleDetail?.NcrbReportData || null;
+      return vehicleDetail?.ncrb_report_data || null;
     } catch (error) {
       logger.error('Get NCRB report by ID error:', error);
       throw error;
@@ -330,31 +327,31 @@ class VehicleReportService {
     if (!vehicleDetail) return null;
 
     return {
-      id: vehicleDetail.Id,
-      registrationNumber: vehicleDetail.RegistrationNumber,
-      ownerName: vehicleDetail.OwnerName,
-      registrationDate: vehicleDetail.RegistrationDate,
-      manufacturer: vehicleDetail.Manufacturer,
-      model: vehicleDetail.Model,
-      variant: vehicleDetail.Variant,
-      yearOfManufacture: vehicleDetail.YearOfManufacture,
-      vehicleClass: vehicleDetail.VehicleClass,
-      fuelType: vehicleDetail.FuelType,
-      color: vehicleDetail.Color,
-      chassisNumber: vehicleDetail.ChassisNumber,
-      engineNumber: vehicleDetail.EngineNumber,
-      registeredAt: vehicleDetail.RegisteredAt,
-      registeredCity: vehicleDetail.RegisteredCity,
-      registeredState: vehicleDetail.RegisteredState,
-      rtoCode: vehicleDetail.RTOCode,
-      ownerSerialNumber: vehicleDetail.OwnerSerialNumber,
-      insuranceValidUpto: vehicleDetail.InsuranceValidUpto,
-      insuranceCompany: vehicleDetail.InsuranceCompany,
-      policyNumber: vehicleDetail.PolicyNumber,
-      fitnessValidUpto: vehicleDetail.FitnessValidUpto,
-      pucValidUpto: vehicleDetail.PUCValidUpto,
-      permitValidUpto: vehicleDetail.PermitValidUpto,
-      createdAt: vehicleDetail.CreatedAt
+      id: vehicleDetail.id,
+      registrationNumber: vehicleDetail.registration_number,
+      ownerName: vehicleDetail.owner_name,
+      registrationDate: vehicleDetail.registration_date,
+      manufacturer: vehicleDetail.manufacturer,
+      model: vehicleDetail.model,
+      variant: vehicleDetail.variant,
+      yearOfManufacture: vehicleDetail.year_of_manufacture,
+      vehicleClass: vehicleDetail.vehicle_class,
+      fuelType: vehicleDetail.fuel_type,
+      color: vehicleDetail.color,
+      chassisNumber: vehicleDetail.chassis_number,
+      engineNumber: vehicleDetail.engine_number,
+      registeredAt: vehicleDetail.registered_at,
+      registeredCity: vehicleDetail.registered_city,
+      registeredState: vehicleDetail.registered_state,
+      rtoCode: vehicleDetail.rto_code,
+      ownerSerialNumber: vehicleDetail.owner_serial_number,
+      insuranceValidUpto: vehicleDetail.insurance_valid_upto,
+      insuranceCompany: vehicleDetail.insurance_company,
+      policyNumber: vehicleDetail.policy_number,
+      fitnessValidUpto: vehicleDetail.fitness_upto,
+      pucValidUpto: vehicleDetail.pucc_upto,
+      permitValidUpto: vehicleDetail.permit_valid_upto,
+      createdAt: vehicleDetail.created_at
     };
   }
 }

@@ -13,8 +13,8 @@ class ObvController extends BaseController {
 
   async getEnterpriseUsedPriceRange(req, res, next) {
     try {
-      // Pass user email from auth context (matches .NET User.Identity.Name)
-      const userEmail = req.user.email;
+      // Pass user email from auth context if available (matches .NET User.Identity.Name)
+      const userEmail = req.user?.email || null;
       const result = await obvService.getEnterpriseUsedPriceRangeAsync(req.body, userEmail);
       return this.fromResult(result, res);
     } catch (error) {
@@ -25,8 +25,8 @@ class ObvController extends BaseController {
   async getByVehicleDetailId(req, res, next) {
     try {
       const { vehicleDetailId } = req.query;
-      // Pass user email from auth context (matches .NET User.Identity.Name)
-      const userEmail = req.user.email;
+      // Pass user email from auth context if available (matches .NET User.Identity.Name)
+      const userEmail = req.user?.email || null;
       const result = await obvService.getByVehicleDetailIdAsync(parseInt(vehicleDetailId), userEmail);
       return this.fromResult(result, res);
     } catch (error) {
