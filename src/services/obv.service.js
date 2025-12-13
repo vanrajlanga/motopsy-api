@@ -414,16 +414,10 @@ class ObvService {
    */
   async getByVehicleDetailIdAsync(vehicleDetailId, userEmail) {
     try {
-      logger.info(`Get OBV for vehicle detail ID: ${vehicleDetailId} by user: ${userEmail}`);
+      logger.info(`Get OBV for vehicle detail ID: ${vehicleDetailId} by user: ${userEmail || 'anonymous'}`);
 
-      // Get user
-      const user = await User.findOne({
-        where: { normalized_email: userEmail.toUpperCase() }
-      });
-
-      if (!user) {
-        return Result.failure('User not found');
-      }
+      // User lookup is optional for this endpoint (matches .NET - no [Authorize])
+      // We proceed with vehicle lookup regardless of user
 
       // Get vehicle details from database
       const vehicleDetail = await VehicleDetail.findByPk(vehicleDetailId);
