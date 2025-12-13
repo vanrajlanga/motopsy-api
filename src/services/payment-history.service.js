@@ -9,21 +9,21 @@ class PaymentHistoryService {
    */
   transformPaymentHistory(payment, user) {
     return {
-      id: payment.Id,
-      paymentDate: payment.PaymentDate,
-      amount: parseFloat(payment.Amount),
-      paymentFor: payment.PaymentFor,
-      method: payment.Method,
-      status: payment.Status,
-      reportGenerated: payment.VehicleDetailRequestId ? true : false,
-      userId: payment.UserId,
+      id: payment.id,
+      paymentDate: payment.payment_date,
+      amount: parseFloat(payment.amount),
+      paymentFor: payment.payment_for,
+      method: payment.method,
+      status: payment.status,
+      reportGenerated: payment.vehicle_detail_request_id ? true : false,
+      userId: payment.user_id,
       user: user ? {
-        id: user.Id,
-        name: `${user.FirstName || ''} ${user.LastName || ''}`.trim() || user.Email,
-        emailAddress: user.Email,
-        phoneNumber: user.PhoneNumber,
-        isAdmin: user.IsAdmin,
-        createdAt: user.CreatedAt
+        id: user.id,
+        name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
+        emailAddress: user.email,
+        phoneNumber: user.phone_number,
+        isAdmin: user.is_admin,
+        createdAt: user.created_at
       } : null
     };
   }
@@ -41,8 +41,8 @@ class PaymentHistoryService {
       }
 
       const payments = await PaymentHistory.findAll({
-        where: { UserId: userId },
-        order: [['PaymentDate', 'DESC']]
+        where: { user_id: userId },
+        order: [['payment_date', 'DESC']]
       });
 
       // Transform to camelCase DTOs with user data
@@ -66,16 +66,16 @@ class PaymentHistoryService {
       const { userId, amount, orderId, paymentId, signature, status } = request;
 
       const payment = await PaymentHistory.create({
-        UserId: userId,
-        Amount: amount,
-        OrderId: orderId,
-        PaymentId: paymentId,
-        Signature: signature,
-        Status: status,
-        CreatedAt: new Date()
+        user_id: userId,
+        amount: amount,
+        order_id: orderId,
+        payment_id: paymentId,
+        signature: signature,
+        status: status,
+        created_at: new Date()
       });
 
-      logger.info(`Payment history created: ${payment.Id}`);
+      logger.info(`Payment history created: ${payment.id}`);
       return Result.success(payment);
     } catch (error) {
       logger.error('Create payment history error:', error);

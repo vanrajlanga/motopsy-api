@@ -1,48 +1,48 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
-const UserActivityLog = sequelize.define('UserActivityLogs', {
-  Id: {
+const UserActivityLog = sequelize.define('user_activity_logs', {
+  id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  UserId: {
+  user_id: {
     type: DataTypes.INTEGER,
     allowNull: false
   },
-  Action: {
+  action: {
     type: DataTypes.STRING(500),
     allowNull: true
   },
-  Screen: {
+  screen: {
     type: DataTypes.STRING(500),
     allowNull: true
   },
-  Details: {
+  details: {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  IPAddress: {
+  ip_address: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  UserAgent: {
+  user_agent: {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  CreatedAt: {
+  created_at: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
   }
 }, {
-  tableName: 'UserActivityLogs',
+  tableName: 'user_activity_logs',
   timestamps: false
 });
 
 // Define association with User model
 const User = require('./user.model');
-UserActivityLog.belongsTo(User, { foreignKey: 'UserId', as: 'User' });
+UserActivityLog.belongsTo(User, { foreignKey: 'user_id', as: 'User' });
 
 module.exports = UserActivityLog;

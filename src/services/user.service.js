@@ -22,7 +22,7 @@ class UserService {
 
       // Find user
       const user = await User.findOne({
-        where: { NormalizedEmail: userEmail.toUpperCase() }
+        where: { normalized_email: userEmail.toUpperCase() }
       });
 
       if (!user) {
@@ -30,7 +30,7 @@ class UserService {
       }
 
       // Verify current password
-      const isValidPassword = await verifyPassword(currentPassword, user.PasswordHash);
+      const isValidPassword = await verifyPassword(currentPassword, user.password_hash);
 
       if (!isValidPassword) {
         return Result.failure('Current password is incorrect');
@@ -40,14 +40,14 @@ class UserService {
       const hashedPassword = await hashPassword(newPassword);
 
       // Update password
-      user.PasswordHash = hashedPassword;
-      user.ModifiedAt = new Date();
+      user.password_hash = hashedPassword;
+      user.modified_at = new Date();
       await user.save();
 
       logger.info(`Password updated for: ${userEmail}`);
 
       // Log activity (matches .NET)
-      await userActivityLogService.logActivityAsync(user.Id, 'PasswordUpdate', 'Profile', { ip: '0.0.0.0' });
+      await userActivityLogService.logActivityAsync(user.id, 'PasswordUpdate', 'Profile', { ip: '0.0.0.0' });
 
       // Return string message matching .NET API (not wrapped in object)
       return Result.success('Password updated successfully');
@@ -64,15 +64,15 @@ class UserService {
   async getUsers(request) {
     try {
       const result = await toDataSourceResult(User, request, {
-        baseWhere: { IsAdmin: false },
-        order: [['CreatedAt', 'DESC']],
+        baseWhere: { is_admin: false },
+        order: [['created_at', 'DESC']],
         transform: (user) => ({
-          id: user.Id,
-          name: `${user.FirstName || ''} ${user.LastName || ''}`.trim() || user.Email,
-          emailAddress: user.Email,
-          phoneNumber: user.PhoneNumber,
-          isAdmin: user.IsAdmin,
-          createdAt: user.CreatedAt
+          id: user.id,
+          name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
+          emailAddress: user.email,
+          phoneNumber: user.phone_number,
+          isAdmin: user.is_admin,
+          createdAt: user.created_at
         })
       });
 
@@ -89,7 +89,7 @@ class UserService {
   async getTotalUserCountAsync() {
     try {
       const count = await User.count({
-        where: { IsAdmin: false }
+        where: { is_admin: false }
       });
       // Return number directly matching .NET API
       return Result.success(count);
@@ -110,8 +110,8 @@ class UserService {
       }
 
       const user = await User.findOne({
-        where: { NormalizedEmail: userEmail.toUpperCase() },
-        attributes: ['Id', 'Email', 'FirstName', 'LastName', 'PhoneNumber', 'IsAdmin', 'CreatedAt']
+        where: { normalized_email: userEmail.toUpperCase() },
+        attributes: ['id', 'email', 'first_name', 'last_name', 'phone_number', 'is_admin', 'created_at']
       });
 
       if (!user) {
@@ -120,12 +120,12 @@ class UserService {
 
       // Transform to match .NET API response format
       const response = {
-        id: user.Id,
-        name: `${user.FirstName || ''} ${user.LastName || ''}`.trim() || user.Email,
-        emailAddress: user.Email,
-        phoneNumber: user.PhoneNumber,
-        isAdmin: user.IsAdmin,
-        createdAt: user.CreatedAt
+        id: user.id,
+        name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
+        emailAddress: user.email,
+        phoneNumber: user.phone_number,
+        isAdmin: user.is_admin,
+        createdAt: user.created_at
       };
 
       return Result.success(response);
@@ -144,7 +144,7 @@ class UserService {
       const { firstName, lastName, phoneNumber } = request;
 
       const user = await User.findOne({
-        where: { NormalizedEmail: userEmail.toUpperCase() }
+        where: { normalized_email: userEmail.toUpperCase() }
       });
 
       if (!user) {
@@ -152,17 +152,17 @@ class UserService {
       }
 
       // Update user details (always update all fields like .NET does)
-      user.FirstName = firstName;
-      user.LastName = lastName;
-      user.PhoneNumber = phoneNumber;
-      user.ModifiedAt = new Date();
+      user.first_name = firstName;
+      user.last_name = lastName;
+      user.phone_number = phoneNumber;
+      user.modified_at = new Date();
 
       await user.save();
 
       logger.info(`User updated: ${userEmail}`);
 
       // Log activity (matches .NET)
-      await userActivityLogService.logActivityAsync(user.Id, 'ProfileUpdate', 'Profile', { ip: '0.0.0.0' });
+      await userActivityLogService.logActivityAsync(user.id, 'ProfileUpdate', 'Profile', { ip: '0.0.0.0' });
 
       // Return empty success matching .NET API
       return Result.success();

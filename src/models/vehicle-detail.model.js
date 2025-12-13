@@ -5,305 +5,305 @@ const { sequelize } = require('../config/database');
  * VehicleDetail model - matches .NET VehicleDetail entity
  * Contains all fields from Surepass rc-full API response
  */
-const VehicleDetail = sequelize.define('VehicleDetails', {
-  Id: {
+const VehicleDetail = sequelize.define('vehicle_details', {
+  id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  UserId: {
+  user_id: {
     type: DataTypes.INTEGER,
     allowNull: false
   },
-  VehicleDetailRequestId: {
+  vehicle_detail_request_id: {
     type: DataTypes.INTEGER,
     allowNull: true
   },
   // Surepass fields (matches VehicleRcResponse)
-  ClientId: {
+  client_id: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  RegistrationNumber: {
+  registration_number: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  RegistrationDate: {
+  registration_date: {
     type: DataTypes.DATE,
     allowNull: true
   },
-  OwnerName: {
+  owner_name: {
     type: DataTypes.STRING(500),
     allowNull: true
   },
-  FatherName: {
+  father_name: {
     type: DataTypes.STRING(500),
     allowNull: true
   },
-  PresentAddress: {
+  present_address: {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  PermanentAddress: {
+  permanent_address: {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  MobileNumber: {
+  mobile_number: {
     type: DataTypes.STRING(50),
     allowNull: true
   },
-  VehicleCategory: {
+  vehicle_category: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  ChassisNumber: {
+  chassis_number: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  EngineNumber: {
+  engine_number: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  MakerDescription: {
+  maker_description: {
     type: DataTypes.STRING(500),
     allowNull: true
   },
-  MakerModel: {
+  maker_model: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
   // Legacy fields for backward compatibility
-  Manufacturer: {
+  manufacturer: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  Model: {
+  model: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  VehicleClass: {
+  vehicle_class: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  BodyType: {
+  body_type: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  FuelType: {
+  fuel_type: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  Color: {
+  color: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  NormsType: {
+  norms_type: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  FitUpTo: {
+  fit_up_to: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  Financer: {
+  financer: {
     type: DataTypes.STRING(500),
     allowNull: true
   },
-  Financed: {
+  financed: {
     type: DataTypes.BOOLEAN,
     allowNull: true,
     defaultValue: false
   },
-  InsuranceCompany: {
+  insurance_company: {
     type: DataTypes.STRING(500),
     allowNull: true
   },
-  InsurancePolicyNumber: {
+  insurance_policy_number: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  InsuranceValidUpto: {
+  insurance_valid_upto: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  ManufacturingDate: {
+  manufacturing_date: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  ManufacturingDateFormatted: {
+  manufacturing_date_formatted: {
     type: DataTypes.STRING(50),
     allowNull: true
   },
-  RegisteredAt: {
+  registered_at: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  LatestBy: {
+  latest_by: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  LessInfo: {
+  less_info: {
     type: DataTypes.BOOLEAN,
     allowNull: true,
     defaultValue: false
   },
-  TaxUpto: {
+  tax_upto: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  TaxPaidUpto: {
+  tax_paid_upto: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  CubicCapacity: {
+  cubic_capacity: {
     type: DataTypes.STRING(50),
     allowNull: true
   },
-  VehicleGrossWeight: {
+  vehicle_gross_weight: {
     type: DataTypes.STRING(50),
     allowNull: true
   },
-  NoCylinders: {
+  no_cylinders: {
     type: DataTypes.STRING(20),
     allowNull: true
   },
-  SeatCapacity: {
+  seat_capacity: {
     type: DataTypes.STRING(20),
     allowNull: true
   },
-  SleeperCapacity: {
+  sleeper_capacity: {
     type: DataTypes.STRING(20),
     allowNull: true
   },
-  StandingCapacity: {
+  standing_capacity: {
     type: DataTypes.STRING(20),
     allowNull: true
   },
-  Wheelbase: {
+  wheelbase: {
     type: DataTypes.STRING(50),
     allowNull: true
   },
-  UnladenWeight: {
+  unladen_weight: {
     type: DataTypes.STRING(50),
     allowNull: true
   },
-  VehicleCategoryDescription: {
+  vehicle_category_description: {
     type: DataTypes.STRING(500),
     allowNull: true
   },
-  PUCCNumber: {
+  pucc_number: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  PUCCUpto: {
+  pucc_upto: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  PermitNumber: {
+  permit_number: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  PermitIssueDate: {
+  permit_issue_date: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  PermitValidFrom: {
+  permit_valid_from: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  PermitValidUpto: {
+  permit_valid_upto: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  PermitType: {
+  permit_type: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  NationalPermitNumber: {
+  national_permit_number: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  NationalPermitUpto: {
+  national_permit_upto: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  NationalPermitIssuedBy: {
+  national_permit_issued_by: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  NonUseStatus: {
+  non_use_status: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  NonUseFrom: {
+  non_use_from: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  NonUseTo: {
+  non_use_to: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  BlacklistStatus: {
+  blacklist_status: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  NocDetails: {
+  noc_details: {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  OwnerNumber: {
+  owner_number: {
     type: DataTypes.STRING(20),
     allowNull: true
   },
-  RcStatus: {
+  rc_status: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  MaskedName: {
+  masked_name: {
     type: DataTypes.STRING(500),
     allowNull: true
   },
-  ChallanDetails: {
+  challan_details: {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  Variant: {
+  variant: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
   // Ex-showroom price for resale value calculation
-  ExShowroomPrice: {
+  ex_showroom_price: {
     type: DataTypes.DECIMAL(12, 2),
     allowNull: true
   },
   // Legacy fields
-  FitnessUpto: {
+  fitness_upto: {
     type: DataTypes.DATE,
     allowNull: true
   },
-  InsuranceUpto: {
+  insurance_upto: {
     type: DataTypes.DATE,
     allowNull: true
   },
-  PurchaseDate: {
+  purchase_date: {
     type: DataTypes.DATE,
     allowNull: true
   },
-  Status: {
+  status: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  CreatedAt: {
+  created_at: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
   },
-  ModifiedAt: {
+  modified_at: {
     type: DataTypes.DATE,
     allowNull: true
   }
 }, {
-  tableName: 'VehicleDetails',
+  tableName: 'vehicle_details',
   timestamps: false
 });
 

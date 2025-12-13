@@ -1,98 +1,98 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
-const User = sequelize.define('AspNetUsers', {
-  Id: {
+const User = sequelize.define('users', {
+  id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  CreatedAt: {
+  created_at: {
     type: DataTypes.DATE(6),
     allowNull: false,
     defaultValue: DataTypes.NOW
   },
-  ModifiedAt: {
+  modified_at: {
     type: DataTypes.DATE(6),
     allowNull: true
   },
-  IsAdmin: {
+  is_admin: {
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: false
   },
-  UserName: {
+  user_name: {
     type: DataTypes.STRING(256),
     allowNull: true
   },
-  NormalizedUserName: {
+  normalized_user_name: {
     type: DataTypes.STRING(256),
     allowNull: true
   },
-  Email: {
+  email: {
     type: DataTypes.STRING(256),
     allowNull: true,
     unique: true
   },
-  NormalizedEmail: {
+  normalized_email: {
     type: DataTypes.STRING(256),
     allowNull: true
   },
-  EmailConfirmed: {
+  email_confirmed: {
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: false
   },
-  PasswordHash: {
+  password_hash: {
     type: DataTypes.TEXT('long'),
     allowNull: true
   },
-  SecurityStamp: {
+  security_stamp: {
     type: DataTypes.TEXT('long'),
     allowNull: true
   },
-  ConcurrencyStamp: {
+  concurrency_stamp: {
     type: DataTypes.TEXT('long'),
     allowNull: true
   },
-  PhoneNumber: {
+  phone_number: {
     type: DataTypes.TEXT('long'),
     allowNull: true
   },
-  PhoneNumberConfirmed: {
+  phone_number_confirmed: {
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: false
   },
-  TwoFactorEnabled: {
+  two_factor_enabled: {
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: false
   },
-  LockoutEnd: {
+  lockout_end: {
     type: DataTypes.DATE(6),
     allowNull: true
   },
-  LockoutEnabled: {
+  lockout_enabled: {
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: true
   },
-  AccessFailedCount: {
+  access_failed_count: {
     type: DataTypes.INTEGER,
     allowNull: false,
     defaultValue: 0
   },
-  FirstName: {
+  first_name: {
     type: DataTypes.STRING(250),
     allowNull: true
   },
-  LastName: {
+  last_name: {
     type: DataTypes.STRING(255),
     allowNull: true
   }
 }, {
-  tableName: 'AspNetUsers',
+  tableName: 'users',
   timestamps: false
 });
 

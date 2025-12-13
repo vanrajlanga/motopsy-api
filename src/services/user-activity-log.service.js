@@ -17,17 +17,17 @@ class UserActivityLogService {
         include: [{
           model: User,
           as: 'User',
-          attributes: ['Id', 'Email']
+          attributes: ['id', 'email']
         }],
-        order: [['CreatedAt', 'DESC']]
+        order: [['created_at', 'DESC']]
       });
 
       // Group by user (matching .NET GroupBy logic)
       const groupedByUser = {};
 
       for (const log of logs) {
-        const userId = log.UserId;
-        const userEmail = log.User?.Email || 'Unknown';
+        const userId = log.user_id;
+        const userEmail = log.User?.email || 'Unknown';
 
         if (!groupedByUser[userId]) {
           groupedByUser[userId] = {
@@ -38,9 +38,9 @@ class UserActivityLogService {
         }
 
         groupedByUser[userId].activityLogs.push({
-          createdAt: log.CreatedAt,
-          logAction: log.Action,
-          logScreen: log.Screen
+          createdAt: log.created_at,
+          logAction: log.action,
+          logScreen: log.screen
         });
       }
 
@@ -57,19 +57,19 @@ class UserActivityLogService {
   async logActivityAsync(userId, action, screen, req) {
     try {
       const maxLog = await UserActivityLog.findOne({
-        attributes: [[sequelize.fn('MAX', sequelize.col('Id')), 'maxId']],
+        attributes: [[sequelize.fn('MAX', sequelize.col('id')), 'maxId']],
         raw: true
       });
       const nextId = (maxLog && maxLog.maxId) ? maxLog.maxId + 1 : 1;
 
       await UserActivityLog.create({
-        Id: nextId,
-        UserId: userId,
-        Action: action,
-        Screen: screen,
-        IPAddress: req.ip || req.connection.remoteAddress,
-        UserAgent: req.get('user-agent'),
-        CreatedAt: new Date()
+        id: nextId,
+        user_id: userId,
+        action: action,
+        screen: screen,
+        ip_address: req.ip || req.connection?.remoteAddress || '0.0.0.0',
+        user_agent: req.get ? req.get('user-agent') : null,
+        created_at: new Date()
       });
 
       logger.info(`Activity logged: ${action} for user ${userId}`);

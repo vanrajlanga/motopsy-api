@@ -19,7 +19,7 @@ const sequelize = new Sequelize(
     },
     define: {
       timestamps: true,
-      underscored: false,
+      underscored: true,
       freezeTableName: true
     }
   }

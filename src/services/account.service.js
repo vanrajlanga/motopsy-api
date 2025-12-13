@@ -18,7 +18,7 @@ class AccountService {
 
       // Check if user already exists
       const existingUser = await User.findOne({
-        where: { NormalizedEmail: email.toUpperCase() }
+        where: { normalized_email: email.toUpperCase() }
       });
 
       if (existingUser) {
@@ -34,49 +34,49 @@ class AccountService {
 
       // Get next available ID
       const maxUser = await User.findOne({
-        attributes: [[sequelize.fn('MAX', sequelize.col('Id')), 'maxId']],
+        attributes: [[sequelize.fn('MAX', sequelize.col('id')), 'maxId']],
         raw: true
       });
       const nextId = (maxUser && maxUser.maxId) ? maxUser.maxId + 1 : 1;
 
       // Create user
       const user = await User.create({
-        Id: nextId,
-        Email: email,
-        NormalizedEmail: email.toUpperCase(),
-        UserName: email,
-        NormalizedUserName: email.toUpperCase(),
-        PasswordHash: hashedPassword,
-        EmailConfirmed: false,
-        PhoneNumber: phoneNumber,
-        PhoneNumberConfirmed: false,
-        TwoFactorEnabled: false,
-        LockoutEnabled: true,
-        AccessFailedCount: 0,
-        IsAdmin: false,
-        FirstName: firstName,
-        LastName: lastName,
-        SecurityStamp: securityStamp,
-        ConcurrencyStamp: concurrencyStamp,
-        CreatedAt: new Date()
+        id: nextId,
+        email: email,
+        normalized_email: email.toUpperCase(),
+        user_name: email,
+        normalized_user_name: email.toUpperCase(),
+        password_hash: hashedPassword,
+        email_confirmed: false,
+        phone_number: phoneNumber,
+        phone_number_confirmed: false,
+        two_factor_enabled: false,
+        lockout_enabled: true,
+        access_failed_count: 0,
+        is_admin: false,
+        first_name: firstName,
+        last_name: lastName,
+        security_stamp: securityStamp,
+        concurrency_stamp: concurrencyStamp,
+        created_at: new Date()
       });
 
-      logger.info(`User registered: ${email}, userId: ${user.Id}`);
+      logger.info(`User registered: ${email}, userId: ${user.id}`);
 
       // Generate email confirmation token with userId
-      const emailToken = generateEmailToken(email, user.Id);
+      const emailToken = generateEmailToken(email, user.id);
 
       // Send email confirmation
-      await emailService.sendEmailConfirmationAsync(email, user.Id, emailToken);
+      await emailService.sendEmailConfirmationAsync(email, user.id, emailToken);
 
       // Return UserDto matching .NET API
       return Result.success({
-        id: user.Id,
-        name: `${user.FirstName} ${user.LastName}`.trim(),
-        emailAddress: user.Email,
-        phoneNumber: user.PhoneNumber,
-        isAdmin: user.IsAdmin,
-        createdAt: user.CreatedAt
+        id: user.id,
+        name: `${user.first_name} ${user.last_name}`.trim(),
+        emailAddress: user.email,
+        phoneNumber: user.phone_number,
+        isAdmin: user.is_admin,
+        createdAt: user.created_at
       });
     } catch (error) {
       logger.error('Registration error:', error);
@@ -96,9 +96,9 @@ class AccountService {
         return Result.failure('UserId and code are required');
       }
 
-      // Find user (Id is the primary key column name)
+      // Find user (id is the primary key column name)
       const user = await User.findOne({
-        where: { Id: userId }
+        where: { id: userId }
       });
 
       if (!user) {
@@ -119,16 +119,16 @@ class AccountService {
       }
 
       // Check if already confirmed
-      if (user.EmailConfirmed) {
+      if (user.email_confirmed) {
         return Result.success({ message: 'Email already confirmed' });
       }
 
       // Update email confirmed
-      user.EmailConfirmed = true;
-      user.ModifiedAt = new Date();
+      user.email_confirmed = true;
+      user.modified_at = new Date();
       await user.save();
 
-      logger.info(`Email confirmed for userId: ${userId}, email: ${user.Email}`);
+      logger.info(`Email confirmed for userId: ${userId}, email: ${user.email}`);
 
       return Result.success({ message: 'Email confirmed successfully' });
     } catch (error) {
@@ -146,7 +146,7 @@ class AccountService {
 
       // Find user
       const user = await User.findOne({
-        where: { NormalizedEmail: email.toUpperCase() }
+        where: { normalized_email: email.toUpperCase() }
       });
 
       if (!user) {
@@ -154,20 +154,20 @@ class AccountService {
       }
 
       // Check if account is locked out
-      if (user.LockoutEnabled && user.LockoutEnd && new Date(user.LockoutEnd) > new Date()) {
+      if (user.lockout_enabled && user.lockout_end && new Date(user.lockout_end) > new Date()) {
         return Result.failure('Account is locked. Please try again later.');
       }
 
       // Verify password
-      const isValidPassword = await verifyPassword(password, user.PasswordHash);
+      const isValidPassword = await verifyPassword(password, user.password_hash);
 
       if (!isValidPassword) {
         // Increment access failed count
-        user.AccessFailedCount += 1;
+        user.access_failed_count += 1;
 
         // Lock account if max attempts reached (10 attempts)
-        if (user.AccessFailedCount >= 10) {
-          user.LockoutEnd = new Date(Date.now() + 24 * 60 * 60 * 1000); // 1 day
+        if (user.access_failed_count >= 10) {
+          user.lockout_end = new Date(Date.now() + 24 * 60 * 60 * 1000); // 1 day
           logger.warn(`Account locked for: ${email}`);
         }
 
@@ -176,14 +176,14 @@ class AccountService {
       }
 
       // Check if email is confirmed
-      if (!user.EmailConfirmed) {
+      if (!user.email_confirmed) {
         return Result.failure('Please confirm your email before logging in');
       }
 
       // Reset access failed count on successful login
-      user.AccessFailedCount = 0;
-      user.LockoutEnd = null;
-      user.ModifiedAt = new Date();
+      user.access_failed_count = 0;
+      user.lockout_end = null;
+      user.modified_at = new Date();
       await user.save();
 
       // Generate JWT token (returns { accessToken, validTo, validFrom })
@@ -207,7 +207,7 @@ class AccountService {
 
       // Find user
       const user = await User.findOne({
-        where: { NormalizedEmail: email.toUpperCase() }
+        where: { normalized_email: email.toUpperCase() }
       });
 
       if (!user) {
@@ -217,7 +217,7 @@ class AccountService {
       }
 
       // Check if email is confirmed
-      if (!user.EmailConfirmed) {
+      if (!user.email_confirmed) {
         logger.warn(`Forgot password request for unconfirmed email: ${email}`);
         return Result.success();
       }
@@ -226,9 +226,9 @@ class AccountService {
       const resetToken = generatePasswordResetToken(email);
 
       // Send password reset email with userId and code
-      await emailService.sendPasswordResetAsync(email, user.Id, resetToken);
+      await emailService.sendPasswordResetAsync(email, user.id, resetToken);
 
-      logger.info(`Password reset email sent to: ${email}, userId: ${user.Id}`);
+      logger.info(`Password reset email sent to: ${email}, userId: ${user.id}`);
 
       // Return empty success matching .NET API
       return Result.success();
@@ -253,7 +253,7 @@ class AccountService {
 
       // Find user by ID
       const user = await User.findOne({
-        where: { Id: userId }
+        where: { id: userId }
       });
 
       if (!user) {
@@ -265,7 +265,7 @@ class AccountService {
         const decoded = verifyPurposeToken(code, 'password-reset');
 
         // Verify the code belongs to this user's email
-        if (decoded.email.toUpperCase() !== user.NormalizedEmail) {
+        if (decoded.email.toUpperCase() !== user.normalized_email) {
           return Result.failure('Invalid reset code');
         }
       } catch (error) {
@@ -277,15 +277,15 @@ class AccountService {
       const hashedPassword = await hashPassword(newPassword);
 
       // Update password
-      user.PasswordHash = hashedPassword;
-      user.SecurityStamp = crypto.randomBytes(16).toString('hex').toUpperCase();
-      user.ModifiedAt = new Date();
+      user.password_hash = hashedPassword;
+      user.security_stamp = crypto.randomBytes(16).toString('hex').toUpperCase();
+      user.modified_at = new Date();
       await user.save();
 
-      logger.info(`Password reset for userId: ${userId}, email: ${user.Email}`);
+      logger.info(`Password reset for userId: ${userId}, email: ${user.email}`);
 
       // Send confirmation email
-      await emailService.sendPasswordResetSuccessAsync(user.Email, user.UserName || user.Email);
+      await emailService.sendPasswordResetSuccessAsync(user.email, user.user_name || user.email);
 
       // Return string message matching .NET API (not wrapped in object)
       return Result.success('Password updated successfully');

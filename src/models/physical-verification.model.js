@@ -1,90 +1,90 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
-const PhysicalVerification = sequelize.define('physicalverifications', {
-  Id: {
+const PhysicalVerification = sequelize.define('physical_verifications', {
+  id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  UserId: {
+  user_id: {
     type: DataTypes.INTEGER,
     allowNull: false
   },
-  Name: {
+  name: {
     type: DataTypes.STRING(50),
     allowNull: false,
     defaultValue: ''
   },
-  VehicleDetailId: {
+  vehicle_detail_id: {
     type: DataTypes.INTEGER,
     allowNull: true
   },
-  RegistrationNumber: {
+  registration_number: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  Status: {
+  status: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  Address: {
+  address: {
     type: DataTypes.STRING(1000),
     allowNull: false,
     defaultValue: ''
   },
-  City: {
+  city: {
     type: DataTypes.STRING(50),
     allowNull: false,
     defaultValue: ''
   },
-  State: {
+  state: {
     type: DataTypes.STRING(50),
     allowNull: false,
     defaultValue: ''
   },
-  Pincode: {
+  pincode: {
     type: DataTypes.INTEGER,
     allowNull: false,
     defaultValue: 0
   },
-  Country: {
+  country: {
     type: DataTypes.STRING(50),
     allowNull: false,
     defaultValue: ''
   },
-  Description: {
+  description: {
     type: DataTypes.STRING(1000),
     allowNull: false,
     defaultValue: ''
   },
-  ReportPath: {
+  report_path: {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  Report: {
+  report: {
     type: DataTypes.BLOB('long'),
     allowNull: true
   },
-  ReportGeneratedAt: {
+  report_generated_at: {
     type: DataTypes.DATE,
     allowNull: true
   },
-  AppointmentAt: {
+  appointment_at: {
     type: DataTypes.DATE,
     allowNull: true
   },
-  CreatedAt: {
+  created_at: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
   },
-  ModifiedAt: {
+  modified_at: {
     type: DataTypes.DATE,
     allowNull: true
   }
 }, {
-  tableName: 'physicalverifications',
+  tableName: 'physical_verifications',
   timestamps: false
 });
 

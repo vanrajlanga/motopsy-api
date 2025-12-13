@@ -107,7 +107,7 @@ class PaymentService {
 
       // Find user
       const user = await User.findOne({
-        where: { NormalizedEmail: userEmail.toUpperCase() }
+        where: { normalized_email: userEmail.toUpperCase() }
       });
 
       if (!user) {
@@ -130,29 +130,29 @@ class PaymentService {
 
       // Get next available ID for PaymentHistory
       const maxPayment = await PaymentHistory.findOne({
-        attributes: [[sequelize.fn('MAX', sequelize.col('Id')), 'maxId']],
+        attributes: [[sequelize.fn('MAX', sequelize.col('id')), 'maxId']],
         raw: true
       });
       const nextId = (maxPayment && maxPayment.maxId) ? maxPayment.maxId + 1 : 1;
 
       // Create PaymentHistory record
       const paymentHistory = await PaymentHistory.create({
-        Id: nextId,
-        UserId: user.Id,
-        Amount: amount,
-        PaymentFor: paymentFor,
-        Status: 0, // Pending
-        OrderId: order.id,
-        PaymentDate: new Date(),
-        CreatedAt: new Date()
+        id: nextId,
+        user_id: user.id,
+        amount: amount,
+        payment_for: paymentFor,
+        status: 0, // Pending
+        order_id: order.id,
+        payment_date: new Date(),
+        created_at: new Date()
       });
 
-      logger.info(`Razorpay order created for ${userEmail}: ${order.id}, paymentFor: ${paymentFor}, paymentHistoryId: ${paymentHistory.Id}`);
+      logger.info(`Razorpay order created for ${userEmail}: ${order.id}, paymentFor: ${paymentFor}, paymentHistoryId: ${paymentHistory.id}`);
 
       // Return response matching .NET API format
       return Result.success({
         orderId: order.id,
-        paymentHistoryId: paymentHistory.Id
+        paymentHistoryId: paymentHistory.id
       });
     } catch (error) {
       logger.error('Create order error:', error);
@@ -216,7 +216,7 @@ class PaymentService {
 
       // Get userId from payment history for activity logging
       const existingPaymentHistory = await PaymentHistory.findByPk(paymentHistoryId);
-      const userId = existingPaymentHistory?.UserId || 0;
+      const userId = existingPaymentHistory?.user_id || 0;
 
       if (!isValid) {
         logger.warn(`Payment verification failed for order: ${razorpayOrderId}`);
@@ -231,27 +231,27 @@ class PaymentService {
 
       // Create VehicleDetailRequest record
       const maxVehicleRequest = await VehicleDetailRequest.findOne({
-        attributes: [[sequelize.fn('MAX', sequelize.col('Id')), 'maxId']],
+        attributes: [[sequelize.fn('MAX', sequelize.col('id')), 'maxId']],
         raw: true
       });
       const nextVehicleRequestId = (maxVehicleRequest && maxVehicleRequest.maxId) ? maxVehicleRequest.maxId + 1 : 1;
 
       const vehicleDetailRequest = await VehicleDetailRequest.create({
-        Id: nextVehicleRequestId,
-        UserId: userId,
-        PaymentHistoryId: paymentHistoryId,
-        RegistrationNumber: registrationNumber,
-        Make: request.Make || request.make,
-        Model: request.Model || request.model,
-        Year: request.Year || request.year,
-        Trim: request.Trim || request.trim,
-        KmsDriven: request.KmsDriven || request.kmsDriven,
-        City: request.City || request.city,
-        NoOfOwners: request.NoOfOwners || request.noOfOwners,
-        Version: request.Version || request.version,
-        TransactionType: request.TransactionType || request.transactionType,
-        CustomerType: request.CustomerType || request.customerType,
-        CreatedAt: new Date()
+        id: nextVehicleRequestId,
+        user_id: userId,
+        payment_history_id: paymentHistoryId,
+        registration_number: registrationNumber,
+        make: request.Make || request.make,
+        model: request.Model || request.model,
+        year: request.Year || request.year,
+        trim: request.Trim || request.trim,
+        kms_driven: request.KmsDriven || request.kmsDriven,
+        city: request.City || request.city,
+        no_of_owners: request.NoOfOwners || request.noOfOwners,
+        version: request.Version || request.version,
+        transaction_type: request.TransactionType || request.transactionType,
+        customer_type: request.CustomerType || request.customerType,
+        created_at: new Date()
       });
 
       // Update PaymentHistory record
@@ -262,22 +262,22 @@ class PaymentService {
         return Result.failure('Payment history not found');
       }
 
-      paymentHistory.Status = 1; // Successful
-      paymentHistory.Method = paymentMethod;
-      paymentHistory.TransactionId = razorpayPaymentId;
-      paymentHistory.ModifiedAt = new Date();
+      paymentHistory.status = 1; // Successful
+      paymentHistory.method = paymentMethod;
+      paymentHistory.transaction_id = razorpayPaymentId;
+      paymentHistory.modified_at = new Date();
       await paymentHistory.save();
 
-      logger.info(`Payment verified successfully: ${razorpayPaymentId}, VehicleDetailRequestId: ${vehicleDetailRequest.Id}`);
+      logger.info(`Payment verified successfully: ${razorpayPaymentId}, VehicleDetailRequestId: ${vehicleDetailRequest.id}`);
 
       // Log successful payment activity (matches .NET)
-      await userActivityLogService.logActivityAsync(paymentHistory.UserId, 'PaymentSuccess', 'Home', { ip: '0.0.0.0' });
+      await userActivityLogService.logActivityAsync(paymentHistory.user_id, 'PaymentSuccess', 'Home', { ip: '0.0.0.0' });
 
       // Return response matching .NET API format
       return Result.success({
         success: true,
-        paymentHistoryId: paymentHistory.Id,
-        vehicleDetailRequestId: vehicleDetailRequest.Id
+        paymentHistoryId: paymentHistory.id,
+        vehicleDetailRequestId: vehicleDetailRequest.id
       });
     } catch (error) {
       logger.error('Verify payment error:', error);

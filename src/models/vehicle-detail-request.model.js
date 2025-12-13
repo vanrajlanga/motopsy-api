@@ -1,91 +1,91 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
-const VehicleDetailRequest = sequelize.define('vehicledetailrequests', {
-  Id: {
+const VehicleDetailRequest = sequelize.define('vehicle_detail_requests', {
+  id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  UserId: {
+  user_id: {
     type: DataTypes.INTEGER,
     allowNull: false
   },
-  PaymentHistoryId: {
+  payment_history_id: {
     type: DataTypes.INTEGER,
     allowNull: true,
     references: {
-      model: 'paymenthistories',
-      key: 'Id'
+      model: 'payment_histories',
+      key: 'id'
     }
   },
-  RegistrationNumber: {
+  registration_number: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  Make: {
+  make: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  Model: {
+  model: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  Year: {
+  year: {
     type: DataTypes.STRING(10),
     allowNull: true
   },
-  Trim: {
+  trim: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  KmsDriven: {
+  kms_driven: {
     type: DataTypes.STRING(50),
     allowNull: true
   },
-  City: {
+  city: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  NoOfOwners: {
+  no_of_owners: {
     type: DataTypes.STRING(10),
     allowNull: true
   },
-  Version: {
+  version: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  TransactionType: {
+  transaction_type: {
     type: DataTypes.STRING(50),
     allowNull: true
   },
-  CustomerType: {
+  customer_type: {
     type: DataTypes.STRING(50),
     allowNull: true
   },
-  Status: {
+  status: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  RequestData: {
+  request_data: {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  ResponseData: {
+  response_data: {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  CreatedAt: {
+  created_at: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
   },
-  ModifiedAt: {
+  modified_at: {
     type: DataTypes.DATE,
     allowNull: true
   }
 }, {
-  tableName: 'vehicledetailrequests',
+  tableName: 'vehicle_detail_requests',
   timestamps: false
 });
 

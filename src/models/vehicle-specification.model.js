@@ -5,14 +5,14 @@ const { sequelize } = require('../config/database');
  * VehicleSpecification model - matches .NET VehicleSpecification entity
  * Contains all 200+ fields for vehicle specifications
  */
-const VehicleSpecification = sequelize.define('vehiclespecifications', {
-  Id: {
+const VehicleSpecification = sequelize.define('vehicle_specifications', {
+  id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: false
   },
   // Naming & Basic Info
-  naming_versionId: DataTypes.TEXT,
+  naming_version_id: DataTypes.TEXT,
   naming_source_url: DataTypes.TEXT,
   naming_make: DataTypes.TEXT,
   naming_model: DataTypes.TEXT,
@@ -38,9 +38,9 @@ const VehicleSpecification = sequelize.define('vehiclespecifications', {
   enginetransmission_acceoeration_0_100_kmph: DataTypes.TEXT,
   enginetransmission_fueltype: DataTypes.TEXT,
   enginetransmission_maxpower: DataTypes.TEXT,
-  enginetransmission_maxpowerRPM: DataTypes.TEXT,
+  enginetransmission_maxpower_rpm: DataTypes.TEXT,
   enginetransmission_maxtorque: DataTypes.TEXT,
-  enginetransmission_maxtorqueRPM: DataTypes.TEXT,
+  enginetransmission_maxtorque_rpm: DataTypes.TEXT,
   enginetransmission_performanceonalternatefuel: DataTypes.TEXT,
   enginetransmission_maxengineperformance: DataTypes.TEXT,
   enginetransmission_maxmotorperformance: DataTypes.TEXT,
@@ -293,13 +293,13 @@ const VehicleSpecification = sequelize.define('vehiclespecifications', {
   on_road_price_by_city_pune: DataTypes.TEXT,
   on_road_price_by_city_navi_mumbai: DataTypes.TEXT,
   on_road_price_by_city_hyderabad: DataTypes.TEXT,
-  on_road_price_by_city_Ahmedabad: DataTypes.TEXT,
+  on_road_price_by_city_ahmedabad: DataTypes.TEXT,
   on_road_price_by_city_chennai: DataTypes.TEXT,
   on_road_price_by_city_kolkata: DataTypes.TEXT,
 
-  Description: DataTypes.TEXT
+  description: DataTypes.TEXT
 }, {
-  tableName: 'vehiclespecifications',
+  tableName: 'vehicle_specifications',
   timestamps: false
 });
 

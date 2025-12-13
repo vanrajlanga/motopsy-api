@@ -2,30 +2,30 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
 const Faq = sequelize.define('faqs', {
-  Id: {
+  id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  Question: {
+  question: {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  Answer: {
+  answer: {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  Order: {
+  order: {
     type: DataTypes.INTEGER,
     allowNull: false,
     defaultValue: 0
   },
-  CreatedAt: {
+  created_at: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
   },
-  ModifiedAt: {
+  modified_at: {
     type: DataTypes.DATE,
     allowNull: true
   }

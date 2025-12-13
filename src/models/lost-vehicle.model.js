@@ -1,18 +1,18 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
-const LostVehicle = sequelize.define('LostVehicles', {
-  Id: {
+const LostVehicle = sequelize.define('lost_vehicles', {
+  id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
-    autoIncrement: false
+    autoIncrement: true
   },
-  RegistrationNumber: {
+  registration_number: {
     type: DataTypes.STRING(255),
     allowNull: false
   }
 }, {
-  tableName: 'LostVehicles',
+  tableName: 'lost_vehicles',
   timestamps: false
 });
 

@@ -13,12 +13,12 @@ class DashboardService {
     const currentMonth = new Date().getMonth() + 1; // 1-12
     const currentYear = new Date().getFullYear();
 
-    const result = await PaymentHistory.sum('Amount', {
+    const result = await PaymentHistory.sum('amount', {
       where: {
         [Op.and]: [
-          sequelize.where(sequelize.fn('MONTH', sequelize.col('PaymentDate')), currentMonth),
-          sequelize.where(sequelize.fn('YEAR', sequelize.col('PaymentDate')), currentYear),
-          { Status: 1 } // Successful
+          sequelize.where(sequelize.fn('MONTH', sequelize.col('payment_date')), currentMonth),
+          sequelize.where(sequelize.fn('YEAR', sequelize.col('payment_date')), currentYear),
+          { status: 1 } // Successful
         ]
       }
     });
@@ -36,12 +36,12 @@ class DashboardService {
     const previousMonth = currentMonth === 1 ? 12 : currentMonth - 1;
     const previousYear = currentMonth === 1 ? currentYear - 1 : currentYear;
 
-    const result = await PaymentHistory.sum('Amount', {
+    const result = await PaymentHistory.sum('amount', {
       where: {
         [Op.and]: [
-          sequelize.where(sequelize.fn('MONTH', sequelize.col('PaymentDate')), previousMonth),
-          sequelize.where(sequelize.fn('YEAR', sequelize.col('PaymentDate')), previousYear),
-          { Status: 1 } // Successful
+          sequelize.where(sequelize.fn('MONTH', sequelize.col('payment_date')), previousMonth),
+          sequelize.where(sequelize.fn('YEAR', sequelize.col('payment_date')), previousYear),
+          { status: 1 } // Successful
         ]
       }
     });
@@ -91,18 +91,18 @@ class DashboardService {
   async getMonthlyRevenueReportAsync(year) {
     const monthlyPayments = await PaymentHistory.findAll({
       attributes: [
-        [sequelize.fn('MONTH', sequelize.col('PaymentDate')), 'month'],
+        [sequelize.fn('MONTH', sequelize.col('payment_date')), 'month'],
         [sequelize.literal(year.toString()), 'year'],
-        [sequelize.fn('SUM', sequelize.col('Amount')), 'revenue']
+        [sequelize.fn('SUM', sequelize.col('amount')), 'revenue']
       ],
       where: {
         [Op.and]: [
-          sequelize.where(sequelize.fn('YEAR', sequelize.col('PaymentDate')), year),
-          { Status: 1 } // Successful
+          sequelize.where(sequelize.fn('YEAR', sequelize.col('payment_date')), year),
+          { status: 1 } // Successful
         ]
       },
-      group: [sequelize.fn('MONTH', sequelize.col('PaymentDate'))],
-      order: [[sequelize.fn('MONTH', sequelize.col('PaymentDate')), 'ASC']],
+      group: [sequelize.fn('MONTH', sequelize.col('payment_date'))],
+      order: [[sequelize.fn('MONTH', sequelize.col('payment_date')), 'ASC']],
       raw: true
     });
 
@@ -121,14 +121,14 @@ class DashboardService {
   async getYearlyRevenueReportAsync() {
     const yearlyPayments = await PaymentHistory.findAll({
       attributes: [
-        [sequelize.fn('YEAR', sequelize.col('PaymentDate')), 'year'],
-        [sequelize.fn('SUM', sequelize.col('Amount')), 'revenue']
+        [sequelize.fn('YEAR', sequelize.col('payment_date')), 'year'],
+        [sequelize.fn('SUM', sequelize.col('amount')), 'revenue']
       ],
       where: {
-        Status: 1 // Successful
+        status: 1 // Successful
       },
-      group: [sequelize.fn('YEAR', sequelize.col('PaymentDate'))],
-      order: [[sequelize.fn('YEAR', sequelize.col('PaymentDate')), 'ASC']],
+      group: [sequelize.fn('YEAR', sequelize.col('payment_date'))],
+      order: [[sequelize.fn('YEAR', sequelize.col('payment_date')), 'ASC']],
       raw: true
     });
 

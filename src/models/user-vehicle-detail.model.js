@@ -1,32 +1,32 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
-const UserVehicleDetail = sequelize.define('uservehicledetails', {
-  Id: {
+const UserVehicleDetail = sequelize.define('user_vehicle_details', {
+  id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  UserId: {
+  user_id: {
     type: DataTypes.INTEGER,
     allowNull: false
   },
-  VehicleDetailId: {
+  vehicle_detail_id: {
     type: DataTypes.INTEGER,
     allowNull: false
   },
-  IsPrimary: {
+  is_primary: {
     type: DataTypes.BOOLEAN,
     allowNull: true,
     defaultValue: false
   },
-  CreatedAt: {
+  created_at: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
   }
 }, {
-  tableName: 'uservehicledetails',
+  tableName: 'user_vehicle_details',
   timestamps: false
 });
 

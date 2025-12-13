@@ -1,27 +1,27 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
-const StateMapping = sequelize.define('statemappings', {
-  Id: {
+const StateMapping = sequelize.define('state_mappings', {
+  id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  StateCode: {
+  state_code: {
     type: DataTypes.STRING(50),
     allowNull: true
   },
-  StateName: {
+  state_name: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  CreatedAt: {
+  created_at: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
   }
 }, {
-  tableName: 'statemappings',
+  tableName: 'state_mappings',
   timestamps: false
 });
 

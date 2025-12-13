@@ -1,32 +1,32 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
-const NcrbReport = sequelize.define('ncrbreports', {
-  Id: {
+const NcrbReport = sequelize.define('ncrb_reports', {
+  id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  Report: {
+  report: {
     type: DataTypes.BLOB('long'),
     allowNull: false
   },
-  VehicleDetailId: {
+  vehicle_detail_id: {
     type: DataTypes.INTEGER,
     allowNull: false,
     unique: true
   },
-  CreatedAt: {
+  created_at: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
   },
-  ModifiedAt: {
+  modified_at: {
     type: DataTypes.DATE,
     allowNull: true
   }
 }, {
-  tableName: 'ncrbreports',
+  tableName: 'ncrb_reports',
   timestamps: false
 });
 

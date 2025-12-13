@@ -1,69 +1,67 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
-const PaymentHistory = sequelize.define('PaymentHistory', {
-  Id: {
+const PaymentHistory = sequelize.define('payment_histories', {
+  id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  UserId: {
+  user_id: {
     type: DataTypes.INTEGER,
     allowNull: false
   },
-  Amount: {
+  amount: {
     type: DataTypes.DECIMAL(18, 2),
     allowNull: false
   },
-  PaymentFor: {
+  payment_for: {
     type: DataTypes.INTEGER,
     allowNull: false,
     comment: '0=VehicleHistoryReport, 1=PhysicalVerification'
   },
-  Method: {
+  method: {
     type: DataTypes.INTEGER,
     allowNull: true,
     comment: '0=Card, 1=Netbanking, 2=Wallet, 3=PayLater, 4=UPI'
   },
-  Status: {
+  status: {
     type: DataTypes.INTEGER,
     allowNull: false,
     defaultValue: 0,
     comment: '0=Pending, 1=Successful, 2=Failed, 3=NotVerified, 4=Refunded'
   },
-  OrderId: {
+  order_id: {
     type: DataTypes.STRING(255),
     allowNull: false
   },
-  TransactionId: {
+  transaction_id: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  // Note: VehicleDetailRequestId does NOT exist in this table
-  // The relationship is reversed: VehicleDetailRequest has PaymentHistoryId
-  PaymentDate: {
+  payment_date: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
   },
-  CreatedAt: {
+  created_at: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
   },
-  ModifiedAt: {
+  modified_at: {
     type: DataTypes.DATE,
     allowNull: true
   }
 }, {
-  tableName: 'paymenthistories',
+  tableName: 'payment_histories',
   timestamps: false
 });
 
 // Define association
 PaymentHistory.associate = (models) => {
   PaymentHistory.belongsTo(models.User, {
-    foreignKey: 'UserId',
+    foreignKey: 'user_id',
     as: 'User'
   });
 };

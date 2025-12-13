@@ -2,76 +2,75 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
 /**
- * VehicleChallanDetail model - matches .NET VehicleChallanDetail entity
+ * VehicleChallanDetail model
  * Contains all fields from Surepass challan API response
  */
-const VehicleChallanDetail = sequelize.define('vehiclechallandetails', {
-  Id: {
+const VehicleChallanDetail = sequelize.define('vehicle_challan_details', {
+  id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  VehicleDetailId: {
+  vehicle_detail_id: {
     type: DataTypes.INTEGER,
     allowNull: true
   },
-  ChallanNumber: {
+  challan_number: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  ChallanDate: {
+  challan_date: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  ChallanPlace: {
+  challan_place: {
     type: DataTypes.STRING(500),
     allowNull: true
   },
-  State: {
+  state: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  Rto: {
+  rto: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  OffenseDetails: {
+  offense_details: {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  AccusedName: {
+  accused_name: {
     type: DataTypes.STRING(500),
     allowNull: true
   },
-  Amount: {
+  amount: {
     type: DataTypes.DECIMAL(18, 2),
     allowNull: true
   },
-  Status: {
+  status: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  CourtChallan: {
+  court_challan: {
     type: DataTypes.BOOLEAN,
     allowNull: true,
     defaultValue: false
   },
-  UpstreamCode: {
+  upstream_code: {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  // Legacy field for backward compatibility
-  ViolationType: {
+  violation_type: {
     type: DataTypes.STRING(500),
     allowNull: true
   },
-  CreatedAt: {
+  created_at: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
   }
 }, {
-  tableName: 'vehiclechallandetails',
+  tableName: 'vehicle_challan_details',
   timestamps: false
 });
 

@@ -20,22 +20,22 @@ class VehicleDetailService {
    */
   transformFailedVehicleDetailRequest(request, user, paymentHistory) {
     return {
-      id: request.Id,
-      userId: request.PaymentHistoryId ? paymentHistory?.UserId : user?.Id,
-      emailAddress: user?.Email || '',
-      phoneNumber: user?.PhoneNumber || '',
-      paymentDate: paymentHistory?.PaymentDate || request.CreatedAt,
-      registrationNumber: request.RegistrationNumber,
-      make: request.Make,
-      model: request.Model,
-      year: request.Year,
-      trim: request.Trim,
-      kmsDriven: request.KmsDriven,
-      city: request.City,
-      noOfOwners: request.NoOfOwners,
-      version: request.Version,
-      transactionType: request.TransactionType,
-      customerType: request.CustomerType
+      id: request.id,
+      userId: request.payment_history_id ? paymentHistory?.user_id : user?.id,
+      emailAddress: user?.email || '',
+      phoneNumber: user?.phone_number || '',
+      paymentDate: paymentHistory?.payment_date || request.created_at,
+      registrationNumber: request.registration_number,
+      make: request.make,
+      model: request.model,
+      year: request.year,
+      trim: request.trim,
+      kmsDriven: request.kms_driven,
+      city: request.city,
+      noOfOwners: request.no_of_owners,
+      version: request.version,
+      transactionType: request.transaction_type,
+      customerType: request.customer_type
     };
   }
 
@@ -52,7 +52,7 @@ class VehicleDetailService {
   }
 
   /**
-   * Transform vehicle detail from database format (PascalCase) to API format (camelCase)
+   * Transform vehicle detail from database format (snake_case) to API format (camelCase)
    * Matches .NET API VehicleDetailDto response format with sensitive data masking
    */
   transformVehicleDetail(vehicleDetail) {
@@ -61,74 +61,74 @@ class VehicleDetailService {
     const data = vehicleDetail.toJSON ? vehicleDetail.toJSON() : vehicleDetail;
 
     // Mask sensitive fields - matches .NET HideSensitiveStringsInVehicleDetails
-    const maskedOwnerName = this.maskSensitiveString(data.OwnerName);
-    const maskedFatherName = this.maskSensitiveString(data.FatherName);
-    const maskedPresentAddress = this.maskSensitiveString(data.PresentAddress);
-    const maskedPermanentAddress = this.maskSensitiveString(data.PermanentAddress);
-    const maskedMobileNumber = data.MobileNumber ?
-      data.MobileNumber.substring(0, 2) + '******' + data.MobileNumber.slice(-2) : null;
+    const maskedOwnerName = this.maskSensitiveString(data.owner_name);
+    const maskedFatherName = this.maskSensitiveString(data.father_name);
+    const maskedPresentAddress = this.maskSensitiveString(data.present_address);
+    const maskedPermanentAddress = this.maskSensitiveString(data.permanent_address);
+    const maskedMobileNumber = data.mobile_number ?
+      data.mobile_number.substring(0, 2) + '******' + data.mobile_number.slice(-2) : null;
 
     return {
-      id: data.Id,
-      clientId: data.ClientId || '',
-      rcNumber: data.RegistrationNumber,
-      registrationDate: data.RegistrationDate,
+      id: data.id,
+      clientId: data.client_id || '',
+      rcNumber: data.registration_number,
+      registrationDate: data.registration_date,
       ownerName: maskedOwnerName,
       fatherName: maskedFatherName || null,
       presentAddress: maskedPresentAddress || null,
       permanentAddress: maskedPermanentAddress || null,
       mobileNumber: maskedMobileNumber || null,
-      vehicleCategory: data.VehicleCategory || null,
-      vehicleChassisNumber: data.ChassisNumber,
-      vehicleEngineNumber: data.EngineNumber,
-      makerDescription: data.MakerDescription || data.Manufacturer || null,
-      makerModel: data.MakerModel || data.Model || null,
-      bodyType: data.BodyType || null,
-      fuelType: data.FuelType,
-      color: data.Color || '',
-      normsType: data.NormsType || null,
-      fitUpTo: data.FitUpTo || '',
-      financer: data.Financer || null,
-      financed: data.Financed || false,
-      insuranceCompany: data.InsuranceCompany || null,
-      insurancePolicyNumber: data.InsurancePolicyNumber || null,
-      insuranceUpto: data.InsuranceValidUpto || null,
-      manufacturingDate: data.ManufacturingDate || null,
-      manufacturingDateFormatted: data.ManufacturingDateFormatted || null,
-      registeredAt: data.RegisteredAt || null,
-      latestBy: data.LatestBy || null,
-      lessInfo: data.LessInfo || null,
-      taxUpto: data.TaxUpto || null,
-      taxPaidUpto: data.TaxPaidUpto || null,
-      cubicCapacity: data.CubicCapacity || '',
-      vehicleGrossWeight: data.VehicleGrossWeight || null,
-      noCylinders: data.NoCylinders || null,
-      seatCapacity: data.SeatCapacity || null,
-      sleeperCapacity: data.SleeperCapacity || null,
-      standingCapacity: data.StandingCapacity || null,
-      wheelbase: data.Wheelbase || null,
-      unladenWeight: data.UnladenWeight || null,
-      vehicleCategoryDescription: data.VehicleCategoryDescription || null,
-      puccNumber: data.PUCCNumber || null,
-      puccUpto: data.PUCCUpto || null,
-      permitNumber: data.PermitNumber || null,
-      permitIssueDate: data.PermitIssueDate || null,
-      permitValidFrom: data.PermitValidFrom || null,
-      permitValidUpto: data.PermitValidUpto || null,
-      permitType: data.PermitType || null,
-      nationalPermitNumber: data.NationalPermitNumber || null,
-      nationalPermitUpto: data.NationalPermitUpto || null,
-      nationalPermitIssuedBy: data.NationalPermitIssuedBy || null,
-      nonUseStatus: data.NonUseStatus || null,
-      nonUseFrom: data.NonUseFrom || null,
-      nonUseTo: data.NonUseTo || null,
-      blacklistStatus: data.BlacklistStatus || null,
-      nocDetails: data.NocDetails || null,
-      ownerNumber: data.OwnerNumber || '',
-      rcStatus: data.RcStatus || null,
-      maskedName: data.MaskedName || '',
-      challanDetails: data.ChallanDetails || null,
-      variant: data.Variant || null
+      vehicleCategory: data.vehicle_category || null,
+      vehicleChassisNumber: data.chassis_number,
+      vehicleEngineNumber: data.engine_number,
+      makerDescription: data.maker_description || data.manufacturer || null,
+      makerModel: data.maker_model || data.model || null,
+      bodyType: data.body_type || null,
+      fuelType: data.fuel_type,
+      color: data.color || '',
+      normsType: data.norms_type || null,
+      fitUpTo: data.fit_up_to || '',
+      financer: data.financer || null,
+      financed: data.financed || false,
+      insuranceCompany: data.insurance_company || null,
+      insurancePolicyNumber: data.insurance_policy_number || null,
+      insuranceUpto: data.insurance_valid_upto || null,
+      manufacturingDate: data.manufacturing_date || null,
+      manufacturingDateFormatted: data.manufacturing_date_formatted || null,
+      registeredAt: data.registered_at || null,
+      latestBy: data.latest_by || null,
+      lessInfo: data.less_info || null,
+      taxUpto: data.tax_upto || null,
+      taxPaidUpto: data.tax_paid_upto || null,
+      cubicCapacity: data.cubic_capacity || '',
+      vehicleGrossWeight: data.vehicle_gross_weight || null,
+      noCylinders: data.no_cylinders || null,
+      seatCapacity: data.seat_capacity || null,
+      sleeperCapacity: data.sleeper_capacity || null,
+      standingCapacity: data.standing_capacity || null,
+      wheelbase: data.wheelbase || null,
+      unladenWeight: data.unladen_weight || null,
+      vehicleCategoryDescription: data.vehicle_category_description || null,
+      puccNumber: data.pucc_number || null,
+      puccUpto: data.pucc_upto || null,
+      permitNumber: data.permit_number || null,
+      permitIssueDate: data.permit_issue_date || null,
+      permitValidFrom: data.permit_valid_from || null,
+      permitValidUpto: data.permit_valid_upto || null,
+      permitType: data.permit_type || null,
+      nationalPermitNumber: data.national_permit_number || null,
+      nationalPermitUpto: data.national_permit_upto || null,
+      nationalPermitIssuedBy: data.national_permit_issued_by || null,
+      nonUseStatus: data.non_use_status || null,
+      nonUseFrom: data.non_use_from || null,
+      nonUseTo: data.non_use_to || null,
+      blacklistStatus: data.blacklist_status || null,
+      nocDetails: data.noc_details || null,
+      ownerNumber: data.owner_number || '',
+      rcStatus: data.rc_status || null,
+      maskedName: data.masked_name || '',
+      challanDetails: data.challan_details || null,
+      variant: data.variant || null
     };
   }
   /**
@@ -157,7 +157,7 @@ class VehicleDetailService {
       let user;
       if (!userId || userId === 0) {
         user = await User.findOne({
-          where: { NormalizedEmail: userEmail.toUpperCase() }
+          where: { normalized_email: userEmail.toUpperCase() }
         });
       } else {
         user = await User.findByPk(userId);
@@ -167,13 +167,13 @@ class VehicleDetailService {
         return Result.failure('User not found');
       }
 
-      const resolvedUserId = user.Id;
+      const resolvedUserId = user.id;
 
       // Check if entry already exists for THIS specific VehicleDetailRequestId
       // Each payment creates a unique VehicleDetailRequestId, so each payment should create a new entry
       if (vehicleDetailRequestId) {
         let vehicleDetail = await VehicleDetail.findOne({
-          where: { VehicleDetailRequestId: vehicleDetailRequestId }
+          where: { vehicle_detail_request_id: vehicleDetailRequestId }
         });
 
         if (vehicleDetail) {
@@ -184,7 +184,7 @@ class VehicleDetailService {
 
       // Check if vehicle details exist for ANY user (to avoid calling Surepass API again)
       const existingVehicleDetail = await VehicleDetail.findOne({
-        where: { RegistrationNumber: registrationNumber }
+        where: { registration_number: registrationNumber }
       });
 
       if (existingVehicleDetail) {
@@ -192,21 +192,21 @@ class VehicleDetailService {
         logger.info(`Vehicle details found, creating new entry for request ${vehicleDetailRequestId}: ${registrationNumber}`);
 
         const maxVehicle = await VehicleDetail.findOne({
-          attributes: [[sequelize.fn('MAX', sequelize.col('Id')), 'maxId']],
+          attributes: [[sequelize.fn('MAX', sequelize.col('id')), 'maxId']],
           raw: true
         });
         const nextId = (maxVehicle && maxVehicle.maxId) ? maxVehicle.maxId + 1 : 1;
 
         // Create new entry for this request with same vehicle data
         const existingData = existingVehicleDetail.toJSON();
-        delete existingData.Id; // Remove old ID
+        delete existingData.id; // Remove old ID
 
         const vehicleDetail = await VehicleDetail.create({
           ...existingData,
-          Id: nextId,
-          UserId: resolvedUserId,
-          VehicleDetailRequestId: vehicleDetailRequestId || null,
-          CreatedAt: new Date()
+          id: nextId,
+          user_id: resolvedUserId,
+          vehicle_detail_request_id: vehicleDetailRequestId || null,
+          created_at: new Date()
         });
 
         logger.info(`Vehicle details created for request ${vehicleDetailRequestId}, user ${resolvedUserId}: ${registrationNumber}`);
@@ -223,7 +223,7 @@ class VehicleDetailService {
       // Save vehicle details to database with ALL fields from Surepass
       const rcData = rcResult.value;
       const maxVehicle = await VehicleDetail.findOne({
-        attributes: [[sequelize.fn('MAX', sequelize.col('Id')), 'maxId']],
+        attributes: [[sequelize.fn('MAX', sequelize.col('id')), 'maxId']],
         raw: true
       });
       const nextId = (maxVehicle && maxVehicle.maxId) ? maxVehicle.maxId + 1 : 1;
@@ -241,75 +241,75 @@ class VehicleDetailService {
         }
       }
 
-      vehicleDetail = await VehicleDetail.create({
-        Id: nextId,
-        UserId: resolvedUserId,
-        VehicleDetailRequestId: vehicleDetailRequestId || null,
+      let vehicleDetail = await VehicleDetail.create({
+        id: nextId,
+        user_id: resolvedUserId,
+        vehicle_detail_request_id: vehicleDetailRequestId || null,
         // All Surepass rc-full fields
-        ClientId: rcData.clientId,
-        RegistrationNumber: rcData.rcNumber,
-        RegistrationDate: registrationDate,
-        OwnerName: rcData.ownerName,
-        FatherName: rcData.fatherName,
-        PresentAddress: rcData.presentAddress,
-        PermanentAddress: rcData.permanentAddress,
-        MobileNumber: rcData.mobileNumber,
-        VehicleCategory: rcData.vehicleCategory,
-        ChassisNumber: rcData.vehicleChassisNumber,
-        EngineNumber: rcData.vehicleEngineNumber,
-        MakerDescription: rcData.makerDescription,
-        MakerModel: rcData.makerModel,
+        client_id: rcData.clientId,
+        registration_number: rcData.rcNumber,
+        registration_date: registrationDate,
+        owner_name: rcData.ownerName,
+        father_name: rcData.fatherName,
+        present_address: rcData.presentAddress,
+        permanent_address: rcData.permanentAddress,
+        mobile_number: rcData.mobileNumber,
+        vehicle_category: rcData.vehicleCategory,
+        chassis_number: rcData.vehicleChassisNumber,
+        engine_number: rcData.vehicleEngineNumber,
+        maker_description: rcData.makerDescription,
+        maker_model: rcData.makerModel,
         // Also set legacy fields for backward compatibility
-        Manufacturer: rcData.makerDescription,
-        Model: rcData.makerModel,
-        BodyType: rcData.bodyType,
-        FuelType: rcData.fuelType,
-        Color: rcData.color,
-        NormsType: rcData.normsType,
-        FitUpTo: rcData.fitUpTo,
-        Financer: rcData.financer,
-        Financed: rcData.financed,
-        InsuranceCompany: rcData.insuranceCompany,
-        InsurancePolicyNumber: rcData.insurancePolicyNumber,
-        InsuranceValidUpto: rcData.insuranceUpto,
-        ManufacturingDate: rcData.manufacturingDate,
-        ManufacturingDateFormatted: rcData.manufacturingDateFormatted,
-        RegisteredAt: rcData.registeredAt,
-        LatestBy: rcData.latestBy,
-        LessInfo: rcData.lessInfo,
-        TaxUpto: rcData.taxUpto,
-        TaxPaidUpto: rcData.taxPaidUpto,
-        CubicCapacity: rcData.cubicCapacity,
-        VehicleGrossWeight: rcData.vehicleGrossWeight,
-        NoCylinders: rcData.noCylinders,
-        SeatCapacity: rcData.seatCapacity,
-        SleeperCapacity: rcData.sleeperCapacity,
-        StandingCapacity: rcData.standingCapacity,
-        Wheelbase: rcData.wheelbase,
-        UnladenWeight: rcData.unladenWeight,
-        VehicleCategoryDescription: rcData.vehicleCategoryDescription,
-        PUCCNumber: rcData.puccNumber,
-        PUCCUpto: rcData.puccUpto,
-        PermitNumber: rcData.permitNumber,
-        PermitIssueDate: rcData.permitIssueDate,
-        PermitValidFrom: rcData.permitValidFrom,
-        PermitValidUpto: rcData.permitValidUpto,
-        PermitType: rcData.permitType,
-        NationalPermitNumber: rcData.nationalPermitNumber,
-        NationalPermitUpto: rcData.nationalPermitUpto,
-        NationalPermitIssuedBy: rcData.nationalPermitIssuedBy,
-        NonUseStatus: rcData.nonUseStatus,
-        NonUseFrom: rcData.nonUseFrom,
-        NonUseTo: rcData.nonUseTo,
-        BlacklistStatus: rcData.blacklistStatus,
-        NocDetails: rcData.nocDetails,
-        OwnerNumber: rcData.ownerNumber,
-        RcStatus: rcData.rcStatus,
-        MaskedName: rcData.maskedName,
-        ChallanDetails: rcData.challanDetails,
-        Variant: rcData.variant,
-        Status: 'Completed',
-        CreatedAt: new Date()
+        manufacturer: rcData.makerDescription,
+        model: rcData.makerModel,
+        body_type: rcData.bodyType,
+        fuel_type: rcData.fuelType,
+        color: rcData.color,
+        norms_type: rcData.normsType,
+        fit_up_to: rcData.fitUpTo,
+        financer: rcData.financer,
+        financed: rcData.financed,
+        insurance_company: rcData.insuranceCompany,
+        insurance_policy_number: rcData.insurancePolicyNumber,
+        insurance_valid_upto: rcData.insuranceUpto,
+        manufacturing_date: rcData.manufacturingDate,
+        manufacturing_date_formatted: rcData.manufacturingDateFormatted,
+        registered_at: rcData.registeredAt,
+        latest_by: rcData.latestBy,
+        less_info: rcData.lessInfo,
+        tax_upto: rcData.taxUpto,
+        tax_paid_upto: rcData.taxPaidUpto,
+        cubic_capacity: rcData.cubicCapacity,
+        vehicle_gross_weight: rcData.vehicleGrossWeight,
+        no_cylinders: rcData.noCylinders,
+        seat_capacity: rcData.seatCapacity,
+        sleeper_capacity: rcData.sleeperCapacity,
+        standing_capacity: rcData.standingCapacity,
+        wheelbase: rcData.wheelbase,
+        unladen_weight: rcData.unladenWeight,
+        vehicle_category_description: rcData.vehicleCategoryDescription,
+        pucc_number: rcData.puccNumber,
+        pucc_upto: rcData.puccUpto,
+        permit_number: rcData.permitNumber,
+        permit_issue_date: rcData.permitIssueDate,
+        permit_valid_from: rcData.permitValidFrom,
+        permit_valid_upto: rcData.permitValidUpto,
+        permit_type: rcData.permitType,
+        national_permit_number: rcData.nationalPermitNumber,
+        national_permit_upto: rcData.nationalPermitUpto,
+        national_permit_issued_by: rcData.nationalPermitIssuedBy,
+        non_use_status: rcData.nonUseStatus,
+        non_use_from: rcData.nonUseFrom,
+        non_use_to: rcData.nonUseTo,
+        blacklist_status: rcData.blacklistStatus,
+        noc_details: rcData.nocDetails,
+        owner_number: rcData.ownerNumber,
+        rc_status: rcData.rcStatus,
+        masked_name: rcData.maskedName,
+        challan_details: rcData.challanDetails,
+        variant: rcData.variant,
+        status: 'Completed',
+        created_at: new Date()
       });
 
       logger.info(`Vehicle details fetched and saved with all fields: ${registrationNumber}`);
@@ -323,7 +323,7 @@ class VehicleDetailService {
             registrationNumber
           );
           if (challanResult.isSuccess && challanResult.value.challans.length > 0) {
-            await this.saveChallanDetails(vehicleDetail.Id, challanResult.value.challans);
+            await this.saveChallanDetails(vehicleDetail.id, challanResult.value.challans);
           }
         } catch (challanError) {
           logger.error('Error fetching challan details:', challanError);
@@ -344,49 +344,49 @@ class VehicleDetailService {
    * Used by both getVehicleDetailsByRCAsync and getVehicleDetailByIdAsync
    */
   async buildVehicleDetailResponse(vehicleDetail, userId) {
-    const vehicleDetailId = vehicleDetail.Id;
+    const vehicleDetailId = vehicleDetail.id;
 
     // Get challan details for this vehicle
     const challanDetails = await VehicleChallanDetail.findAll({
-      where: { VehicleDetailId: vehicleDetailId },
-      order: [['ChallanDate', 'DESC']]
+      where: { vehicle_detail_id: vehicleDetailId },
+      order: [['challan_date', 'DESC']]
     });
 
     // Check if vehicle is lost
     const lostVehicle = await LostVehicle.findOne({
-      where: { RegistrationNumber: vehicleDetail.RegistrationNumber }
+      where: { registration_number: vehicleDetail.registration_number }
     });
 
     // Get NCRB report if exists
     const ncrbReport = await NcrbReport.findOne({
-      where: { VehicleDetailId: vehicleDetailId }
+      where: { vehicle_detail_id: vehicleDetailId }
     });
 
     // Get state from registration number
-    const stateCode = vehicleDetail.RegistrationNumber ? vehicleDetail.RegistrationNumber.substring(0, 2) : '';
+    const stateCode = vehicleDetail.registration_number ? vehicleDetail.registration_number.substring(0, 2) : '';
     const stateMapping = await StateMapping.findOne({
-      where: { StateCode: stateCode }
+      where: { state_code: stateCode }
     });
 
     // Get user vehicle detail for createdAt timestamp
     const userVehicleDetail = await UserVehicleDetail.findOne({
-      where: { VehicleDetailId: vehicleDetailId, UserId: userId }
+      where: { vehicle_detail_id: vehicleDetailId, user_id: userId }
     });
 
     // Calculate vehicle age from ManufacturingDateFormatted
-    const vehicleAge = this.calculateVehicleAge(vehicleDetail.ManufacturingDateFormatted);
+    const vehicleAge = this.calculateVehicleAge(vehicleDetail.manufacturing_date_formatted);
 
     // Get vehicle specification using smart matching
     let vehicleSpecification = await this.findVehicleSpecification(vehicleDetail);
 
     // Transform challan details to match .NET VehicleChallanDetailDto
     const transformedChallans = challanDetails.map(challan => ({
-      id: challan.Id,
-      challanNumber: challan.ChallanNumber,
-      challanDate: challan.ChallanDate,
-      violationType: challan.ViolationType || challan.OffenseDetails,
-      amount: challan.Amount ? parseFloat(challan.Amount) : null,
-      status: challan.Status
+      id: challan.id,
+      challanNumber: challan.challan_number,
+      challanDate: challan.challan_date,
+      violationType: challan.violation_type || challan.offense_details,
+      amount: challan.amount ? parseFloat(challan.amount) : null,
+      status: challan.status
     }));
 
     // Transform vehicle specification to match frontend VehicleSpecificationInterface (92+ fields)
@@ -398,11 +398,11 @@ class VehicleDetailService {
       vehicleChallanDetails: transformedChallans,
       vehicleSpecification: transformedSpec,
       ncrbReportAvailable: ncrbReport !== null,
-      reportId: ncrbReport ? ncrbReport.Id : null,
+      reportId: ncrbReport ? ncrbReport.id : null,
       lostVehicle: lostVehicle !== null,
-      createdAt: userVehicleDetail ? userVehicleDetail.CreatedAt : vehicleDetail.CreatedAt,
+      createdAt: userVehicleDetail ? userVehicleDetail.created_at : vehicleDetail.created_at,
       vehicleAge: vehicleAge,
-      state: stateMapping ? stateMapping.StateName : ''
+      state: stateMapping ? stateMapping.state_name : ''
     };
   }
 
@@ -446,33 +446,33 @@ class VehicleDetailService {
         // Check if challan already exists
         const existing = await VehicleChallanDetail.findOne({
           where: {
-            VehicleDetailId: vehicleDetailId,
-            ChallanNumber: challan.challan_number
+            vehicle_detail_id: vehicleDetailId,
+            challan_number: challan.challan_number
           }
         });
 
         if (!existing) {
           const maxChallan = await VehicleChallanDetail.findOne({
-            attributes: [[sequelize.fn('MAX', sequelize.col('Id')), 'maxId']],
+            attributes: [[sequelize.fn('MAX', sequelize.col('id')), 'maxId']],
             raw: true
           });
           const nextId = (maxChallan && maxChallan.maxId) ? maxChallan.maxId + 1 : 1;
 
           await VehicleChallanDetail.create({
-            Id: nextId,
-            VehicleDetailId: vehicleDetailId,
-            ChallanNumber: challan.challan_number,
-            ChallanDate: challan.challan_date,
-            ChallanPlace: challan.challan_place,
-            State: challan.state,
-            Rto: challan.rto,
-            OffenseDetails: challan.offense_details,
-            AccusedName: challan.accused_name,
-            Amount: challan.amount,
-            Status: challan.challan_status,
-            CourtChallan: challan.court_challan,
-            UpstreamCode: challan.upstream_code,
-            CreatedAt: new Date()
+            id: nextId,
+            vehicle_detail_id: vehicleDetailId,
+            challan_number: challan.challan_number,
+            challan_date: challan.challan_date,
+            challan_place: challan.challan_place,
+            state: challan.state,
+            rto: challan.rto,
+            offense_details: challan.offense_details,
+            accused_name: challan.accused_name,
+            amount: challan.amount,
+            status: challan.challan_status,
+            court_challan: challan.court_challan,
+            upstream_code: challan.upstream_code,
+            created_at: new Date()
           });
         }
       }
@@ -542,18 +542,18 @@ class VehicleDetailService {
         include: [{
           model: PaymentHistory,
           as: 'PaymentHistory',
-          where: { Status: 1 }, // Successful payment
+          where: { status: 1 }, // Successful payment
           required: true
         }],
-        where: sequelize.literal('NOT EXISTS (SELECT 1 FROM VehicleDetails vd WHERE vd.VehicleDetailRequestId = vehicledetailrequests.Id)'),
-        order: [['CreatedAt', 'DESC']],
+        where: sequelize.literal('NOT EXISTS (SELECT 1 FROM vehicle_details vd WHERE vd.vehicle_detail_request_id = vehicle_detail_requests.id)'),
+        order: [['created_at', 'DESC']],
         limit: 100
       });
 
       // Get user data for each request
       const transformedRequests = await Promise.all(failedRequests.map(async (request) => {
         const paymentHistory = request.PaymentHistory;
-        const user = await User.findByPk(paymentHistory.UserId);
+        const user = await User.findByPk(paymentHistory.user_id);
         return this.transformFailedVehicleDetailRequest(request, user, paymentHistory);
       }));
 
@@ -572,7 +572,7 @@ class VehicleDetailService {
     try {
       // Find user
       const user = await User.findOne({
-        where: { NormalizedEmail: userEmail.toUpperCase() }
+        where: { normalized_email: userEmail.toUpperCase() }
       });
 
       if (!user) {
@@ -584,11 +584,11 @@ class VehicleDetailService {
         include: [{
           model: PaymentHistory,
           as: 'PaymentHistory',
-          where: { UserId: user.Id },
+          where: { user_id: user.id },
           required: true
         }],
-        where: sequelize.literal('NOT EXISTS (SELECT 1 FROM VehicleDetails vd WHERE vd.VehicleDetailRequestId = vehicledetailrequests.Id)'),
-        order: [['CreatedAt', 'DESC']],
+        where: sequelize.literal('NOT EXISTS (SELECT 1 FROM vehicle_details vd WHERE vd.vehicle_detail_request_id = vehicle_detail_requests.id)'),
+        order: [['created_at', 'DESC']],
         limit: 100
       });
 
@@ -605,7 +605,7 @@ class VehicleDetailService {
   /**
    * Find vehicle specification using smart matching
    * Matches .NET VehicleSpecificationRepository.GetVehicleSpecificationByVehicleDetails
-   * @param {Object} vehicleDetail - Vehicle detail with MakerDescription/MakerModel
+   * @param {Object} vehicleDetail - Vehicle detail with maker_description/maker_model
    * @param {string} requestMake - Make from request (optional)
    * @param {string} requestModel - Model from request (optional)
    * @param {string} requestVersion - Version from request (optional)
@@ -621,14 +621,14 @@ class VehicleDetailService {
 
       // Priority 2: Extract from vehicle detail if request params not provided
       if (!make && vehicleDetail) {
-        // Extract make from MakerDescription (e.g., "KIA INDIA PRIVATE LIMITED" -> "Kia")
-        const makerDesc = vehicleDetail.MakerDescription || vehicleDetail.Manufacturer || '';
+        // Extract make from maker_description (e.g., "KIA INDIA PRIVATE LIMITED" -> "Kia")
+        const makerDesc = vehicleDetail.maker_description || vehicleDetail.manufacturer || '';
         make = this.extractMakeFromDescription(makerDesc);
       }
 
       if (!model && vehicleDetail) {
-        // Extract model from MakerModel (e.g., "SELTOS G1.5 6MT HTE" -> "Seltos")
-        const makerModel = vehicleDetail.MakerModel || vehicleDetail.Model || '';
+        // Extract model from maker_model (e.g., "SELTOS G1.5 6MT HTE" -> "Seltos")
+        const makerModel = vehicleDetail.maker_model || vehicleDetail.model || '';
         model = this.extractModelFromDescription(makerModel);
       }
 
@@ -861,7 +861,7 @@ class VehicleDetailService {
       engineType: data.enginetransmission_engine_type,
       engineTransmissionMileageArai: data.enginetransmission_mileage_arai || data.keydata_key_mileage_arai,
       maxpower: data.enginetransmission_maxpower,
-      maxpowerRpm: data.enginetransmission_maxpowerRPM,
+      maxpowerRpm: data.enginetransmission_maxpower_rpm,
       maxtorque: data.enginetransmission_maxtorque,
       transmission: data.keydata_key_transmission || data.enginetrans_transmission,
       transmissionDetails: data.enginetrans_transmission,
