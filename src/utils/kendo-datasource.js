@@ -13,7 +13,7 @@ const { Op } = require('sequelize');
  * @returns {Object} DataSourceResult { data, total }
  */
 async function toDataSourceResult(model, request, options = {}) {
-  const { take = 10, skip = 0, sort, filter } = request;
+  const { take, skip = 0, sort, filter } = request;
   const { baseWhere = {}, attributes, include, transform, order: defaultOrder } = options;
 
   // Build where clause
@@ -41,9 +41,13 @@ async function toDataSourceResult(model, request, options = {}) {
   const queryOptions = {
     where: whereClause,
     order: orderClause,
-    offset: skip,
-    limit: take
+    offset: skip
   };
+
+  // Only apply limit if take is provided and > 0 (take: 0 means "return all" in Kendo)
+  if (take && take > 0) {
+    queryOptions.limit = take;
+  }
 
   if (attributes) {
     queryOptions.attributes = attributes;
