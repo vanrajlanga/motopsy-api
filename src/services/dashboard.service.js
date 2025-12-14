@@ -148,13 +148,13 @@ class DashboardService {
     try {
       let value;
 
-      // Support both numeric (0, 1) and string ("Month", "Year", "month", "year")
+      // Support both numeric (0, 1) and string ("0", "1", "Month", "Year", "month", "year")
       const normalizedFilter = typeof filter === 'string' ? filter.toLowerCase() : filter;
 
-      if (normalizedFilter === 0 || normalizedFilter === 'month') {
+      if (normalizedFilter === 0 || normalizedFilter === '0' || normalizedFilter === 'month') {
         // Month filter - get monthly report for current year
         value = await this.getMonthlyRevenueReportAsync(new Date().getFullYear());
-      } else if (normalizedFilter === 1 || normalizedFilter === 'year') {
+      } else if (normalizedFilter === 1 || normalizedFilter === '1' || normalizedFilter === 'year') {
         // Year filter - get yearly report
         value = await this.getYearlyRevenueReportAsync();
       } else {
