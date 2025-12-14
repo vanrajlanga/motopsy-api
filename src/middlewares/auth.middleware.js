@@ -26,7 +26,7 @@ const authenticate = (req, res, next) => {
     // Extract email from unique_name (matching .NET format)
     const email = decoded.unique_name || decoded.email;
     const userId = decoded.sub || decoded.userId;
-    const isAdmin = decoded.isAdmin === 'True' || decoded.isAdmin === true;
+    const isAdmin = decoded.isAdmin === 'true' || decoded.isAdmin === 'True' || decoded.isAdmin === true || decoded.isAdmin === '1';
 
     // Attach user info to request
     req.user = {
@@ -84,7 +84,7 @@ const optionalAuth = (req, res, next) => {
       // Extract email from unique_name (matching .NET format)
       const email = decoded.unique_name || decoded.email;
       const userId = decoded.sub || decoded.userId;
-      const isAdmin = decoded.isAdmin === 'True' || decoded.isAdmin === true;
+      const isAdmin = decoded.isAdmin === 'true' || decoded.isAdmin === 'True' || decoded.isAdmin === true || decoded.isAdmin === '1';
 
       req.user = {
         email: email,
