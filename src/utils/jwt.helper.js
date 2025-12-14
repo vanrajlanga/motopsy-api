@@ -19,7 +19,7 @@ const generateToken = (user) => {
   const payload = {
     sub: String(user.id || user.Id),
     unique_name: user.email || user.Email,
-    isAdmin: String(user.isAdmin || user.IsAdmin || false),
+    isAdmin: String(user.is_admin || user.isAdmin || user.IsAdmin || false),
     nbf: now,
     exp: exp,
     iat: now,
