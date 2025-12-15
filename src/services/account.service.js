@@ -1,7 +1,7 @@
 const User = require('../models/user.model');
 const { sequelize } = require('../config/database');
 const { hashPassword, verifyPassword } = require('../utils/hash.helper');
-const { generateToken, generateEmailToken, generatePasswordResetToken, verifyPurposeToken } = require('../utils/jwt.helper');
+const { generateToken, generateEmailToken, generatePasswordResetToken, verifyPurposeToken, generateEmailLoginToken } = require('../utils/jwt.helper');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
 const emailService = require('./email.service');
@@ -313,6 +313,55 @@ class AccountService {
     } catch (error) {
       logger.error('Contact us error:', error);
       return Result.failure(error.message || 'Failed to send message');
+    }
+  }
+
+  /**
+   * Login with email token (magic link auto-login)
+   * Used for auto-login when user clicks link from payment confirmation email
+   */
+  async loginWithEmailTokenAsync(token) {
+    try {
+      if (!token) {
+        return Result.failure('Token is required');
+      }
+
+      // Verify the email login token
+      let decoded;
+      try {
+        decoded = verifyPurposeToken(token, 'email-login');
+      } catch (error) {
+        logger.error('Email login token verification error:', error);
+        return Result.failure('Invalid or expired login link');
+      }
+
+      const { userId, redirectPath } = decoded;
+
+      // Find user
+      const user = await User.findByPk(userId);
+
+      if (!user) {
+        return Result.failure('User not found');
+      }
+
+      // Check if account is locked
+      if (user.lockout_enabled && user.lockout_end && new Date(user.lockout_end) > new Date()) {
+        return Result.failure('Account is locked. Please try again later.');
+      }
+
+      // Generate JWT token
+      const tokenData = generateToken(user);
+
+      logger.info(`User auto-logged in via email link: ${user.email}`);
+
+      // Return token with redirect path
+      return Result.success({
+        ...tokenData,
+        redirectPath: redirectPath || '/my-profile'
+      });
+    } catch (error) {
+      logger.error('Email token login error:', error);
+      return Result.failure(error.message || 'Login failed');
     }
   }
 }

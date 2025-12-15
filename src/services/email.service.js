@@ -1,5 +1,6 @@
 const nodemailer = require("nodemailer");
 const logger = require("../config/logger");
+const { generateEmailLoginToken } = require("../utils/jwt.helper");
 
 class EmailService {
     constructor() {
@@ -479,7 +480,7 @@ class EmailService {
     }
 
     /**
-     * Send payment success email to user with View Report button
+     * Send payment success email to user with View Report button (auto-login)
      */
     async sendPaymentSuccessToUserAsync(userEmail, userName, registrationNumber, amount, vehicleDetailRequestId, userId) {
         if (!this.isConfigured || !this.transporter) {
@@ -492,8 +493,12 @@ class EmailService {
 
         try {
             const frontendUrl = process.env.FRONTEND_URL || 'https://motopsy.com';
-            // Link to user's profile page where they can see their reports
-            const reportLink = `${frontendUrl}/#/my-profile`;
+
+            // Generate auto-login token for magic link
+            const loginToken = generateEmailLoginToken(userId, '/my-profile');
+
+            // Link to auto-login page with token - frontend will handle the auto-login
+            const reportLink = `${frontendUrl}/#/account/auto-login?token=${encodeURIComponent(loginToken)}`;
 
             const mailOptions = {
                 from: `"Motopsy" <${this.fromEmail}>`,

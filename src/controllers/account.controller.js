@@ -79,6 +79,20 @@ class AccountController extends ApiController {
       next(error);
     }
   }
+
+  /**
+   * POST /api/account/login-with-token
+   * Auto-login using email token (magic link)
+   */
+  async loginWithToken(req, res, next) {
+    try {
+      const { token } = req.body;
+      const result = await accountService.loginWithEmailTokenAsync(token);
+      return this.fromResult(result, res);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new AccountController();

@@ -99,10 +99,25 @@ const verifyPurposeToken = (token, purpose) => {
   }
 };
 
+/**
+ * Generate email login token (magic link) for auto-login from email
+ * @param {number} userId - User ID
+ * @param {string} redirectPath - Path to redirect after login (e.g., '/my-profile')
+ * @returns {string} Email login token
+ */
+const generateEmailLoginToken = (userId, redirectPath = '/my-profile') => {
+  return jwt.sign(
+    { userId, redirectPath, purpose: 'email-login' },
+    JWT_SECRET,
+    { expiresIn: '7d' } // Valid for 7 days
+  );
+};
+
 module.exports = {
   generateToken,
   verifyToken,
   generateEmailToken,
   generatePasswordResetToken,
-  verifyPurposeToken
+  verifyPurposeToken,
+  generateEmailLoginToken
 };
