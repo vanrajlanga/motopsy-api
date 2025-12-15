@@ -498,7 +498,7 @@ class EmailService {
             const loginToken = generateEmailLoginToken(userId, '/my-profile');
 
             // Link to auto-login page with token - frontend will handle the auto-login
-            const reportLink = `${frontendUrl}/#/account/auto-login?token=${encodeURIComponent(loginToken)}`;
+            const reportLink = `${frontendUrl}/#/auto-login?token=${encodeURIComponent(loginToken)}`;
 
             const mailOptions = {
                 from: `"Motopsy" <${this.fromEmail}>`,
