@@ -60,7 +60,7 @@ class PaymentService {
           return Result.failure(couponResult.error || 'Invalid coupon code');
         }
 
-        const couponData = couponResult.data;
+        const couponData = couponResult.value;
         const expectedAmount = couponData.finalAmount;
 
         if (amount !== expectedAmount) {
