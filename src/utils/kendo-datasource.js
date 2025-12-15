@@ -60,9 +60,9 @@ async function toDataSourceResult(model, request, options = {}) {
   // Get data
   let data = await model.findAll(queryOptions);
 
-  // Transform data if needed
+  // Transform data if needed (supports async transforms)
   if (transform) {
-    data = data.map(transform);
+    data = await Promise.all(data.map(transform));
   }
 
   return {
