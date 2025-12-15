@@ -52,6 +52,25 @@ const PaymentHistory = sequelize.define('payment_histories', {
   modified_at: {
     type: DataTypes.DATE,
     allowNull: true
+  },
+  // Coupon tracking columns
+  coupon_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'coupons',
+      key: 'id'
+    }
+  },
+  original_amount: {
+    type: DataTypes.DECIMAL(18, 2),
+    allowNull: true,
+    comment: 'Original amount before coupon discount'
+  },
+  discount_amount: {
+    type: DataTypes.DECIMAL(18, 2),
+    allowNull: true,
+    comment: 'Discount amount from coupon'
   }
 }, {
   tableName: 'payment_histories',

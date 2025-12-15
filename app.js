@@ -22,6 +22,7 @@ const dashboardRoutes = require('./src/routes/dashboard.routes');
 const physicalVerificationRoutes = require('./src/routes/physical-verification.routes');
 const obvRoutes = require('./src/routes/obv.routes');
 const userActivityLogRoutes = require('./src/routes/user-activity-log.routes');
+const couponRoutes = require('./src/routes/coupon.routes');
 
 const app = express();
 
@@ -104,6 +105,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/physicalVerification', physicalVerificationRoutes);
 app.use('/api/obv', obvRoutes);
 app.use('/api/UserActivityLog', userActivityLogRoutes);
+app.use('/api/coupon', couponRoutes);
 
 // 404 handler
 app.use((req, res) => {

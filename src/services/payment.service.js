@@ -6,6 +6,7 @@ const PaymentHistory = require('../models/payment-history.model');
 const VehicleDetailRequest = require('../models/vehicle-detail-request.model');
 const User = require('../models/user.model');
 const userActivityLogService = require('./user-activity-log.service');
+const couponService = require('./coupon.service');
 const { sequelize } = require('../config/database');
 require('dotenv').config();
 
@@ -15,55 +16,20 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET
 });
 
-// Valid coupon codes configuration
-const COUPON_CODES = {
-  'motopsy99': {
-    discountPercentage: 99,
-    description: '99% discount'
-  }
-};
-
 class PaymentService {
   /**
    * Validate coupon code and return discount details
+   * Now uses dynamic coupon service instead of hardcoded coupons
    */
-  async validateCoupon(couponCode) {
-    try {
-      if (!couponCode) {
-        return Result.failure('Coupon code is required');
-      }
-
-      const normalizedCode = couponCode.toLowerCase().trim();
-      const coupon = COUPON_CODES[normalizedCode];
-
-      if (!coupon) {
-        return Result.failure('Invalid coupon code');
-      }
-
-      const originalAmount = parseInt(process.env.RAZORPAY_AMOUNT) || 199;
-      const discountAmount = Math.floor(originalAmount * (coupon.discountPercentage / 100));
-      const finalAmount = originalAmount - discountAmount;
-
-      logger.info(`Coupon validated: ${normalizedCode}, discount: ${coupon.discountPercentage}%, original: ${originalAmount}, final: ${finalAmount}`);
-
-      return Result.success({
-        valid: true,
-        couponCode: normalizedCode,
-        discountPercentage: coupon.discountPercentage,
-        originalAmount: originalAmount,
-        discountAmount: discountAmount,
-        finalAmount: finalAmount,
-        description: coupon.description
-      });
-    } catch (error) {
-      logger.error('Validate coupon error:', error);
-      return Result.failure(error.message || 'Failed to validate coupon');
-    }
+  async validateCoupon(couponCode, userId = null, orderAmount = null) {
+    // Delegate to coupon service for dynamic validation
+    return await couponService.validateCouponAsync(couponCode, userId, orderAmount);
   }
 
   /**
    * Create Razorpay order
    * Matches .NET API CreateOrder implementation
+   * Now uses dynamic coupon service for validation
    */
   async createOrder(request, userEmail) {
     try {
@@ -81,23 +47,32 @@ class PaymentService {
       // Validate amount - either matches configured amount or matches discounted amount with valid coupon
       const configuredAmount = parseInt(process.env.RAZORPAY_AMOUNT) || 199;
 
-      if (couponCode) {
-        // Validate coupon and check if amount matches discounted price
-        const normalizedCode = couponCode.toLowerCase().trim();
-        const coupon = COUPON_CODES[normalizedCode];
+      // Variables to store coupon info for tracking
+      let couponId = null;
+      let originalAmount = configuredAmount;
+      let discountAmount = 0;
 
-        if (!coupon) {
-          return Result.failure('Invalid coupon code');
+      if (couponCode) {
+        // Validate coupon using dynamic coupon service
+        const couponResult = await couponService.validateCouponAsync(couponCode, null, configuredAmount);
+
+        if (!couponResult.isSuccess) {
+          return Result.failure(couponResult.error || 'Invalid coupon code');
         }
 
-        const discountAmount = Math.floor(configuredAmount * (coupon.discountPercentage / 100));
-        const expectedAmount = configuredAmount - discountAmount;
+        const couponData = couponResult.data;
+        const expectedAmount = couponData.finalAmount;
 
         if (amount !== expectedAmount) {
           return Result.failure('Amount does not match with applied coupon');
         }
 
-        logger.info(`Order created with coupon: ${normalizedCode}, amount: ${amount}`);
+        // Store coupon info for usage tracking
+        couponId = couponData.couponId;
+        originalAmount = couponData.originalAmount;
+        discountAmount = couponData.discountAmount;
+
+        logger.info(`Order created with coupon: ${couponCode}, couponId: ${couponId}, amount: ${amount}`);
       } else {
         // No coupon - amount must match configured amount
         if (amount !== configuredAmount) {
@@ -135,7 +110,7 @@ class PaymentService {
       });
       const nextId = (maxPayment && maxPayment.maxId) ? maxPayment.maxId + 1 : 1;
 
-      // Create PaymentHistory record
+      // Create PaymentHistory record with coupon info
       const paymentHistory = await PaymentHistory.create({
         id: nextId,
         user_id: user.id,
@@ -144,10 +119,14 @@ class PaymentService {
         status: 0, // Pending
         order_id: order.id,
         payment_date: new Date(),
-        created_at: new Date()
+        created_at: new Date(),
+        // Store coupon info for tracking after payment verification
+        coupon_id: couponId,
+        original_amount: originalAmount,
+        discount_amount: discountAmount
       });
 
-      logger.info(`Razorpay order created for ${userEmail}: ${order.id}, paymentFor: ${paymentFor}, paymentHistoryId: ${paymentHistory.id}`);
+      logger.info(`Razorpay order created for ${userEmail}: ${order.id}, paymentFor: ${paymentFor}, paymentHistoryId: ${paymentHistory.id}, couponId: ${couponId}`);
 
       // Return response matching .NET API format
       return Result.success({
@@ -269,6 +248,19 @@ class PaymentService {
       await paymentHistory.save();
 
       logger.info(`Payment verified successfully: ${razorpayPaymentId}, VehicleDetailRequestId: ${vehicleDetailRequest.id}`);
+
+      // Record coupon usage if a coupon was applied
+      if (paymentHistory.coupon_id) {
+        await couponService.recordUsageAsync(
+          paymentHistory.coupon_id,
+          paymentHistory.user_id,
+          paymentHistory.id,
+          paymentHistory.original_amount || paymentHistory.amount,
+          paymentHistory.discount_amount || 0,
+          paymentHistory.amount
+        );
+        logger.info(`Coupon usage recorded for payment ${paymentHistory.id}, couponId: ${paymentHistory.coupon_id}`);
+      }
 
       // Log successful payment activity (matches .NET)
       await userActivityLogService.logActivityAsync(paymentHistory.user_id, 'PaymentSuccess', 'Home', { ip: '0.0.0.0' });
