@@ -13,6 +13,14 @@ const CouponAuditLog = require('./coupon-audit-log.model');
 
 // Setup associations (only if not already defined)
 
+// PaymentHistory belongs to User
+if (!PaymentHistory.associations.User) {
+  PaymentHistory.belongsTo(User, {
+    foreignKey: 'user_id',
+    as: 'User'
+  });
+}
+
 // VehicleDetailRequest belongs to PaymentHistory
 if (!VehicleDetailRequest.associations.PaymentHistory) {
   VehicleDetailRequest.belongsTo(PaymentHistory, {
