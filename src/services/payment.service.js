@@ -266,23 +266,37 @@ class PaymentService {
       // Log successful payment activity (matches .NET)
       await userActivityLogService.logActivityAsync(paymentHistory.user_id, 'PaymentSuccess', 'Home', { ip: '0.0.0.0' });
 
-      // Send email notification to admin about the new payment
+      // Send email notifications about the payment
       try {
         const user = await User.findByPk(paymentHistory.user_id);
         if (user) {
+          // Construct user name from first_name and last_name
+          const userName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.user_name || null;
+
+          // Send notification to admin (no button)
           await emailService.sendPaymentNotificationToAdminAsync(
             user.email,
-            user.name || user.email,
+            userName,
             registrationNumber,
             paymentHistory.amount,
             paymentMethod,
             vehicleDetailRequest.id,
             user.id
           );
+
+          // Send notification to user with View Report button
+          await emailService.sendPaymentSuccessToUserAsync(
+            user.email,
+            userName,
+            registrationNumber,
+            paymentHistory.amount,
+            vehicleDetailRequest.id,
+            user.id
+          );
         }
       } catch (emailError) {
         // Log email error but don't fail the payment verification
-        logger.error('Failed to send payment notification email to admin:', emailError);
+        logger.error('Failed to send payment notification emails:', emailError);
       }
 
       // Return response matching .NET API format

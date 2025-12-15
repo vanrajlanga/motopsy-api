@@ -372,8 +372,7 @@ class EmailService {
     }
 
     /**
-     * Send payment success notification to admin
-     * Includes link to view the pending vehicle report requests
+     * Send payment success notification to admin (no button)
      */
     async sendPaymentNotificationToAdminAsync(userEmail, userName, registrationNumber, amount, paymentMethod, vehicleDetailRequestId, userId) {
         if (!this.isConfigured || !this.transporter) {
@@ -386,9 +385,6 @@ class EmailService {
 
         try {
             const adminEmail = process.env.ADMIN_EMAIL || process.env.CONTACT_EMAIL || this.fromEmail;
-            const adminPanelUrl = process.env.ADMIN_PANEL_URL || 'https://admin.motopsy.com';
-            // Link to vehicle report list page - admin can search for the specific request
-            const reportLink = `${adminPanelUrl}/#/admin/vehicleReport`;
 
             const paymentMethodNames = {
                 0: 'Card',
@@ -412,7 +408,6 @@ class EmailService {
               .container { max-width: 600px; margin: 0 auto; padding: 20px; }
               .header { background-color: #28a745; color: white; padding: 20px; text-align: center; }
               .content { padding: 20px; background-color: #f9f9f9; }
-              .button { display: inline-block; padding: 12px 24px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; margin: 20px 0; }
               .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
               table { width: 100%; border-collapse: collapse; margin: 15px 0; }
               table td { padding: 10px; border-bottom: 1px solid #ddd; }
@@ -464,11 +459,6 @@ class EmailService {
                     <td>${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
                   </tr>
                 </table>
-
-                <p>Click the button below to view pending vehicle report requests:</p>
-                <a href="${reportLink}" class="button">View Report Requests</a>
-
-                <p style="font-size: 12px; color: #666;">Or copy this link: ${reportLink}</p>
               </div>
               <div class="footer">
                 <p>&copy; ${new Date().getFullYear()} Motopsy. All rights reserved.</p>
@@ -484,6 +474,106 @@ class EmailService {
             return true;
         } catch (error) {
             logger.error("Send payment notification email error:", error);
+            return false;
+        }
+    }
+
+    /**
+     * Send payment success email to user with View Report button
+     */
+    async sendPaymentSuccessToUserAsync(userEmail, userName, registrationNumber, amount, vehicleDetailRequestId, userId) {
+        if (!this.isConfigured || !this.transporter) {
+            logger.warn(
+                "Email service not configured. Skipping payment success email to user.",
+                { userEmail, registrationNumber }
+            );
+            return false;
+        }
+
+        try {
+            const frontendUrl = process.env.FRONTEND_URL || 'https://motopsy.com';
+            // Link to user's profile page where they can see their reports
+            const reportLink = `${frontendUrl}/#/my-profile`;
+
+            const mailOptions = {
+                from: `"Motopsy" <${this.fromEmail}>`,
+                to: userEmail,
+                subject: `Payment Successful - Vehicle Report for ${registrationNumber}`,
+                html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background-color: #28a745; color: white; padding: 20px; text-align: center; }
+              .content { padding: 20px; background-color: #f9f9f9; }
+              .button { display: inline-block; padding: 14px 28px; background-color: #007bff; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; font-size: 16px; }
+              .button:hover { background-color: #0056b3; }
+              .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+              table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+              table td { padding: 10px; border-bottom: 1px solid #ddd; }
+              table td:first-child { font-weight: bold; width: 40%; color: #666; }
+              .amount { font-size: 20px; font-weight: bold; color: #28a745; }
+              .reg-number { font-size: 18px; font-weight: bold; color: #007bff; }
+              .success-icon { font-size: 48px; margin-bottom: 10px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <div class="success-icon">✓</div>
+                <h1>Payment Successful!</h1>
+              </div>
+              <div class="content">
+                <p>Dear ${userName || 'Customer'},</p>
+                <p>Thank you for your payment! Your vehicle history report request has been received and is being processed.</p>
+
+                <table>
+                  <tr>
+                    <td>Registration Number:</td>
+                    <td class="reg-number">${registrationNumber}</td>
+                  </tr>
+                  <tr>
+                    <td>Amount Paid:</td>
+                    <td class="amount">₹${amount}</td>
+                  </tr>
+                  <tr>
+                    <td>Request ID:</td>
+                    <td>#${vehicleDetailRequestId}</td>
+                  </tr>
+                  <tr>
+                    <td>Date & Time:</td>
+                    <td>${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
+                  </tr>
+                </table>
+
+                <p>Your report will be generated shortly. Click the button below to view your report once it's ready:</p>
+
+                <div style="text-align: center;">
+                  <a href="${reportLink}" class="button">View Report</a>
+                </div>
+
+                <p style="font-size: 12px; color: #666; margin-top: 20px;">Or copy this link: ${reportLink}</p>
+
+                <p style="margin-top: 20px;">If you have any questions, please don't hesitate to contact our support team.</p>
+
+                <p>Thank you for choosing Motopsy!</p>
+              </div>
+              <div class="footer">
+                <p>&copy; ${new Date().getFullYear()} Motopsy. All rights reserved.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `,
+            };
+
+            await this.transporter.sendMail(mailOptions);
+            logger.info(`Payment success email sent to user: ${userEmail} for ${registrationNumber}`);
+            return true;
+        } catch (error) {
+            logger.error("Send payment success email to user error:", error);
             return false;
         }
     }
