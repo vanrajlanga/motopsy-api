@@ -372,6 +372,123 @@ class EmailService {
     }
 
     /**
+     * Send payment success notification to admin
+     * Includes link to view the pending vehicle report requests
+     */
+    async sendPaymentNotificationToAdminAsync(userEmail, userName, registrationNumber, amount, paymentMethod, vehicleDetailRequestId, userId) {
+        if (!this.isConfigured || !this.transporter) {
+            logger.warn(
+                "Email service not configured. Skipping payment notification email.",
+                { userEmail, registrationNumber }
+            );
+            return false;
+        }
+
+        try {
+            const adminEmail = process.env.ADMIN_EMAIL || process.env.CONTACT_EMAIL || this.fromEmail;
+            const adminPanelUrl = process.env.ADMIN_PANEL_URL || 'https://admin.motopsy.com';
+            // Link to vehicle report list page - admin can search for the specific request
+            const reportLink = `${adminPanelUrl}/#/admin/vehicleReport`;
+
+            const paymentMethodNames = {
+                0: 'Card',
+                1: 'Net Banking',
+                2: 'Wallet',
+                3: 'Pay Later',
+                4: 'UPI'
+            };
+            const paymentMethodName = paymentMethodNames[paymentMethod] || 'Unknown';
+
+            const mailOptions = {
+                from: `"Motopsy" <${this.fromEmail}>`,
+                to: adminEmail,
+                subject: `New Payment Received - ${registrationNumber}`,
+                html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background-color: #28a745; color: white; padding: 20px; text-align: center; }
+              .content { padding: 20px; background-color: #f9f9f9; }
+              .button { display: inline-block; padding: 12px 24px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; margin: 20px 0; }
+              .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+              table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+              table td { padding: 10px; border-bottom: 1px solid #ddd; }
+              table td:first-child { font-weight: bold; width: 40%; color: #666; }
+              .amount { font-size: 24px; font-weight: bold; color: #28a745; }
+              .reg-number { font-size: 20px; font-weight: bold; color: #007bff; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>New Payment Received!</h1>
+              </div>
+              <div class="content">
+                <p>Hi Admin,</p>
+                <p>A new payment has been successfully processed. Here are the details:</p>
+
+                <table>
+                  <tr>
+                    <td>Customer Email:</td>
+                    <td>${userEmail}</td>
+                  </tr>
+                  <tr>
+                    <td>Customer Name:</td>
+                    <td>${userName || 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td>Registration Number:</td>
+                    <td class="reg-number">${registrationNumber}</td>
+                  </tr>
+                  <tr>
+                    <td>Amount Paid:</td>
+                    <td class="amount">₹${amount}</td>
+                  </tr>
+                  <tr>
+                    <td>Payment Method:</td>
+                    <td>${paymentMethodName}</td>
+                  </tr>
+                  <tr>
+                    <td>Request ID:</td>
+                    <td>#${vehicleDetailRequestId}</td>
+                  </tr>
+                  <tr>
+                    <td>User ID:</td>
+                    <td>#${userId}</td>
+                  </tr>
+                  <tr>
+                    <td>Date & Time:</td>
+                    <td>${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
+                  </tr>
+                </table>
+
+                <p>Click the button below to view pending vehicle report requests:</p>
+                <a href="${reportLink}" class="button">View Report Requests</a>
+
+                <p style="font-size: 12px; color: #666;">Or copy this link: ${reportLink}</p>
+              </div>
+              <div class="footer">
+                <p>&copy; ${new Date().getFullYear()} Motopsy. All rights reserved.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `,
+            };
+
+            await this.transporter.sendMail(mailOptions);
+            logger.info(`Payment notification email sent to admin for: ${registrationNumber}`);
+            return true;
+        } catch (error) {
+            logger.error("Send payment notification email error:", error);
+            return false;
+        }
+    }
+
+    /**
      * Send email with file attachment
      * Matches .NET: SendEmail with attachment
      */
