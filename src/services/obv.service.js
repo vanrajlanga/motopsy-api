@@ -158,7 +158,7 @@ class ObvService {
     try {
       logger.info(`Looking up price from specifications: ${make} ${model} ${variant || ''}`);
 
-      // Build search conditions
+      // Build search conditions - require price to exist
       const whereConditions = {
         price_breakdown_ex_showroom_price: {
           [Op.and]: [
@@ -168,20 +168,42 @@ class ObvService {
         }
       };
 
-      // Try exact make match first
+      // Step 1: Try EXACT model match first
       let specs = await VehicleSpecification.findAll({
         where: {
           ...whereConditions,
-          naming_make: {
-            [Op.like]: `%${make}%`
-          },
-          naming_model: {
-            [Op.like]: `%${model}%`
-          }
+          naming_make: { [Op.like]: `%${make}%` },
+          naming_model: model  // Exact match
         },
         limit: 10,
-        order: [['id', 'DESC']] // Get latest entries first
+        order: [['id', 'DESC']]
       });
+
+      // Step 2: If no exact match, try model at START (e.g., "C-Class [2022-2024]")
+      if (specs.length === 0) {
+        specs = await VehicleSpecification.findAll({
+          where: {
+            ...whereConditions,
+            naming_make: { [Op.like]: `%${make}%` },
+            naming_model: { [Op.like]: `${model}%` }  // Starts with model
+          },
+          limit: 10,
+          order: [['id', 'DESC']]
+        });
+      }
+
+      // Step 3: Fallback to contains match
+      if (specs.length === 0) {
+        specs = await VehicleSpecification.findAll({
+          where: {
+            ...whereConditions,
+            naming_make: { [Op.like]: `%${make}%` },
+            naming_model: { [Op.like]: `%${model}%` }
+          },
+          limit: 10,
+          order: [['id', 'DESC']]
+        });
+      }
 
       // If variant provided, filter further
       if (specs.length > 0 && variant) {

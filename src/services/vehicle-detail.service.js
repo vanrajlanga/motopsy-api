@@ -640,21 +640,43 @@ class VehicleDetailService {
 
       logger.info(`Finding specification for: make=${make}, model=${model}, version=${version}`);
 
-      // Find candidates matching make and model (case-insensitive)
-      const candidates = await VehicleSpecification.findAll({
+      // Step 1: Try EXACT model match first (e.g., "C-Class" exactly)
+      let candidates = await VehicleSpecification.findAll({
         where: {
-          naming_make: { [Op.like]: make },
-          naming_model: { [Op.like]: `%${model}%` }
+          naming_make: { [Op.like]: `%${make}%` },
+          naming_model: model  // Exact match
         },
-        limit: 100
+        limit: 50
       });
+
+      // Step 2: If no exact match, try partial match with model at START (e.g., "C-Class [2022-2024]")
+      if (candidates.length === 0) {
+        candidates = await VehicleSpecification.findAll({
+          where: {
+            naming_make: { [Op.like]: `%${make}%` },
+            naming_model: { [Op.like]: `${model}%` }  // Starts with model
+          },
+          limit: 50
+        });
+      }
+
+      // Step 3: Fallback to contains match (last resort)
+      if (candidates.length === 0) {
+        candidates = await VehicleSpecification.findAll({
+          where: {
+            naming_make: { [Op.like]: `%${make}%` },
+            naming_model: { [Op.like]: `%${model}%` }
+          },
+          limit: 100
+        });
+      }
 
       if (candidates.length === 0) {
         logger.info(`No specifications found for make=${make}, model=${model}`);
         return null;
       }
 
-      logger.info(`Found ${candidates.length} specification candidates`);
+      logger.info(`Found ${candidates.length} specification candidates for ${model}`);
 
       // If version provided, do fuzzy matching (like .NET does)
       if (version) {
