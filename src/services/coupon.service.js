@@ -8,6 +8,15 @@ const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
 const { toDataSourceResult } = require('../utils/kendo-datasource');
 
+// Lazy import to avoid circular dependency
+let pricingService = null;
+const getPricingService = () => {
+  if (!pricingService) {
+    pricingService = require('./pricing.service');
+  }
+  return pricingService;
+};
+
 class CouponService {
   /**
    * Get all coupons with pagination (admin)
@@ -250,8 +259,10 @@ class CouponService {
         return Result.failure('This coupon has reached its maximum usage limit');
       }
 
-      // Check minimum order amount
-      const configuredAmount = parseInt(process.env.RAZORPAY_AMOUNT) || 199;
+      // Get configured amount from pricing service (dynamic pricing)
+      const pricingSvc = getPricingService();
+      const pricingResult = await pricingSvc.getVehicleHistoryPriceAsync();
+      const configuredAmount = pricingResult.isSuccess ? pricingResult.value.amount : (parseInt(process.env.RAZORPAY_AMOUNT) || 799);
       const originalAmount = orderAmount || configuredAmount;
 
       if (coupon.min_order_amount && originalAmount < parseFloat(coupon.min_order_amount)) {

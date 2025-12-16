@@ -10,6 +10,7 @@ const UserActivityLog = require('./user-activity-log.model');
 const Coupon = require('./coupon.model');
 const CouponUsageHistory = require('./coupon-usage-history.model');
 const CouponAuditLog = require('./coupon-audit-log.model');
+const PricingSetting = require('./pricing-setting.model');
 
 // Setup associations (only if not already defined)
 
@@ -87,5 +88,6 @@ module.exports = {
   UserActivityLog,
   Coupon,
   CouponUsageHistory,
-  CouponAuditLog
+  CouponAuditLog,
+  PricingSetting
 };

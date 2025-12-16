@@ -8,6 +8,7 @@ const User = require('../models/user.model');
 const userActivityLogService = require('./user-activity-log.service');
 const couponService = require('./coupon.service');
 const emailService = require('./email.service');
+const pricingService = require('./pricing.service');
 const { sequelize } = require('../config/database');
 require('dotenv').config();
 
@@ -30,7 +31,7 @@ class PaymentService {
   /**
    * Create Razorpay order
    * Matches .NET API CreateOrder implementation
-   * Now uses dynamic coupon service for validation
+   * Now uses dynamic coupon service for validation and dynamic pricing
    */
   async createOrder(request, userEmail) {
     try {
@@ -45,8 +46,9 @@ class PaymentService {
         return Result.failure('PaymentFor is required');
       }
 
-      // Validate amount - either matches configured amount or matches discounted amount with valid coupon
-      const configuredAmount = parseInt(process.env.RAZORPAY_AMOUNT) || 199;
+      // Get configured amount from pricing service (dynamic pricing)
+      const pricingResult = await pricingService.getVehicleHistoryPriceAsync();
+      const configuredAmount = pricingResult.isSuccess ? pricingResult.value.amount : (parseInt(process.env.RAZORPAY_AMOUNT) || 799);
 
       // Variables to store coupon info for tracking
       let couponId = null;

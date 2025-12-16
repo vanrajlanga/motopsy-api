@@ -24,6 +24,7 @@ const obvRoutes = require('./src/routes/obv.routes');
 const userActivityLogRoutes = require('./src/routes/user-activity-log.routes');
 const couponRoutes = require('./src/routes/coupon.routes');
 const orderRoutes = require('./src/routes/order.routes');
+const pricingRoutes = require('./src/routes/pricing.routes');
 
 const app = express();
 
@@ -108,6 +109,7 @@ app.use('/api/obv', obvRoutes);
 app.use('/api/UserActivityLog', userActivityLogRoutes);
 app.use('/api/coupon', couponRoutes);
 app.use('/api/order', orderRoutes);
+app.use('/api/pricing', pricingRoutes);
 
 // 404 handler
 app.use((req, res) => {
