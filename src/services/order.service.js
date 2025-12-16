@@ -1,6 +1,7 @@
 const PaymentHistory = require('../models/payment-history.model');
 const User = require('../models/user.model');
 const VehicleDetailRequest = require('../models/vehicle-detail-request.model');
+const VehicleDetail = require('../models/vehicle-detail.model');
 const Coupon = require('../models/coupon.model');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
@@ -52,12 +53,14 @@ class OrderService {
 
   /**
    * Transform payment history to Order DTO matching frontend interface
+   * @param {Object} payment - Payment history with associations
+   * @param {number|null} vehicleDetailId - Optional vehicleDetailId from lookup
    */
-  transformToOrderDto(payment) {
+  transformToOrderDto(payment, vehicleDetailId = null) {
     const user = payment.User || null;
     // VehicleDetailRequests is an array (hasMany), get the first one
-    const vehicleRequest = (payment.VehicleDetailRequests && payment.VehicleDetailRequests.length > 0) 
-      ? payment.VehicleDetailRequests[0] 
+    const vehicleRequest = (payment.VehicleDetailRequests && payment.VehicleDetailRequests.length > 0)
+      ? payment.VehicleDetailRequests[0]
       : null;
     const coupon = payment.Coupon || null;
 
@@ -81,6 +84,7 @@ class OrderService {
       customerEmail: user?.email || 'N/A',
       customerPhone: user?.phone_number || null,
       vehicleRequestId: vehicleRequest?.id || null,
+      vehicleDetailId: vehicleDetailId,
       registrationNumber: vehicleRequest?.registration_number || null,
       vehicleMake: vehicleRequest?.make || null,
       vehicleModel: vehicleRequest?.model || null,
@@ -142,8 +146,34 @@ class OrderService {
       // Get data
       const payments = await PaymentHistory.findAll(queryOptions);
 
-      // Transform to Order DTOs
-      const orders = payments.map(payment => this.transformToOrderDto(payment));
+      // Get all vehicleRequestIds to look up vehicleDetailIds
+      const vehicleRequestIds = payments
+        .filter(p => p.VehicleDetailRequests && p.VehicleDetailRequests.length > 0)
+        .map(p => p.VehicleDetailRequests[0].id);
+
+      // Look up vehicleDetailIds from vehicle_details table
+      let vehicleDetailMap = {};
+      if (vehicleRequestIds.length > 0) {
+        const vehicleDetails = await VehicleDetail.findAll({
+          where: {
+            vehicle_detail_request_id: { [Op.in]: vehicleRequestIds }
+          },
+          attributes: ['id', 'vehicle_detail_request_id']
+        });
+        // Create map: vehicleRequestId -> vehicleDetailId
+        vehicleDetails.forEach(vd => {
+          vehicleDetailMap[vd.vehicle_detail_request_id] = vd.id;
+        });
+      }
+
+      // Transform to Order DTOs with vehicleDetailId
+      const orders = payments.map(payment => {
+        const vehicleRequestId = (payment.VehicleDetailRequests && payment.VehicleDetailRequests.length > 0)
+          ? payment.VehicleDetailRequests[0].id
+          : null;
+        const vehicleDetailId = vehicleRequestId ? vehicleDetailMap[vehicleRequestId] || null : null;
+        return this.transformToOrderDto(payment, vehicleDetailId);
+      });
 
       logger.info(`Found ${orders.length} orders (total: ${total})`);
       return Result.success({
