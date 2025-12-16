@@ -171,6 +171,9 @@ class VehicleDetailService {
 
       // Check if entry already exists for THIS specific VehicleDetailRequestId
       // Each payment creates a unique VehicleDetailRequestId, so each payment should create a new entry
+      // Request params for vehicle specification matching
+      const requestParams = { make, model, version };
+
       if (vehicleDetailRequestId) {
         let vehicleDetail = await VehicleDetail.findOne({
           where: { vehicle_detail_request_id: vehicleDetailRequestId }
@@ -178,7 +181,7 @@ class VehicleDetailService {
 
         if (vehicleDetail) {
           logger.info(`Vehicle details already exist for this request: ${vehicleDetailRequestId}`);
-          return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId));
+          return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId, requestParams));
         }
       }
 
@@ -210,7 +213,7 @@ class VehicleDetailService {
         });
 
         logger.info(`Vehicle details created for request ${vehicleDetailRequestId}, user ${resolvedUserId}: ${registrationNumber}`);
-        return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId));
+        return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId, requestParams));
       }
 
       // No existing data - Call Surepass API to fetch full RC details (uses rc-full endpoint)
@@ -332,7 +335,7 @@ class VehicleDetailService {
       }
 
       // Return full response matching frontend expectations
-      return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId));
+      return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId, requestParams));
     } catch (error) {
       logger.error('Get vehicle details error:', error);
       return Result.failure(error.message || 'Failed to get vehicle details');
@@ -342,8 +345,11 @@ class VehicleDetailService {
   /**
    * Build full vehicle detail response with all related data
    * Used by both getVehicleDetailsByRCAsync and getVehicleDetailByIdAsync
+   * @param {Object} vehicleDetail - Vehicle detail from database
+   * @param {number} userId - User ID
+   * @param {Object} requestParams - Optional request parameters for better spec matching
    */
-  async buildVehicleDetailResponse(vehicleDetail, userId) {
+  async buildVehicleDetailResponse(vehicleDetail, userId, requestParams = {}) {
     const vehicleDetailId = vehicleDetail.id;
 
     // Get challan details for this vehicle
@@ -377,7 +383,9 @@ class VehicleDetailService {
     const vehicleAge = this.calculateVehicleAge(vehicleDetail.manufacturing_date_formatted);
 
     // Get vehicle specification using smart matching
-    let vehicleSpecification = await this.findVehicleSpecification(vehicleDetail);
+    // Pass request params (make, model, version) for better matching
+    const { make, model, version } = requestParams;
+    let vehicleSpecification = await this.findVehicleSpecification(vehicleDetail, make, model, version);
 
     // Transform challan details to match .NET VehicleChallanDetailDto
     const transformedChallans = challanDetails.map(challan => ({
