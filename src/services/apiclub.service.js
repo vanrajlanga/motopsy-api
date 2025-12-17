@@ -47,6 +47,7 @@ class ApiclubService {
         logger.info(`[APIclub] RC verification successful for: ${registrationNumber}`);
 
         // Map APIclub response to Surepass-compatible format
+        // Updated with all fields available in Production API (Dec 2025)
         return Result.success({
           // Basic Info
           clientId: data.request_id || '',
@@ -56,7 +57,7 @@ class ApiclubService {
 
           // Owner Details
           ownerName: data.owner_name,
-          fatherName: data.father_name || null,
+          fatherName: data.father_name || null, // Available in Production!
           ownerNumber: data.owner_count || null,
           maskedName: null, // Not available in APIclub
           mobileNumber: null, // Not available in APIclub
@@ -64,7 +65,7 @@ class ApiclubService {
           // Address
           presentAddress: data.present_address || null,
           permanentAddress: data.permanent_address || null,
-          registeredAt: null, // Not available in APIclub
+          registeredAt: data.rto_name || null, // Available in Production!
 
           // Vehicle Identity
           vehicleChassisNumber: data.chassis_number,
@@ -74,7 +75,7 @@ class ApiclubService {
           // Vehicle Specs
           makerDescription: data.brand_name,
           makerModel: data.brand_model,
-          bodyType: null, // Not available in APIclub
+          bodyType: data.body_type || null, // Available in Production!
           fuelType: data.fuel_type,
           color: data.color || '',
           normsType: data.norms || null,
@@ -84,30 +85,29 @@ class ApiclubService {
           vehicleGrossWeight: data.gross_weight,
           noCylinders: data.cylinders,
           seatCapacity: data.seating_capacity,
-          sleeperCapacity: null, // Not available in APIclub
-          standingCapacity: null, // Not available in APIclub
-          unladenWeight: null, // Not available in APIclub
-          wheelbase: null, // Not available in APIclub
+          sleeperCapacity: data.sleeper_capacity || null, // Available in Production!
+          standingCapacity: data.standing_capacity || null, // Available in Production!
+          unladenWeight: data.unladen_weight || null, // Available in Production!
+          wheelbase: data.wheelbase || null, // Available in Production!
 
           // Category
-          vehicleCategory: data.class,
+          vehicleCategory: data.category || data.class,
           vehicleCategoryDescription: data.class,
 
           // Manufacturing & Age
-          // APIclub doesn't provide manufacturing date, estimate from registration date
-          // Vehicles are typically manufactured 1-3 months before registration
-          manufacturingDate: this._estimateManufacturingDate(data.registration_date),
-          manufacturingDateFormatted: this._estimateManufacturingDateFormatted(data.registration_date),
-          vehicleAge: data.vehicle_age || null, // Pre-calculated by APIclub (if available)
+          // Use actual values from Production, fallback to estimation
+          manufacturingDate: data.manufacturing_date || null,
+          manufacturingDateFormatted: data.manufacturing_date_formatted || null,
+          vehicleAge: data.vehicle_age || null,
 
           // Fitness
-          fitUpTo: null, // Not available in APIclub
-          latestBy: null, // Not available in APIclub
-          lessInfo: false,
+          fitUpTo: data.fit_up_to || null, // Available in Production!
+          latestBy: data.latest_by || null, // Available in Production!
+          lessInfo: false, // Not available in APIclub
 
           // Finance
           financer: data.financer || null,
-          financed: data.is_financed === 'YES' || data.is_financed === 'true' || !!data.financer,
+          financed: data.is_financed === true || data.is_financed === 'true' || data.is_financed === 'YES' || !!data.financer,
 
           // Insurance
           insuranceCompany: data.insurance_company || null,
@@ -115,8 +115,8 @@ class ApiclubService {
           insuranceUpto: data.insurance_expiry || null,
 
           // Tax
-          taxUpto: data.tax_upto !== '1900-01-01' ? data.tax_upto : null,
-          taxPaidUpto: data.tax_paid_upto || null,
+          taxUpto: data.tax_upto && data.tax_upto !== '1900-01-01' ? data.tax_upto : null,
+          taxPaidUpto: data.tax_paid_upto && data.tax_paid_upto !== '1900-01-01' ? data.tax_paid_upto : null,
 
           // PUCC
           puccNumber: data.pucc_number || null,
@@ -124,21 +124,21 @@ class ApiclubService {
 
           // Permit
           permitNumber: data.permit_number || null,
-          permitIssueDate: data.permit_issue_date !== '1900-01-01' ? data.permit_issue_date : null,
-          permitValidFrom: data.permit_valid_from !== '1900-01-01' ? data.permit_valid_from : null,
-          permitValidUpto: data.permit_valid_upto !== '1900-01-01' ? data.permit_valid_upto : null,
+          permitIssueDate: data.permit_issue_date && data.permit_issue_date !== '1900-01-01' ? data.permit_issue_date : null,
+          permitValidFrom: data.permit_valid_from && data.permit_valid_from !== '1900-01-01' ? data.permit_valid_from : null,
+          permitValidUpto: data.permit_valid_upto && data.permit_valid_upto !== '1900-01-01' ? data.permit_valid_upto : null,
           permitType: data.permit_type || null,
 
           // National Permit
           nationalPermitNumber: data.national_permit_number || null,
-          nationalPermitUpto: data.national_permit_upto !== '1900-01-01' ? data.national_permit_upto : null,
+          nationalPermitUpto: data.national_permit_upto && data.national_permit_upto !== '1900-01-01' ? data.national_permit_upto : null,
           nationalPermitIssuedBy: data.national_permit_issued_by || null,
 
           // Status
-          nonUseStatus: null, // Not available in APIclub
-          nonUseFrom: null, // Not available in APIclub
-          nonUseTo: null, // Not available in APIclub
-          blacklistStatus: null, // Not available in APIclub
+          nonUseStatus: null, // Not available in APIclub rc_info
+          nonUseFrom: null, // Not available in APIclub rc_info
+          nonUseTo: null, // Not available in APIclub rc_info
+          blacklistStatus: null, // Available in rc_lite only (empty in test)
           nocDetails: data.noc_details || null,
 
           // Challan (not available in this endpoint)
@@ -279,42 +279,6 @@ class ApiclubService {
         total: 0,
         _source: 'apiclub'
       });
-    }
-  }
-
-  /**
-   * Estimate manufacturing date from registration date
-   * Vehicles are typically manufactured 2 months before registration
-   * @private
-   */
-  _estimateManufacturingDate(registrationDate) {
-    if (!registrationDate) return null;
-    try {
-      const regDate = new Date(registrationDate);
-      if (isNaN(regDate.getTime())) return null;
-      regDate.setMonth(regDate.getMonth() - 2);
-      return regDate.toISOString().split('T')[0]; // YYYY-MM-DD format
-    } catch (e) {
-      return null;
-    }
-  }
-
-  /**
-   * Estimate manufacturing date formatted (MM/YYYY) from registration date
-   * Used for vehicle age calculation
-   * @private
-   */
-  _estimateManufacturingDateFormatted(registrationDate) {
-    if (!registrationDate) return null;
-    try {
-      const regDate = new Date(registrationDate);
-      if (isNaN(regDate.getTime())) return null;
-      regDate.setMonth(regDate.getMonth() - 2);
-      const month = String(regDate.getMonth() + 1).padStart(2, '0');
-      const year = regDate.getFullYear();
-      return `${month}/${year}`; // MM/YYYY format (e.g., "09/2012")
-    } catch (e) {
-      return null;
     }
   }
 
