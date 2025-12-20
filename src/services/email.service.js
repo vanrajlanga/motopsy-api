@@ -481,8 +481,15 @@ class EmailService {
 
     /**
      * Send payment success email to user with View Report button (auto-login)
+     * @param {string} userEmail - User's email address
+     * @param {string} userName - User's name
+     * @param {string} registrationNumber - Vehicle registration number
+     * @param {number} amount - Payment amount
+     * @param {number} vehicleDetailRequestId - Vehicle detail request ID
+     * @param {number} userId - User ID
+     * @param {object} invoiceAttachment - Optional invoice attachment { buffer: Buffer, fileName: string }
      */
-    async sendPaymentSuccessToUserAsync(userEmail, userName, registrationNumber, amount, vehicleDetailRequestId, userId) {
+    async sendPaymentSuccessToUserAsync(userEmail, userName, registrationNumber, amount, vehicleDetailRequestId, userId, invoiceAttachment = null) {
         if (!this.isConfigured || !this.transporter) {
             logger.warn(
                 "Email service not configured. Skipping payment success email to user.",
@@ -533,6 +540,7 @@ class EmailService {
               <div class="content">
                 <p>Dear ${userName || 'Customer'},</p>
                 <p>Thank you for your payment! Your vehicle history report request has been received and is being processed.</p>
+                ${invoiceAttachment ? '<p><strong>Your invoice is attached to this email.</strong></p>' : ''}
 
                 <table>
                   <tr>
@@ -574,8 +582,17 @@ class EmailService {
         `,
             };
 
+            // Add invoice attachment if provided
+            if (invoiceAttachment && invoiceAttachment.buffer && invoiceAttachment.fileName) {
+                mailOptions.attachments = [{
+                    filename: invoiceAttachment.fileName,
+                    content: invoiceAttachment.buffer,
+                    contentType: 'application/pdf'
+                }];
+            }
+
             await this.transporter.sendMail(mailOptions);
-            logger.info(`Payment success email sent to user: ${userEmail} for ${registrationNumber}`);
+            logger.info(`Payment success email sent to user: ${userEmail} for ${registrationNumber}${invoiceAttachment ? ' with invoice attached' : ''}`);
             return true;
         } catch (error) {
             logger.error("Send payment success email to user error:", error);

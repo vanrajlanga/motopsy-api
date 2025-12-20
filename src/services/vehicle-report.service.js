@@ -1,11 +1,13 @@
 const VehicleDetail = require('../models/vehicle-detail.model');
 const PhysicalVerification = require('../models/physical-verification.model');
 const User = require('../models/user.model');
+const NcrbReport = require('../models/ncrb-report.model');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
 const emailService = require('./email.service');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
+const fs = require('fs');
 
 class VehicleReportService {
   /**
@@ -67,45 +69,104 @@ class VehicleReportService {
    */
   async addOrUpdateReportAsync(dto, userId) {
     try {
-      const user = await User.findByPk(userId);
-      if (!user) {
-        return Result.failure('User not found');
-      }
-
       const vehicleDetail = await VehicleDetail.findByPk(dto.vehicleDetailId);
       if (!vehicleDetail) {
         return Result.failure("Vehicle History Report doesn't exist");
       }
 
-      // Store the file bytes
-      const fileBytes = dto.ncrbReport.buffer;
+      // Get the owner of the vehicle report (not the admin uploading)
+      const vehicleOwner = await User.findByPk(vehicleDetail.user_id);
+      if (!vehicleOwner) {
+        return Result.failure('Vehicle owner not found');
+      }
 
-      // Check if NcrbReport exists for this vehicle detail
-      // For now, we'll store in a simple way - in production, you'd want a separate NcrbReport table
-      await vehicleDetail.update({
-        ncrb_report_data: fileBytes,
-        ncrb_report_file_name: dto.ncrbReport.originalname,
-        ncrb_report_updated_at: new Date()
+      // Store the file bytes - handle both disk storage (path) and memory storage (buffer)
+      let fileBytes;
+      if (dto.ncrbReport.buffer) {
+        fileBytes = dto.ncrbReport.buffer;
+      } else if (dto.ncrbReport.path) {
+        fileBytes = fs.readFileSync(dto.ncrbReport.path);
+        // Clean up the temporary file after reading
+        fs.unlinkSync(dto.ncrbReport.path);
+      } else {
+        logger.error('Invalid file upload - no buffer or path');
+        return Result.failure('Invalid file upload');
+      }
+
+      // Check if NcrbReport exists for this vehicle detail, update or create
+      const existingNcrbReport = await NcrbReport.findOne({
+        where: { vehicle_detail_id: dto.vehicleDetailId }
       });
 
-      // Send email if requested
+      if (existingNcrbReport) {
+        // Update existing NCRB report
+        await existingNcrbReport.update({
+          report: fileBytes,
+          modified_at: new Date()
+        });
+        logger.info(`Updated NCRB report for vehicle detail ID: ${dto.vehicleDetailId}`);
+      } else {
+        // Create new NCRB report
+        await NcrbReport.create({
+          report: fileBytes,
+          vehicle_detail_id: dto.vehicleDetailId,
+          created_at: new Date()
+        });
+        logger.info(`Created new NCRB report for vehicle detail ID: ${dto.vehicleDetailId}`);
+      }
+
+      // Send email if requested - send to the vehicle owner
       if (dto.sendMail) {
+        logger.info(`Sending NCRB email to vehicle owner: ${vehicleOwner.email}, filename: ${dto.ncrbReport.originalname}, file size: ${fileBytes.length} bytes`);
+        const userName = vehicleOwner.user_name || vehicleOwner.first_name || vehicleOwner.email;
         const message = `
-          <p>Dear ${user.user_name},</p>
-          <p>Thank you for your recent purchase of a Vehicle History Report from Motopsy.com.</p>
-          <p>We are pleased to confirm that the NCRB Vehicle NOC, which is an integral part of your Vehicle History Report, is attached to this email.</p>
-          <p>We are grateful for your patronage and look forward to serving you again in the future.</p>
-          <p>Best regards,</p>
-          <p>Atul Bawa</p>
-          <p>Motopsy.com</p>`;
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: #9c27b0; padding: 20px; text-align: center;">
+              <h1 style="color: white; margin: 0;">Motopsy</h1>
+            </div>
+            <div style="padding: 30px; background-color: #f9f9f9;">
+              <p style="font-size: 16px; color: #333;">Dear ${userName},</p>
+              <p style="font-size: 14px; color: #555; line-height: 1.6;">
+                Thank you for your recent purchase of a Vehicle History Report from Motopsy.com.
+              </p>
+              <p style="font-size: 14px; color: #555; line-height: 1.6;">
+                We are pleased to confirm that the <strong>NCRB Vehicle NOC</strong>, which is an integral part of your
+                Vehicle History Report, is attached to this email.
+              </p>
+              <div style="background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0;">
+                <p style="margin: 0; color: #2e7d32; font-size: 14px;">
+                  <strong>Registration Number:</strong> ${vehicleDetail.registration_number}
+                </p>
+              </div>
+              <p style="font-size: 14px; color: #555; line-height: 1.6;">
+                We are grateful for your patronage and look forward to serving you again in the future.
+              </p>
+              <p style="font-size: 14px; color: #555; margin-top: 30px;">
+                Best regards,<br>
+                <strong>Team Motopsy</strong>
+              </p>
+            </div>
+            <div style="background-color: #333; padding: 20px; text-align: center;">
+              <p style="color: #999; font-size: 12px; margin: 0;">
+                © ${new Date().getFullYear()} Motopsy Technologies Pvt. Ltd. All rights reserved.
+              </p>
+              <p style="color: #999; font-size: 12px; margin: 5px 0 0 0;">
+                www.motopsy.com
+              </p>
+            </div>
+          </div>`;
+
+        // Use a descriptive filename with registration number
+        const attachmentFilename = `NCRB_Report_${vehicleDetail.registration_number}.pdf`;
 
         await emailService.sendEmailWithAttachmentAsync(
-          user.email,
-          'NCRB Report',
+          vehicleOwner.email,
+          'NCRB Vehicle NOC Report - Motopsy',
           message,
           fileBytes,
-          dto.ncrbReport.originalname
+          attachmentFilename
         );
+        logger.info(`NCRB report email sent to: ${vehicleOwner.email}`);
       }
 
       return Result.success();
@@ -231,18 +292,27 @@ class VehicleReportService {
         where: { user_id: user.id }
       });
 
+      // Get all NCRB reports for user's vehicle details
+      const vehicleDetailIds = userVehicleHistoryReports.map(v => v.id);
+      const ncrbReports = await NcrbReport.findAll({
+        where: { vehicle_detail_id: vehicleDetailIds }
+      });
+
       // Map to VehicleDetailWithReportDto
       const vehicleDetailWithReports = userVehicleHistoryReports.map(uvr => {
         const pvForVehicle = userPhysicalVerifications.find(
           x => x.registration_number === uvr.registration_number
+        );
+        const ncrbForVehicle = ncrbReports.find(
+          n => n.vehicle_detail_id === uvr.id
         );
 
         return {
           registrationNumber: uvr.registration_number,
           vehicleDetailId: uvr.id,
           physicalVerificationReport: !!pvForVehicle,
-          ncrbReport: !!uvr.ncrb_report_data,
-          ncrbReportId: uvr.ncrb_report_data ? uvr.id : null,
+          ncrbReport: !!ncrbForVehicle,
+          ncrbReportId: ncrbForVehicle?.id || null,
           physicalVerificationReportId: pvForVehicle?.id || null,
           generatedDate: uvr.created_at
         };
@@ -307,13 +377,17 @@ class VehicleReportService {
    */
   async getNcrbReportByIdAsync(reportId) {
     try {
-      // Find vehicle detail that has this NCRB report
-      const vehicleDetail = await VehicleDetail.findOne({
-        where: { id: reportId },
-        attributes: ['ncrb_report_data']
+      // Find NCRB report by ID
+      const ncrbReport = await NcrbReport.findByPk(reportId, {
+        attributes: ['report']
       });
 
-      return vehicleDetail?.ncrb_report_data || null;
+      if (!ncrbReport || !ncrbReport.report) {
+        return null;
+      }
+
+      // Return as base64 string for frontend consumption
+      return ncrbReport.report.toString('base64');
     } catch (error) {
       logger.error('Get NCRB report by ID error:', error);
       throw error;

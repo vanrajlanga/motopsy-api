@@ -11,6 +11,8 @@ const Coupon = require('./coupon.model');
 const CouponUsageHistory = require('./coupon-usage-history.model');
 const CouponAuditLog = require('./coupon-audit-log.model');
 const PricingSetting = require('./pricing-setting.model');
+const Invoice = require('./invoice.model');
+const NcrbReport = require('./ncrb-report.model');
 
 // Setup associations (only if not already defined)
 
@@ -78,6 +80,46 @@ if (!CouponAuditLog.associations.Coupon) {
   });
 }
 
+// Invoice belongs to PaymentHistory
+if (!Invoice.associations.PaymentHistory) {
+  Invoice.belongsTo(PaymentHistory, {
+    foreignKey: 'payment_history_id',
+    as: 'PaymentHistory'
+  });
+}
+
+// Invoice belongs to User
+if (!Invoice.associations.User) {
+  Invoice.belongsTo(User, {
+    foreignKey: 'user_id',
+    as: 'User'
+  });
+}
+
+// PaymentHistory has one Invoice
+if (!PaymentHistory.associations.Invoice) {
+  PaymentHistory.hasOne(Invoice, {
+    foreignKey: 'payment_history_id',
+    as: 'Invoice'
+  });
+}
+
+// NcrbReport belongs to VehicleDetail
+if (!NcrbReport.associations.VehicleDetail) {
+  NcrbReport.belongsTo(VehicleDetail, {
+    foreignKey: 'vehicle_detail_id',
+    as: 'VehicleDetail'
+  });
+}
+
+// VehicleDetail has one NcrbReport
+if (!VehicleDetail.associations.NcrbReport) {
+  VehicleDetail.hasOne(NcrbReport, {
+    foreignKey: 'vehicle_detail_id',
+    as: 'NcrbReport'
+  });
+}
+
 module.exports = {
   sequelize,
   User,
@@ -89,5 +131,7 @@ module.exports = {
   Coupon,
   CouponUsageHistory,
   CouponAuditLog,
-  PricingSetting
+  PricingSetting,
+  Invoice,
+  NcrbReport
 };

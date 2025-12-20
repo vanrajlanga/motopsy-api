@@ -9,6 +9,7 @@ const userActivityLogService = require('./user-activity-log.service');
 const couponService = require('./coupon.service');
 const emailService = require('./email.service');
 const pricingService = require('./pricing.service');
+const invoiceService = require('./invoice.service');
 const { sequelize } = require('../config/database');
 require('dotenv').config();
 
@@ -275,6 +276,31 @@ class PaymentService {
           // Construct user name from first_name and last_name
           const userName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.user_name || null;
 
+          // Generate invoice for the payment
+          let invoiceAttachment = null;
+          try {
+            const invoiceResult = await invoiceService.createInvoice({
+              paymentHistoryId: paymentHistory.id,
+              userId: user.id,
+              customerName: userName || user.email,
+              customerEmail: user.email,
+              customerPhone: user.phone_number || null,
+              registrationNumber: registrationNumber,
+              description: 'Vehicle History Report',
+              quantity: 1,
+              totalAmount: parseFloat(paymentHistory.amount)
+            });
+
+            invoiceAttachment = {
+              buffer: invoiceResult.pdfBuffer,
+              fileName: invoiceResult.fileName
+            };
+            logger.info(`Invoice generated: ${invoiceResult.invoice.invoice_number} for payment ${paymentHistory.id}`);
+          } catch (invoiceError) {
+            logger.error('Failed to generate invoice:', invoiceError);
+            // Continue with email without invoice attachment
+          }
+
           // Send notification to admin (no button)
           await emailService.sendPaymentNotificationToAdminAsync(
             user.email,
@@ -286,14 +312,15 @@ class PaymentService {
             user.id
           );
 
-          // Send notification to user with View Report button
+          // Send notification to user with View Report button and invoice attachment
           await emailService.sendPaymentSuccessToUserAsync(
             user.email,
             userName,
             registrationNumber,
             paymentHistory.amount,
             vehicleDetailRequest.id,
-            user.id
+            user.id,
+            invoiceAttachment
           );
         }
       } catch (emailError) {
