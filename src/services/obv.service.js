@@ -307,12 +307,20 @@ class ObvService {
   /**
    * Get enterprise used price range using custom calculation
    * Replaces Droom API with internal algorithm
+   * Note: make, model, year are ALWAYS extracted from Surepass/APIclub API response
+   * Only kmsDriven is taken from frontend input for consistency
    */
   async getEnterpriseUsedPriceRangeAsync(request, userEmail) {
     try {
       logger.info(`Used price range requested by user: ${userEmail}`);
 
-      let { make, model, year, trim, kmsDriven, city, noOfOwners, vehicleDetailId, originalPrice } = request;
+      // Only kmsDriven comes from frontend - everything else from API response
+      let { kmsDriven, city, vehicleDetailId, originalPrice } = request;
+      let make = null;
+      let model = null;
+      let year = null;
+      let trim = null;
+      let noOfOwners = null;
       let vehicleDetail = null;
       let stateCode = null;
 
@@ -320,22 +328,13 @@ class ObvService {
       if (vehicleDetailId) {
         vehicleDetail = await VehicleDetail.findByPk(vehicleDetailId);
         if (vehicleDetail) {
-          // Extract values from vehicle detail if not provided
-          if (!make) {
-            make = this.extractMakeFromDescription(vehicleDetail.maker_description || vehicleDetail.manufacturer);
-          }
-          if (!model) {
-            model = this.extractModelFromDescription(vehicleDetail.maker_model || vehicleDetail.model);
-          }
-          if (!year) {
-            year = this.extractYear(vehicleDetail);
-          }
-          if (!trim) {
-            trim = vehicleDetail.variant || '';
-          }
-          if (!noOfOwners) {
-            noOfOwners = vehicleDetail.owner_number || '1';
-          }
+          // ALWAYS extract values from API response (Surepass/APIclub)
+          // This ensures consistency regardless of what user fills in modal
+          make = this.extractMakeFromDescription(vehicleDetail.maker_description || vehicleDetail.manufacturer);
+          model = this.extractModelFromDescription(vehicleDetail.maker_model || vehicleDetail.model);
+          year = this.extractYear(vehicleDetail);
+          trim = vehicleDetail.variant || '';
+          noOfOwners = vehicleDetail.owner_number || '1';
 
           // Get state code from registration number
           stateCode = vehicleDetail.registration_number ? vehicleDetail.registration_number.substring(0, 2) : '';

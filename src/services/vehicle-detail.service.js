@@ -12,6 +12,7 @@ const { sequelize } = require('../config/database');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
 const surepassService = require('./surepass.service');
+const resaleValueService = require('./resale-value.service');
 
 class VehicleDetailService {
   /**
@@ -146,7 +147,8 @@ class VehicleDetailService {
         model,
         version,
         vehicleDetailRequestId,
-        userId
+        userId,
+        kmsDriven  // Only field needed from frontend for OBV calculation
       } = request;
 
       if (!registrationNumber) {
@@ -171,8 +173,6 @@ class VehicleDetailService {
 
       // Check if entry already exists for THIS specific VehicleDetailRequestId
       // Each payment creates a unique VehicleDetailRequestId, so each payment should create a new entry
-      // Request params for vehicle specification matching
-      const requestParams = { make, model, version };
 
       if (vehicleDetailRequestId) {
         let vehicleDetail = await VehicleDetail.findOne({
@@ -181,7 +181,7 @@ class VehicleDetailService {
 
         if (vehicleDetail) {
           logger.info(`Vehicle details already exist for this request: ${vehicleDetailRequestId}`);
-          return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId, requestParams));
+          return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId, kmsDriven));
         }
       }
 
@@ -213,7 +213,7 @@ class VehicleDetailService {
         });
 
         logger.info(`Vehicle details created for request ${vehicleDetailRequestId}, user ${resolvedUserId}: ${registrationNumber}`);
-        return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId, requestParams));
+        return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId, kmsDriven));
       }
 
       // No existing data - Call Surepass API to fetch full RC details (uses rc-full endpoint)
@@ -335,7 +335,7 @@ class VehicleDetailService {
       }
 
       // Return full response matching frontend expectations
-      return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId, requestParams));
+      return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId, kmsDriven));
     } catch (error) {
       logger.error('Get vehicle details error:', error);
       return Result.failure(error.message || 'Failed to get vehicle details');
@@ -345,11 +345,12 @@ class VehicleDetailService {
   /**
    * Build full vehicle detail response with all related data
    * Used by both getVehicleDetailsByRCAsync and getVehicleDetailByIdAsync
+   * Now includes OBV (Orange Book Value) calculation - merged from obv.service.js
    * @param {Object} vehicleDetail - Vehicle detail from database
    * @param {number} userId - User ID
-   * @param {Object} requestParams - Optional request parameters for better spec matching
+   * @param {number} kmsDriven - Kilometers driven (optional, from frontend)
    */
-  async buildVehicleDetailResponse(vehicleDetail, userId, requestParams = {}) {
+  async buildVehicleDetailResponse(vehicleDetail, userId, kmsDriven = null) {
     const vehicleDetailId = vehicleDetail.id;
 
     // Get challan details for this vehicle
@@ -383,9 +384,9 @@ class VehicleDetailService {
     const vehicleAge = this.calculateVehicleAge(vehicleDetail.manufacturing_date_formatted);
 
     // Get vehicle specification using smart matching
-    // Pass request params (make, model, version) for better matching
-    const { make, model, version } = requestParams;
-    let vehicleSpecification = await this.findVehicleSpecification(vehicleDetail, make, model, version);
+    // Now ALWAYS uses make, model, version from API response (Surepass/APIclub)
+    // instead of frontend input for consistency
+    let vehicleSpecification = await this.findVehicleSpecification(vehicleDetail);
 
     // Transform challan details to match .NET VehicleChallanDetailDto
     const transformedChallans = challanDetails.map(challan => ({
@@ -400,6 +401,46 @@ class VehicleDetailService {
     // Transform vehicle specification to match frontend VehicleSpecificationInterface (92+ fields)
     const transformedSpec = vehicleSpecification ? this.transformVehicleSpecification(vehicleSpecification) : null;
 
+    // ========== OBV (Orange Book Value) Calculation ==========
+    // Merged from obv.service.js - calculates resale value in same API call
+    let priceRange = null;
+    try {
+      // Extract make, model, year from API response
+      const make = this.extractMakeFromDescription(vehicleDetail.maker_description || vehicleDetail.manufacturer);
+      const model = this.extractModelFromDescription(vehicleDetail.maker_model || vehicleDetail.model);
+      const year = this.extractYearFromManufacturingDate(vehicleDetail.manufacturing_date_formatted);
+      const noOfOwners = vehicleDetail.owner_number || '1';
+
+      if (make && model && year) {
+        // Get ex-showroom price from VehicleSpecification table
+        let originalPrice = await this.lookupExShowroomPrice(make, model, vehicleDetail.variant);
+
+        if (originalPrice) {
+          // Calculate resale value using resaleValueService
+          const resaleResult = resaleValueService.calculateResaleValue({
+            originalPrice: originalPrice,
+            make: make,
+            year: year,
+            kmsDriven: kmsDriven ? parseInt(kmsDriven) : null,
+            state: stateMapping ? stateMapping.state_name : null,
+            stateCode: stateCode,
+            city: stateMapping ? stateMapping.state_capital : null,
+            noOfOwners: noOfOwners
+          });
+
+          if (resaleResult.isSuccess) {
+            priceRange = resaleResult.value;
+            logger.info(`OBV calculated for ${make} ${model}: Good range ₹${priceRange.Good.range_from} - ₹${priceRange.Good.range_to}`);
+          }
+        } else {
+          logger.info(`No ex-showroom price found for ${make} ${model}, skipping OBV calculation`);
+        }
+      }
+    } catch (obvError) {
+      logger.error('Error calculating OBV:', obvError);
+      // Continue without OBV - not critical
+    }
+
     // Return response matching frontend expectations
     return {
       vehicleDetail: this.transformVehicleDetail(vehicleDetail),
@@ -410,8 +451,110 @@ class VehicleDetailService {
       lostVehicle: lostVehicle !== null,
       createdAt: userVehicleDetail ? userVehicleDetail.created_at : vehicleDetail.created_at,
       vehicleAge: vehicleAge,
-      state: stateMapping ? stateMapping.state_name : ''
+      state: stateMapping ? stateMapping.state_name : '',
+      // OBV data - new field merged from /api/obv/enterprise-used-price-range
+      priceRange: priceRange
     };
+  }
+
+  /**
+   * Lookup ex-showroom price from VehicleSpecification table
+   * @param {string} make - Vehicle make (e.g., "Kia")
+   * @param {string} model - Vehicle model (e.g., "Seltos")
+   * @param {string} variant - Vehicle variant (optional)
+   */
+  async lookupExShowroomPrice(make, model, variant = null) {
+    try {
+      const { Op } = require('sequelize');
+
+      // Build search conditions - require price to exist
+      const whereConditions = {
+        price_breakdown_ex_showroom_price: {
+          [Op.and]: [
+            { [Op.ne]: null },
+            { [Op.ne]: '' }
+          ]
+        }
+      };
+
+      // Step 1: Try EXACT model match first
+      let specs = await VehicleSpecification.findAll({
+        where: {
+          ...whereConditions,
+          naming_make: { [Op.like]: `%${make}%` },
+          naming_model: model
+        },
+        limit: 10,
+        order: [['id', 'DESC']]
+      });
+
+      // Step 2: If no exact match, try model at START
+      if (specs.length === 0) {
+        specs = await VehicleSpecification.findAll({
+          where: {
+            ...whereConditions,
+            naming_make: { [Op.like]: `%${make}%` },
+            naming_model: { [Op.like]: `${model}%` }
+          },
+          limit: 10,
+          order: [['id', 'DESC']]
+        });
+      }
+
+      // Step 3: Fallback to contains match
+      if (specs.length === 0) {
+        specs = await VehicleSpecification.findAll({
+          where: {
+            ...whereConditions,
+            naming_make: { [Op.like]: `%${make}%` },
+            naming_model: { [Op.like]: `%${model}%` }
+          },
+          limit: 10,
+          order: [['id', 'DESC']]
+        });
+      }
+
+      // If variant provided, filter further
+      if (specs.length > 0 && variant) {
+        const variantSpecs = specs.filter(s =>
+          s.naming_version && s.naming_version.toLowerCase().includes(variant.toLowerCase())
+        );
+        if (variantSpecs.length > 0) {
+          specs = variantSpecs;
+        }
+      }
+
+      if (specs.length === 0) {
+        return null;
+      }
+
+      // Get the first matching spec's price
+      const spec = specs[0];
+      const priceStr = spec.price_breakdown_ex_showroom_price;
+      return this.parsePriceString(priceStr);
+    } catch (error) {
+      logger.error('Error looking up ex-showroom price:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Parse price string to number
+   * Handles Indian number formats like "₹ 10,49,000.00" or "Rs. 10,00,000"
+   */
+  parsePriceString(priceStr) {
+    if (!priceStr) return null;
+
+    // Remove currency symbols and spaces
+    let cleanedPrice = priceStr
+      .replace(/[₹?]/g, '')
+      .replace(/Rs\.?/gi, '')
+      .replace(/\s/g, '')
+      .replace(/,/g, '')
+      .trim();
+
+    const price = parseFloat(cleanedPrice);
+    return isNaN(price) ? null : price;
   }
 
   /**
@@ -606,59 +749,52 @@ class VehicleDetailService {
   /**
    * Find vehicle specification using smart matching
    * Matches .NET VehicleSpecificationRepository.GetVehicleSpecificationByVehicleDetails
+   * Now ALWAYS extracts make, model, version from vehicleDetail (Surepass/APIclub response)
+   * instead of relying on frontend input for consistency
    * @param {Object} vehicleDetail - Vehicle detail with maker_description/maker_model
-   * @param {string} requestMake - Make from request (optional)
-   * @param {string} requestModel - Model from request (optional)
-   * @param {string} requestVersion - Version from request (optional)
    */
-  async findVehicleSpecification(vehicleDetail, requestMake = null, requestModel = null, requestVersion = null) {
+  async findVehicleSpecification(vehicleDetail) {
     try {
       const { Op } = require('sequelize');
 
-      // Priority 1: Use request params if provided (like .NET does)
-      let make = requestMake;
-      let model = requestModel;
-      let version = requestVersion;
-
-      // Priority 2: Extract from vehicle detail if request params not provided
-      if (!make && vehicleDetail) {
-        // Extract make from maker_description (e.g., "KIA INDIA PRIVATE LIMITED" -> "Kia")
-        const makerDesc = vehicleDetail.maker_description || vehicleDetail.manufacturer || '';
-        make = this.extractMakeFromDescription(makerDesc);
+      if (!vehicleDetail) {
+        logger.info('Cannot find specification: vehicleDetail not provided');
+        return null;
       }
 
-      if (!model && vehicleDetail) {
-        // Extract model from maker_model (e.g., "SELTOS G1.5 6MT HTE" -> "Seltos")
-        const makerModel = vehicleDetail.maker_model || vehicleDetail.model || '';
-        model = this.extractModelFromDescription(makerModel);
-      }
+      // ALWAYS extract make, model, version from API response (Surepass/APIclub)
+      // This ensures consistency regardless of what user fills in modal
+
+      // Extract make from maker_description (e.g., "KIA INDIA PRIVATE LIMITED" -> "Kia")
+      const makerDesc = vehicleDetail.maker_description || vehicleDetail.manufacturer || '';
+      const make = this.extractMakeFromDescription(makerDesc);
+
+      // Extract model from maker_model (e.g., "SELTOS G1.5 6MT HTE" -> "Seltos")
+      const makerModel = vehicleDetail.maker_model || vehicleDetail.model || '';
+      const model = this.extractModelFromDescription(makerModel);
+
+      // Extract version from maker_model (e.g., "SELTOS G1.5 6MT HTE" -> "G1.5 6MT HTE")
+      const version = this.extractVersionFromDescription(makerModel);
+
+      // Extract year from manufacturing date for potential future use
+      const year = this.extractYearFromManufacturingDate(vehicleDetail.manufacturing_date_formatted);
 
       if (!make || !model) {
         logger.info('Cannot find specification: make or model not available');
         return null;
       }
 
-      logger.info(`Finding specification for: make=${make}, model=${model}, version=${version}`);
+      logger.info(`Finding specification for: make=${make}, model=${model}, version=${version}, year=${year}`);
 
-      // Step 1: Try EXACT model match first (e.g., "C-Class" exactly)
+      // Always use partial match to include year-suffixed models (e.g., "Celerio [2017-2021]")
+      // This ensures we get both exact matches AND year-suffixed variants
       let candidates = await VehicleSpecification.findAll({
         where: {
           naming_make: { [Op.like]: `%${make}%` },
-          naming_model: model  // Exact match
+          naming_model: { [Op.like]: `${model}%` }  // Starts with model (includes year suffixes)
         },
-        limit: 50
+        limit: 100  // Increased limit to capture more variants
       });
-
-      // Step 2: If no exact match, try partial match with model at START (e.g., "C-Class [2022-2024]")
-      if (candidates.length === 0) {
-        candidates = await VehicleSpecification.findAll({
-          where: {
-            naming_make: { [Op.like]: `%${make}%` },
-            naming_model: { [Op.like]: `${model}%` }  // Starts with model
-          },
-          limit: 50
-        });
-      }
 
       // Step 3: Fallback to contains match (last resort)
       if (candidates.length === 0) {
@@ -678,24 +814,124 @@ class VehicleDetailService {
 
       logger.info(`Found ${candidates.length} specification candidates for ${model}`);
 
-      // If version provided, do fuzzy matching (like .NET does)
+      // Get fuel type from API response for filtering
+      const fuelTypeRaw = (vehicleDetail.fuel_type || vehicleDetail.fuelType || '').toLowerCase();
+
+      // Handle dual-fuel types like "petrol/cng", "petrol/lpg"
+      const fuelTypes = fuelTypeRaw.split('/').map(f => f.trim()).filter(f => f);
+      const primaryFuel = fuelTypes[0] || '';
+      const hasCNG = fuelTypes.includes('cng') || fuelTypeRaw.includes('cng');
+      const hasLPG = fuelTypes.includes('lpg') || fuelTypeRaw.includes('lpg');
+
+      // Filter candidates by fuel type first (if available)
+      if (primaryFuel && ['petrol', 'diesel', 'cng', 'electric', 'lpg'].includes(primaryFuel)) {
+        const fuelFilteredCandidates = candidates.filter(c => {
+          const candidateFuel = (c.keydata_key_fueltype || c.enginetransmission_fueltype || '').toLowerCase();
+
+          // For dual-fuel vehicles, prefer CNG/LPG variants if available
+          if (hasCNG && candidateFuel.includes('cng')) return true;
+          if (hasLPG && candidateFuel.includes('lpg')) return true;
+
+          // Otherwise match primary fuel
+          return candidateFuel === primaryFuel || candidateFuel.includes(primaryFuel);
+        });
+
+        if (fuelFilteredCandidates.length > 0) {
+          logger.info(`Filtered to ${fuelFilteredCandidates.length} candidates matching fuel type: ${fuelTypeRaw}`);
+          candidates = fuelFilteredCandidates;
+        }
+      }
+
+      // If version provided, do improved fuzzy matching
       if (version) {
-        const versionParts = version.split(/\s+/).filter(p => p.length > 0);
+        const versionUpper = version.toUpperCase();
         let bestMatch = null;
         let bestScore = 0;
+
+        // Check if version has (O) suffix - indicates optional/variant
+        const hasOptionalSuffix = versionUpper.includes('(O)') || versionUpper.includes('(OPT)') || versionUpper.includes('OPT');
+
+        // Known variant codes to look for (order matters - more specific first)
+        // Kia variants
+        const kiaVariants = ['GTX PLUS', 'HTK PLUS', 'HTX PLUS', 'GTX', 'HTK', 'HTX', 'HTE', 'GRAVITY'];
+        // Maruti variants
+        const marutiVariants = ['ZXI PLUS', 'VXI PLUS', 'LXI', 'VXI', 'ZXI', 'LDI', 'VDI', 'ZDI'];
+        // Hyundai variants
+        const hyundaiVariants = ['SPORTZ', 'ASTA', 'MAGNA', 'ERA', 'SX', 'S'];
+        // Tata variants
+        const tataVariants = ['XZ PLUS', 'XZA PLUS', 'XZ', 'XZA', 'XT', 'XTA', 'XM', 'XMA', 'XE'];
+        // Honda variants
+        const hondaVariants = ['ZX', 'VX', 'V', 'S', 'E'];
+
+        const allVariantCodes = [...kiaVariants, ...marutiVariants, ...hyundaiVariants, ...tataVariants, ...hondaVariants];
+
+        // Extract variant code from API version string
+        let apiVariantCode = null;
+        for (const code of allVariantCodes) {
+          if (versionUpper.includes(code)) {
+            apiVariantCode = code;
+            break;
+          }
+        }
+
+        // Extract engine displacement (e.g., "1.5", "1.4", "2.0")
+        const engineMatch = version.match(/(\d+\.\d+)/);
+        const apiEngineSize = engineMatch ? engineMatch[1] : null;
+
+        // Extract transmission type (order matters - check specific first)
+        const apiTransmission = versionUpper.includes('AMT') ? 'AMT' :
+                               versionUpper.includes('CVT') ? 'CVT' :
+                               versionUpper.includes('DCT') ? 'DCT' :
+                               versionUpper.includes('IMT') ? 'IMT' :
+                               versionUpper.includes('AT') ? 'AT' :
+                               versionUpper.includes('6MT') || versionUpper.includes('5MT') || versionUpper.includes('MT') ? 'MT' : null;
+
+        logger.info(`Version parsing: variant=${apiVariantCode}, engine=${apiEngineSize}, transmission=${apiTransmission}, hasOptional=${hasOptionalSuffix}`);
 
         for (const candidate of candidates) {
           if (!candidate.naming_version) continue;
 
-          const candidateParts = candidate.naming_version.split(/\s+/).filter(p => p.length > 0);
+          const candidateVersion = candidate.naming_version.toUpperCase();
           let score = 0;
 
-          for (let i = 0; i < Math.min(versionParts.length, candidateParts.length); i++) {
-            if (versionParts[i].toLowerCase() === candidateParts[i].toLowerCase()) {
-              score++;
-            } else {
-              break;
+          // Score for variant code match (highest priority)
+          if (apiVariantCode) {
+            if (candidateVersion.includes(apiVariantCode)) {
+              score += 100; // High score for variant match
             }
+          }
+
+          // Score for (O)/(OPT) suffix match
+          const candidateHasOptional = candidateVersion.includes('(O)') || candidateVersion.includes('(OPT)') || candidateVersion.includes('OPT');
+          if (hasOptionalSuffix && candidateHasOptional) {
+            score += 40; // Bonus for matching optional suffix
+          } else if (!hasOptionalSuffix && !candidateHasOptional) {
+            score += 10; // Small bonus if both don't have optional
+          }
+
+          // Score for engine size match
+          if (apiEngineSize && candidateVersion.includes(apiEngineSize)) {
+            score += 50;
+          }
+
+          // Score for transmission match
+          if (apiTransmission) {
+            if (candidateVersion.includes(apiTransmission)) {
+              score += 30;
+            }
+          }
+
+          // Score for CNG match if dual-fuel vehicle
+          if (hasCNG) {
+            const candidateFuel = (candidate.keydata_key_fueltype || '').toLowerCase();
+            if (candidateFuel.includes('cng') || candidateVersion.includes('CNG')) {
+              score += 60; // Prefer CNG variant for dual-fuel vehicles
+            }
+          }
+
+          // Bonus: Prefer versions without year range suffix for general match
+          if (!candidateVersion.includes('[')) {
+            score += 5;
           }
 
           if (score > bestScore) {
@@ -704,7 +940,13 @@ class VehicleDetailService {
           }
         }
 
-        return bestMatch || candidates[0];
+        if (bestMatch) {
+          logger.info(`Best match: ${bestMatch.naming_version} with score ${bestScore}`);
+          return bestMatch;
+        }
+
+        // Fallback to first candidate if no scoring match
+        return candidates[0];
       }
 
       // No version - return first match
@@ -798,15 +1040,98 @@ class VehicleDetailService {
                            'BAJAJ', 'TVS', 'ROYAL', 'YAMAHA', 'SUZUKI', 'KAWASAKI',
                            'KTM', 'HARLEY', 'DUCATI', 'TRIUMPH', 'BENELLI', 'APRILIA'];
 
-    let modelWord = words[0];
+    // Compound model names that include a suffix (e.g., "Celerio X", "Grand i10", "Swift Dzire")
+    const compoundModels = {
+      'CELERIO X': 'Celerio X',
+      'GRAND I10': 'Grand i10',
+      'GRAND I10 NIOS': 'Grand i10 Nios',
+      'SWIFT DZIRE': 'Swift Dzire',
+      'VENUE N LINE': 'Venue N Line',
+      'CITY E': 'City e',
+      'BALENO RS': 'Baleno RS',
+      'POLO GT': 'Polo GT',
+      'JAZZ X': 'Jazz X',
+      'SELTOS X LINE': 'Seltos X Line',
+      'SONET X LINE': 'Sonet X Line'
+    };
 
-    // Check if first word is a brand prefix - if so, use second word as model
+    let startIndex = 0;
+
+    // Check if first word is a brand prefix - if so, start from second word
     if (words.length > 1 && brandPrefixes.includes(words[0].toUpperCase())) {
-      modelWord = words[1];
+      startIndex = 1;
     }
+
+    // Check for compound model names first (check first 3 words after brand)
+    for (let numWords = 3; numWords >= 2; numWords--) {
+      if (words.length >= startIndex + numWords) {
+        const potentialCompound = words.slice(startIndex, startIndex + numWords).join(' ').toUpperCase();
+        if (compoundModels[potentialCompound]) {
+          return compoundModels[potentialCompound];
+        }
+      }
+    }
+
+    // Default: use single word model name
+    let modelWord = words[startIndex] || words[0];
 
     // Capitalize properly (e.g., "SELTOS" -> "Seltos", "PUNCH" -> "Punch")
     return modelWord.charAt(0).toUpperCase() + modelWord.slice(1).toLowerCase();
+  }
+
+  /**
+   * Extract version/variant from maker_model description
+   * E.g., "SELTOS G1.5 6MT HTE" -> "G1.5 6MT HTE"
+   * E.g., "TATA PUNCH ADV 1.2P MT BS6PH2" -> "ADV 1.2P MT BS6PH2"
+   * This extracts everything after the model name
+   */
+  extractVersionFromDescription(description) {
+    if (!description) return null;
+
+    const words = description.split(/\s+/);
+    if (words.length <= 1) return null;
+
+    // Brand names that appear in MakerModel - if first word matches, skip it
+    const brandPrefixes = ['TATA', 'MARUTI', 'MAHINDRA', 'HYUNDAI', 'HONDA', 'TOYOTA',
+                           'FORD', 'VOLKSWAGEN', 'SKODA', 'RENAULT', 'NISSAN', 'MG',
+                           'JEEP', 'MERCEDES', 'BMW', 'AUDI', 'JAGUAR', 'CHEVROLET',
+                           'FIAT', 'DATSUN', 'ISUZU', 'FORCE', 'EICHER', 'HERO',
+                           'BAJAJ', 'TVS', 'ROYAL', 'YAMAHA', 'SUZUKI', 'KAWASAKI',
+                           'KTM', 'HARLEY', 'DUCATI', 'TRIUMPH', 'BENELLI', 'APRILIA'];
+
+    // Compound model suffixes that should be skipped as part of model name
+    const compoundModelSuffixes = ['X', 'NIOS', 'DZIRE', 'RS', 'GT', 'LINE'];
+
+    let startIndex = 1; // Start after model name (first word)
+
+    // If first word is a brand prefix, model is second word, version starts at third
+    if (brandPrefixes.includes(words[0].toUpperCase())) {
+      startIndex = 2;
+    }
+
+    // Check if the next word after model is a compound suffix - if so, skip it too
+    if (words.length > startIndex && compoundModelSuffixes.includes(words[startIndex].toUpperCase())) {
+      startIndex++;
+    }
+
+    if (words.length <= startIndex) return null;
+
+    // Join remaining words as version
+    const version = words.slice(startIndex).join(' ');
+    return version || null;
+  }
+
+  /**
+   * Extract year from manufacturing date formatted string
+   * E.g., "1/2023" -> "2023"
+   * E.g., "2023-01" -> "2023"
+   */
+  extractYearFromManufacturingDate(manufacturingDateFormatted) {
+    if (!manufacturingDateFormatted) return null;
+
+    // Try to extract 4-digit year
+    const yearMatch = manufacturingDateFormatted.match(/\b(19|20)\d{2}\b/);
+    return yearMatch ? yearMatch[0] : null;
   }
 
   /**
