@@ -1213,6 +1213,7 @@ class VehicleDetailService {
       maxtorque: data.enginetransmission_maxtorque,
       transmission: data.keydata_key_transmission || data.enginetrans_transmission,
       transmissionDetails: data.enginetrans_transmission,
+      emissionStandard: data.enginetransmission_emissionstandard,
 
       // Dimension & Weight
       groundClearance: data.dimensionweight_groundclearance,
