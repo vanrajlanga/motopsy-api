@@ -472,12 +472,13 @@ class ObvService {
       }
 
       // Calculate resale value using custom algorithm
-      // Note: kmsDriven is null here as we don't have it from vehicle details alone
+      // Use stored kms_driven from vehicle_details table for consistent calculation
+      const kmsDriven = vehicleDetail.kms_driven;
       const resaleResult = resaleValueService.calculateResaleValue({
         originalPrice: originalPrice,
         make: make,
         year: year,
-        kmsDriven: null, // Not available from vehicle details, will use neutral (no penalty)
+        kmsDriven: kmsDriven ? parseInt(kmsDriven) : null,
         state: state,
         stateCode: stateCode,
         city: city,

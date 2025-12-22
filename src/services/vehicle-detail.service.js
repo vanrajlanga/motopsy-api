@@ -209,6 +209,7 @@ class VehicleDetailService {
           id: nextId,
           user_id: resolvedUserId,
           vehicle_detail_request_id: vehicleDetailRequestId || null,
+          kms_driven: kmsDriven ? parseInt(kmsDriven) : null,
           created_at: new Date()
         });
 
@@ -311,6 +312,7 @@ class VehicleDetailService {
         masked_name: rcData.maskedName,
         challan_details: rcData.challanDetails,
         variant: rcData.variant,
+        kms_driven: kmsDriven ? parseInt(kmsDriven) : null,
         status: 'Completed',
         created_at: new Date()
       });
@@ -570,8 +572,11 @@ class VehicleDetailService {
         return Result.failure('Vehicle detail not found');
       }
 
-      // Build the response using shared method
-      const response = await this.buildVehicleDetailResponse(vehicleDetail, userId);
+      // Use stored kms_driven for consistent OBV calculation
+      const kmsDriven = vehicleDetail.kms_driven;
+
+      // Build the response using shared method with stored kmsDriven
+      const response = await this.buildVehicleDetailResponse(vehicleDetail, userId, kmsDriven);
 
       return Result.success(response);
     } catch (error) {

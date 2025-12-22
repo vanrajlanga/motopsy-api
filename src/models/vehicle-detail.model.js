@@ -276,6 +276,11 @@ const VehicleDetail = sequelize.define('vehicle_details', {
     type: DataTypes.DECIMAL(12, 2),
     allowNull: true
   },
+  // Kilometers driven (from user input for OBV calculation)
+  kms_driven: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
   // Legacy fields
   fitness_upto: {
     type: DataTypes.DATE,
