@@ -1,4 +1,6 @@
 const VehicleDetail = require('../models/vehicle-detail.model');
+const VehicleDetailRequest = require('../models/vehicle-detail-request.model');
+const PaymentHistory = require('../models/payment-history.model');
 const PhysicalVerification = require('../models/physical-verification.model');
 const User = require('../models/user.model');
 const NcrbReport = require('../models/ncrb-report.model');
@@ -275,6 +277,7 @@ class VehicleReportService {
   /**
    * Get vehicle details with reports for a user
    * Matches .NET: GetVehicleDetailWithReportsAsync(userId)
+   * Now shows one entry per paid order (matching Order List behavior)
    */
   async getVehicleDetailWithReportsAsync(userId) {
     try {
@@ -283,42 +286,79 @@ class VehicleReportService {
         return Result.failure('User not found');
       }
 
-      const userVehicleHistoryReports = await VehicleDetail.findAll({
+      // Get ALL paid vehicle_detail_requests for this user (one per payment)
+      const allPaidRequests = await VehicleDetailRequest.findAll({
         where: { user_id: user.id },
+        include: [{
+          model: PaymentHistory,
+          as: 'PaymentHistory',
+          where: { status: 1 }, // Only paid orders
+          required: true
+        }],
         order: [['created_at', 'DESC']]
       });
 
+      // Get all vehicle_details for this user
+      const userVehicleDetails = await VehicleDetail.findAll({
+        where: { user_id: user.id }
+      });
+
+      // Create a map of vehicle_detail_request_id -> vehicle_detail
+      const vehicleDetailByRequestId = {};
+      // Create a map of registration_number -> latest vehicle_detail
+      const vehicleDetailByRegNumber = {};
+
+      userVehicleDetails.forEach(vd => {
+        if (vd.vehicle_detail_request_id) {
+          vehicleDetailByRequestId[vd.vehicle_detail_request_id] = vd;
+        }
+        // Keep the latest vehicle_detail for each registration number
+        const regNo = vd.registration_number;
+        if (!vehicleDetailByRegNumber[regNo] || new Date(vd.created_at) > new Date(vehicleDetailByRegNumber[regNo].created_at)) {
+          vehicleDetailByRegNumber[regNo] = vd;
+        }
+      });
+
+      // Get physical verifications
       const userPhysicalVerifications = await PhysicalVerification.findAll({
         where: { user_id: user.id }
       });
 
       // Get all NCRB reports for user's vehicle details
-      const vehicleDetailIds = userVehicleHistoryReports.map(v => v.id);
-      const ncrbReports = await NcrbReport.findAll({
-        where: { vehicle_detail_id: vehicleDetailIds }
-      });
+      const vehicleDetailIds = userVehicleDetails.map(v => v.id);
+      const ncrbReports = vehicleDetailIds.length > 0 ? await NcrbReport.findAll({
+        where: { vehicle_detail_id: { [Op.in]: vehicleDetailIds } }
+      }) : [];
 
-      // Map to VehicleDetailWithReportDto
-      const vehicleDetailWithReports = userVehicleHistoryReports.map(uvr => {
+      // Map each paid request to a report entry
+      const reports = allPaidRequests.map(req => {
+        // Try to find vehicle_detail by request_id first, then by registration_number
+        let vehicleDetail = vehicleDetailByRequestId[req.id] || vehicleDetailByRegNumber[req.registration_number] || null;
+
         const pvForVehicle = userPhysicalVerifications.find(
-          x => x.registration_number === uvr.registration_number
+          x => x.registration_number === req.registration_number
         );
-        const ncrbForVehicle = ncrbReports.find(
-          n => n.vehicle_detail_id === uvr.id
-        );
+
+        const ncrbForVehicle = vehicleDetail ? ncrbReports.find(
+          n => n.vehicle_detail_id === vehicleDetail.id
+        ) : null;
 
         return {
-          registrationNumber: uvr.registration_number,
-          vehicleDetailId: uvr.id,
+          registrationNumber: req.registration_number,
+          vehicleDetailId: vehicleDetail?.id || null,
+          vehicleDetailRequestId: req.id,
+          paymentHistoryId: req.payment_history_id,
           physicalVerificationReport: !!pvForVehicle,
           ncrbReport: !!ncrbForVehicle,
           ncrbReportId: ncrbForVehicle?.id || null,
           physicalVerificationReportId: pvForVehicle?.id || null,
-          generatedDate: uvr.created_at
+          generatedDate: req.created_at,
+          paymentDate: req.PaymentHistory?.payment_date || req.created_at,
+          status: vehicleDetail ? 'generated' : 'pending'
         };
       });
 
-      return Result.success(vehicleDetailWithReports);
+      return Result.success(reports);
     } catch (error) {
       logger.error('Get vehicle detail with reports error:', error);
       return Result.failure(error.message || 'Failed to get reports');

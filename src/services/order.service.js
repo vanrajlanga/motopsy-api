@@ -2,6 +2,7 @@ const PaymentHistory = require('../models/payment-history.model');
 const User = require('../models/user.model');
 const VehicleDetailRequest = require('../models/vehicle-detail-request.model');
 const VehicleDetail = require('../models/vehicle-detail.model');
+const NcrbReport = require('../models/ncrb-report.model');
 const Coupon = require('../models/coupon.model');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
@@ -56,7 +57,7 @@ class OrderService {
    * @param {Object} payment - Payment history with associations
    * @param {number|null} vehicleDetailId - Optional vehicleDetailId from lookup
    */
-  transformToOrderDto(payment, vehicleDetailId = null) {
+  transformToOrderDto(payment, vehicleDetailId = null, ncrbReportId = null) {
     const user = payment.User || null;
     // VehicleDetailRequests is an array (hasMany), get the first one
     const vehicleRequest = (payment.VehicleDetailRequests && payment.VehicleDetailRequests.length > 0)
@@ -90,7 +91,8 @@ class OrderService {
       vehicleModel: vehicleRequest?.model || null,
       couponId: payment.coupon_id || null,
       couponCode: coupon?.coupon_code || null,
-      couponName: coupon?.coupon_name || null
+      couponName: coupon?.coupon_name || null,
+      ncrbReportId: ncrbReportId
     };
   }
 
@@ -151,7 +153,7 @@ class OrderService {
         .filter(p => p.VehicleDetailRequests && p.VehicleDetailRequests.length > 0)
         .map(p => p.VehicleDetailRequests[0].id);
 
-      // Look up vehicleDetailIds from vehicle_details table
+      // Look up vehicleDetailIds from vehicle_details table (by vehicle_detail_request_id)
       let vehicleDetailMap = {};
       if (vehicleRequestIds.length > 0) {
         const vehicleDetails = await VehicleDetail.findAll({
@@ -166,13 +168,63 @@ class OrderService {
         });
       }
 
-      // Transform to Order DTOs with vehicleDetailId
+      // For orders with registration numbers, also look up vehicle_details by user_id + registration_number
+      // This handles cases where vehicle_detail_request_id is NULL (legacy data)
+      const userRegPairs = payments
+        .filter(p => p.VehicleDetailRequests && p.VehicleDetailRequests.length > 0 && p.VehicleDetailRequests[0].registration_number)
+        .map(p => ({
+          userId: p.user_id,
+          registrationNumber: p.VehicleDetailRequests[0].registration_number,
+          requestId: p.VehicleDetailRequests[0].id
+        }));
+
+      // Look up vehicle_details by user_id + registration_number for fallback
+      if (userRegPairs.length > 0) {
+        for (const pair of userRegPairs) {
+          // Skip if we already have a vehicleDetailId for this request
+          if (vehicleDetailMap[pair.requestId]) continue;
+
+          const vehicleDetail = await VehicleDetail.findOne({
+            where: {
+              user_id: pair.userId,
+              registration_number: pair.registrationNumber
+            },
+            attributes: ['id'],
+            order: [['created_at', 'DESC']]
+          });
+
+          if (vehicleDetail) {
+            vehicleDetailMap[pair.requestId] = vehicleDetail.id;
+          }
+        }
+      }
+
+      // Get all vehicleDetailIds to look up NCRB reports
+      const vehicleDetailIds = Object.values(vehicleDetailMap).filter(id => id);
+
+      // Look up NCRB reports for vehicle details
+      let ncrbReportMap = {};
+      if (vehicleDetailIds.length > 0) {
+        const ncrbReports = await NcrbReport.findAll({
+          where: {
+            vehicle_detail_id: { [Op.in]: vehicleDetailIds }
+          },
+          attributes: ['id', 'vehicle_detail_id']
+        });
+        // Create map: vehicleDetailId -> ncrbReportId
+        ncrbReports.forEach(nr => {
+          ncrbReportMap[nr.vehicle_detail_id] = nr.id;
+        });
+      }
+
+      // Transform to Order DTOs with vehicleDetailId and ncrbReportId
       const orders = payments.map(payment => {
         const vehicleRequestId = (payment.VehicleDetailRequests && payment.VehicleDetailRequests.length > 0)
           ? payment.VehicleDetailRequests[0].id
           : null;
         const vehicleDetailId = vehicleRequestId ? vehicleDetailMap[vehicleRequestId] || null : null;
-        return this.transformToOrderDto(payment, vehicleDetailId);
+        const ncrbReportId = vehicleDetailId ? ncrbReportMap[vehicleDetailId] || null : null;
+        return this.transformToOrderDto(payment, vehicleDetailId, ncrbReportId);
       });
 
       logger.info(`Found ${orders.length} orders (total: ${total})`);
