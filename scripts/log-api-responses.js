@@ -11,7 +11,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
-const VEHICLE_NUMBER = process.argv[2] || 'GJ03MR4048';
+const VEHICLE_NUMBER = process.argv[2] || 'GJ01HV6583';
 const APICLUB_KEY = process.env.APICLUB_API_KEY;
 const SUREPASS_TOKEN = process.env.SUREPASS_TOKEN;
 

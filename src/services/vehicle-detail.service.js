@@ -171,53 +171,7 @@ class VehicleDetailService {
 
       const resolvedUserId = user.id;
 
-      // Check if entry already exists for THIS specific VehicleDetailRequestId
-      // Each payment creates a unique VehicleDetailRequestId, so each payment should create a new entry
-
-      if (vehicleDetailRequestId) {
-        let vehicleDetail = await VehicleDetail.findOne({
-          where: { vehicle_detail_request_id: vehicleDetailRequestId }
-        });
-
-        if (vehicleDetail) {
-          logger.info(`Vehicle details already exist for this request: ${vehicleDetailRequestId}`);
-          return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId, kmsDriven));
-        }
-      }
-
-      // Check if vehicle details exist for ANY user (to avoid calling Surepass API again)
-      const existingVehicleDetail = await VehicleDetail.findOne({
-        where: { registration_number: registrationNumber }
-      });
-
-      if (existingVehicleDetail) {
-        // Vehicle data exists - replicate entry for this new request/payment
-        logger.info(`Vehicle details found, creating new entry for request ${vehicleDetailRequestId}: ${registrationNumber}`);
-
-        const maxVehicle = await VehicleDetail.findOne({
-          attributes: [[sequelize.fn('MAX', sequelize.col('id')), 'maxId']],
-          raw: true
-        });
-        const nextId = (maxVehicle && maxVehicle.maxId) ? maxVehicle.maxId + 1 : 1;
-
-        // Create new entry for this request with same vehicle data
-        const existingData = existingVehicleDetail.toJSON();
-        delete existingData.id; // Remove old ID
-
-        const vehicleDetail = await VehicleDetail.create({
-          ...existingData,
-          id: nextId,
-          user_id: resolvedUserId,
-          vehicle_detail_request_id: vehicleDetailRequestId || null,
-          kms_driven: kmsDriven ? parseInt(kmsDriven) : null,
-          created_at: new Date()
-        });
-
-        logger.info(`Vehicle details created for request ${vehicleDetailRequestId}, user ${resolvedUserId}: ${registrationNumber}`);
-        return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId, kmsDriven));
-      }
-
-      // No existing data - Call Surepass API to fetch full RC details (uses rc-full endpoint)
+      // Always call Surepass API to fetch fresh RC details (no caching)
       const rcResult = await surepassService.getRegistrationDetailsAsync(registrationNumber);
 
       if (!rcResult.isSuccess) {
@@ -339,7 +293,7 @@ class VehicleDetailService {
       // Return full response matching frontend expectations
       return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId, kmsDriven));
     } catch (error) {
-      logger.error('Get vehicle details error:', error);
+      logger.error('Get vehicle details error:', error.message || error);
       return Result.failure(error.message || 'Failed to get vehicle details');
     }
   }
