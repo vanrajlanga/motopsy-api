@@ -298,6 +298,11 @@ const VehicleDetail = sequelize.define('vehicle_details', {
     type: DataTypes.STRING(100),
     allowNull: true
   },
+  api_source: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    comment: 'API used to fetch RC data: surepass, apiclub'
+  },
   created_at: {
     type: DataTypes.DATE,
     allowNull: false,

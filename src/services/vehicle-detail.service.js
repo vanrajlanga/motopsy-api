@@ -268,6 +268,7 @@ class VehicleDetailService {
         variant: rcData.variant,
         kms_driven: kmsDriven ? parseInt(kmsDriven) : null,
         status: 'Completed',
+        api_source: rcData._source || 'unknown',
         created_at: new Date()
       });
 
@@ -282,7 +283,8 @@ class VehicleDetailService {
             registrationNumber
           );
           if (challanResult.isSuccess && challanResult.value.challans.length > 0) {
-            await this.saveChallanDetails(vehicleDetail.id, challanResult.value.challans);
+            const challanApiSource = challanResult.value._source || 'unknown';
+            await this.saveChallanDetails(vehicleDetail.id, challanResult.value.challans, challanApiSource);
           }
         } catch (challanError) {
           logger.error('Error fetching challan details:', challanError);
@@ -344,14 +346,14 @@ class VehicleDetailService {
     // instead of frontend input for consistency
     let vehicleSpecification = await this.findVehicleSpecification(vehicleDetail);
 
-    // Transform challan details to match .NET VehicleChallanDetailDto
+    // Transform challan details to match frontend ChallanDetailsInterface
     const transformedChallans = challanDetails.map(challan => ({
       id: challan.id,
       challanNumber: challan.challan_number,
       challanDate: challan.challan_date,
-      violationType: challan.violation_type || challan.offense_details,
+      offenseDetails: challan.offense_details || challan.violation_type,
       amount: challan.amount ? parseFloat(challan.amount) : null,
-      status: challan.status
+      challanStatus: challan.status
     }));
 
     // Transform vehicle specification to match frontend VehicleSpecificationInterface (92+ fields)
@@ -540,10 +542,10 @@ class VehicleDetailService {
   }
 
   /**
-   * Save challan details from Surepass API
+   * Save challan details from Surepass/APIclub API
    * Matches .NET ChallanService.SaveChallanDetailsAsync
    */
-  async saveChallanDetails(vehicleDetailId, challans) {
+  async saveChallanDetails(vehicleDetailId, challans, apiSource = 'unknown') {
     try {
       for (const challan of challans) {
         // Check if challan already exists
@@ -575,11 +577,12 @@ class VehicleDetailService {
             status: challan.challan_status,
             court_challan: challan.court_challan,
             upstream_code: challan.upstream_code,
+            api_source: apiSource,
             created_at: new Date()
           });
         }
       }
-      logger.info(`Saved ${challans.length} challan details for vehicle ${vehicleDetailId}`);
+      logger.info(`Saved ${challans.length} challan details for vehicle ${vehicleDetailId} (source: ${apiSource})`);
     } catch (error) {
       logger.error('Error saving challan details:', error);
     }

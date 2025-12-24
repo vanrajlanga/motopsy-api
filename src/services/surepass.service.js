@@ -167,30 +167,37 @@ class SurepassService {
    * Get challan details for a vehicle
    * Matches .NET API ISurepassService.GetChallanDetailsAsync()
    *
-   * FAILSAFE: If Surepass fails, automatically falls back to APIclub
+   * FAILSAFE: If Surepass API fails, automatically falls back to APIclub
+   * If Surepass succeeds (even with empty results), we use that response
    */
   async getChallanDetailsAsync(chassisNumber, engineNumber, registrationNumber) {
     // Try Surepass first
     const surepassResult = await this._getSurepassChallanDetails(chassisNumber, engineNumber, registrationNumber);
 
-    if (surepassResult.isSuccess && surepassResult.value.challans.length > 0) {
-      // Surepass returned challans
+    if (surepassResult.isSuccess) {
+      // Surepass API call succeeded - use this result (even if empty)
+      logger.info(`[Challan] Surepass succeeded for: ${registrationNumber}, challans: ${surepassResult.value.challans.length}`);
       return surepassResult;
     }
 
-    // Surepass failed or returned empty - try APIclub as failsafe
+    // Surepass API failed - try APIclub as failsafe
     if (this.apiclubService.isConfigured()) {
-      logger.info(`[Challan] Trying APIclub failsafe for: ${registrationNumber}`);
+      logger.info(`[Challan] Surepass failed, trying APIclub failsafe for: ${registrationNumber}`);
       const apiclubResult = await this.apiclubService.getChallanDetailsAsync(chassisNumber, engineNumber, registrationNumber);
 
-      if (apiclubResult.isSuccess && apiclubResult.value.challans.length > 0) {
+      if (apiclubResult.isSuccess) {
         logger.info(`[Failsafe] APIclub returned ${apiclubResult.value.challans.length} challans for ${registrationNumber}`);
         return apiclubResult;
       }
     }
 
-    // Return Surepass result (even if empty)
-    return surepassResult;
+    // Both failed - return empty result
+    return Result.success({
+      challans: [],
+      totalPending: 0,
+      totalAmount: 0,
+      _source: 'none'
+    });
   }
 
   /**
@@ -204,8 +211,8 @@ class SurepassService {
       const response = await axios.post(
         `${this.apiUrl}/rc/rc-related/challan-details`,
         {
-          chassis_no: chassisNumber,
-          engine_no: engineNumber,
+          chassis_number: chassisNumber,
+          engine_number: engineNumber,
           rc_number: registrationNumber.replace(/\s/g, '').toUpperCase()
         },
         {
@@ -216,10 +223,28 @@ class SurepassService {
 
       if (response.data.success) {
         const data = response.data.data;
+        const challanDetails = data.challan_details || {};
+        const challans = challanDetails.challans || [];
+
+        // Map Surepass challan format to our internal format
+        const mappedChallans = challans.map(c => ({
+          challan_number: c.challan_number,
+          challan_date: c.challan_date,
+          challan_place: c.challan_place,
+          state: c.state,
+          rto: c.rto,
+          offense_details: c.offense_details,
+          accused_name: c.accused_name,
+          amount: c.amount,
+          challan_status: c.challan_status,
+          court_challan: c.court_challan,
+          upstream_code: c.upstream_code
+        }));
+
         return Result.success({
-          challans: data.challans || [],
-          totalPending: data.total_pending || 0,
-          totalAmount: data.total_amount || 0,
+          challans: mappedChallans,
+          totalPending: mappedChallans.filter(c => c.challan_status === 'Pending').length,
+          totalAmount: mappedChallans.reduce((sum, c) => sum + (c.amount || 0), 0),
           _source: 'surepass'
         });
       } else {
@@ -233,13 +258,8 @@ class SurepassService {
       }
     } catch (error) {
       logger.error('[Surepass] Challan details error:', error.message);
-      // Return empty challans on error (not critical)
-      return Result.success({
-        challans: [],
-        totalPending: 0,
-        totalAmount: 0,
-        _source: 'surepass'
-      });
+      // Return failure so failsafe can try APIclub
+      return Result.failure(error.message || 'Surepass challan API failed');
     }
   }
 

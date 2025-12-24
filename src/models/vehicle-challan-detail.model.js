@@ -68,6 +68,12 @@ const VehicleChallanDetail = sequelize.define('vehicle_challan_details', {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
+  },
+  // API source tracking
+  api_source: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    comment: 'API source: surepass, apiclub'
   }
 }, {
   tableName: 'vehicle_challan_details',
