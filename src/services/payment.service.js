@@ -36,7 +36,7 @@ class PaymentService {
    */
   async createOrder(request, userEmail) {
     try {
-      const { amount, paymentFor, currency = 'INR', couponCode } = request;
+      const { amount, paymentFor, currency = 'INR', couponCode, registrationNumber, kmsDriven } = request;
 
       // Validate required fields
       if (!amount && amount !== 0) {
@@ -114,7 +114,7 @@ class PaymentService {
       });
       const nextId = (maxPayment && maxPayment.maxId) ? maxPayment.maxId + 1 : 1;
 
-      // Create PaymentHistory record with coupon info
+      // Create PaymentHistory record with coupon info and vehicle details
       const paymentHistory = await PaymentHistory.create({
         id: nextId,
         user_id: user.id,
@@ -127,7 +127,10 @@ class PaymentService {
         // Store coupon info for tracking after payment verification
         coupon_id: couponId,
         original_amount: originalAmount,
-        discount_amount: discountAmount
+        discount_amount: discountAmount,
+        // Store vehicle details for tracking (in case report generation fails)
+        registration_number: registrationNumber ? registrationNumber.toUpperCase().replace(/\s/g, '') : null,
+        kms_driven: kmsDriven ? parseInt(kmsDriven) : null
       });
 
       logger.info(`Razorpay order created for ${userEmail}: ${order.id}, paymentFor: ${paymentFor}, paymentHistoryId: ${paymentHistory.id}, couponId: ${couponId}`);

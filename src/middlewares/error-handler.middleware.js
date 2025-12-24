@@ -1,5 +1,6 @@
 const logger = require('../config/logger');
 const Result = require('../utils/result');
+const emailService = require('../services/email.service');
 
 /**
  * Global error handling middleware (matching .NET ErrorHandlingMiddleware)
@@ -11,6 +12,20 @@ const errorHandler = (err, req, res, next) => {
 
   // Default error message
   let errorMessage = err.message || 'Internal Server Error';
+
+  // Handle specific error types first to determine final status code
+  if (err.name === 'ValidationError') {
+    statusCode = 400;
+    errorMessage = err.message;
+  } else if (err.name === 'UnauthorizedError' || err.message.includes('token')) {
+    statusCode = 401;
+    errorMessage = 'Unauthorized';
+  } else if (err.name === 'ForbiddenError') {
+    statusCode = 403;
+    errorMessage = 'Forbidden';
+  } else if (err.name === 'NotFoundError' || errorMessage.toLowerCase().includes('not found')) {
+    statusCode = 404;
+  }
 
   // Enhanced error logging with full details
   const errorDetails = {
@@ -49,18 +64,12 @@ const errorHandler = (err, req, res, next) => {
   // Log the error with all details
   logger.error('API Error occurred', errorDetails);
 
-  // Handle specific error types
-  if (err.name === 'ValidationError') {
-    statusCode = 400;
-    errorMessage = err.message;
-  } else if (err.name === 'UnauthorizedError' || err.message.includes('token')) {
-    statusCode = 401;
-    errorMessage = 'Unauthorized';
-  } else if (err.name === 'ForbiddenError') {
-    statusCode = 403;
-    errorMessage = 'Forbidden';
-  } else if (err.name === 'NotFoundError' || errorMessage.toLowerCase().includes('not found')) {
-    statusCode = 404;
+  // Send error notification email for server errors (500+) only
+  // Skip 4xx client errors (auth failures, not found, validation errors)
+  if (statusCode >= 500) {
+    emailService.sendErrorNotificationAsync(errorDetails).catch(emailErr => {
+      logger.error('Failed to send error notification email:', emailErr.message);
+    });
   }
 
   // Create Result object matching .NET response format

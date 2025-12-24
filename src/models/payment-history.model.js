@@ -71,6 +71,17 @@ const PaymentHistory = sequelize.define('payment_histories', {
     type: DataTypes.DECIMAL(18, 2),
     allowNull: true,
     comment: 'Discount amount from coupon'
+  },
+  // Vehicle details for tracking (in case report generation fails)
+  registration_number: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    comment: 'Vehicle registration number for which payment was made'
+  },
+  kms_driven: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'KMs driven entered by user at time of payment'
   }
 }, {
   tableName: 'payment_histories',

@@ -635,6 +635,160 @@ class EmailService {
             return false;
         }
     }
+
+    /**
+     * Send error notification email to admin/developer
+     * Called when an API error occurs
+     */
+    async sendErrorNotificationAsync(errorDetails) {
+        if (!this.isConfigured || !this.transporter) {
+            logger.warn("Email service not configured. Skipping error notification email.");
+            return false;
+        }
+
+        try {
+            const errorEmail = process.env.ERROR_NOTIFICATION_EMAIL || 'chintan.eclipso@gmail.com';
+
+            const {
+                message,
+                stack,
+                statusCode,
+                timestamp,
+                request,
+                error
+            } = errorDetails;
+
+            const mailOptions = {
+                from: `"Motopsy Error Alert" <${this.fromEmail}>`,
+                to: errorEmail,
+                subject: `🚨 API Error [${statusCode}] - ${message?.substring(0, 50) || 'Unknown Error'}`,
+                html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: 'Courier New', monospace; line-height: 1.6; color: #333; background: #f5f5f5; }
+              .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+              .header { background-color: #dc3545; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+              .content { padding: 20px; background-color: #fff; border: 1px solid #ddd; }
+              .section { margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 4px; border-left: 4px solid #dc3545; }
+              .section-title { font-weight: bold; color: #dc3545; margin-bottom: 10px; font-size: 14px; text-transform: uppercase; }
+              .code { background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 12px; white-space: pre-wrap; word-wrap: break-word; }
+              table { width: 100%; border-collapse: collapse; font-size: 13px; }
+              table td { padding: 8px; border-bottom: 1px solid #eee; vertical-align: top; }
+              table td:first-child { font-weight: bold; width: 30%; color: #666; }
+              .footer { text-align: center; padding: 15px; color: #666; font-size: 11px; background: #f8f9fa; border-radius: 0 0 8px 8px; }
+              .status-code { font-size: 36px; font-weight: bold; }
+              .timestamp { font-size: 12px; opacity: 0.8; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <div class="status-code">${statusCode || 500}</div>
+                <h2 style="margin: 10px 0 5px 0;">API Error Occurred</h2>
+                <div class="timestamp">${timestamp || new Date().toISOString()}</div>
+              </div>
+              <div class="content">
+
+                <div class="section">
+                  <div class="section-title">Error Message</div>
+                  <div style="color: #dc3545; font-weight: bold; font-size: 16px;">${message || 'Unknown Error'}</div>
+                </div>
+
+                <div class="section">
+                  <div class="section-title">Request Details</div>
+                  <table>
+                    <tr>
+                      <td>Method:</td>
+                      <td><strong>${request?.method || 'N/A'}</strong></td>
+                    </tr>
+                    <tr>
+                      <td>URL:</td>
+                      <td>${request?.url || 'N/A'}</td>
+                    </tr>
+                    <tr>
+                      <td>Path:</td>
+                      <td>${request?.path || 'N/A'}</td>
+                    </tr>
+                    <tr>
+                      <td>IP Address:</td>
+                      <td>${request?.ip || 'N/A'}</td>
+                    </tr>
+                    <tr>
+                      <td>User ID:</td>
+                      <td>${request?.userId || 'anonymous'}</td>
+                    </tr>
+                    <tr>
+                      <td>User Agent:</td>
+                      <td style="font-size: 11px;">${request?.headers?.['user-agent'] || 'N/A'}</td>
+                    </tr>
+                  </table>
+                </div>
+
+                ${request?.query && Object.keys(request.query).length > 0 ? `
+                <div class="section">
+                  <div class="section-title">Query Parameters</div>
+                  <div class="code">${JSON.stringify(request.query, null, 2)}</div>
+                </div>
+                ` : ''}
+
+                ${request?.body && Object.keys(request.body).length > 0 ? `
+                <div class="section">
+                  <div class="section-title">Request Body</div>
+                  <div class="code">${JSON.stringify(request.body, null, 2)}</div>
+                </div>
+                ` : ''}
+
+                ${error ? `
+                <div class="section">
+                  <div class="section-title">Error Details</div>
+                  <table>
+                    <tr>
+                      <td>Error Name:</td>
+                      <td>${error.name || 'N/A'}</td>
+                    </tr>
+                    <tr>
+                      <td>Error Code:</td>
+                      <td>${error.code || 'N/A'}</td>
+                    </tr>
+                    ${error.sql ? `
+                    <tr>
+                      <td>SQL Query:</td>
+                      <td style="font-size: 11px;">${error.sql}</td>
+                    </tr>
+                    ` : ''}
+                  </table>
+                </div>
+                ` : ''}
+
+                ${stack ? `
+                <div class="section">
+                  <div class="section-title">Stack Trace</div>
+                  <div class="code">${stack}</div>
+                </div>
+                ` : ''}
+
+              </div>
+              <div class="footer">
+                <p>Motopsy API Error Notification | Environment: ${process.env.NODE_ENV || 'development'}</p>
+                <p>Server: ${process.env.SERVER_NAME || 'localhost'}</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `,
+            };
+
+            await this.transporter.sendMail(mailOptions);
+            logger.info(`Error notification email sent to: ${errorEmail}`);
+            return true;
+        } catch (emailError) {
+            // Don't throw - just log if email fails
+            logger.error("Failed to send error notification email:", emailError.message);
+            return false;
+        }
+    }
 }
 
 module.exports = new EmailService();
