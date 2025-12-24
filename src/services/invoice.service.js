@@ -3,15 +3,16 @@ const fs = require('fs');
 const path = require('path');
 const { Invoice } = require('../models');
 
-// Company Details (from the reference PDF)
+// Company Details
 const COMPANY_INFO = {
   name: 'Motopsy Technologies Pvt. Ltd.',
-  address: 'F-101, T-17, Lotus Boulevard, Sector-100, Noida-201301',
-  gstin: '09AAQCM2318G1ZB',
   cin: 'U74999UP2022PTC171341',
+  address: 'F-101, T-17, Lotus Boulevard, Sector-100, Noida-201301, UP',
+  gstin: '09AAQCM2318G1ZB',
   email: 'Atul.b@motopsy.com',
   phone: '+91 9911515335',
   website: 'www.Motopsy.com',
+  placeOfSupply: 'Uttar Pradesh (09)',
   bank: {
     name: 'IDFC First Bank',
     accountName: 'Motopsy Technologies Pvt. Ltd',
@@ -20,8 +21,14 @@ const COMPANY_INFO = {
   }
 };
 
+// SAC Code for Online Information Retrieval Services
+const SAC_CODE = '998433';
+
 // GST Rate (18% included in total amount)
 const GST_RATE = 18;
+
+// Blue color theme
+const BLUE_COLOR = '#1976D2';
 
 class InvoiceService {
   /**
@@ -52,16 +59,8 @@ class InvoiceService {
 
   /**
    * Calculate GST breakdown from total amount (GST is included)
-   * @param {number} totalAmount - Total amount including GST
-   * @returns {object} { subtotal, gstAmount, totalAmount }
    */
   calculateGSTBreakdown(totalAmount) {
-    // GST is included in total, so we need to extract it
-    // Total = Subtotal + GST
-    // Total = Subtotal + (Subtotal * GST_RATE / 100)
-    // Total = Subtotal * (1 + GST_RATE / 100)
-    // Subtotal = Total / (1 + GST_RATE / 100)
-
     const subtotal = totalAmount / (1 + GST_RATE / 100);
     const gstAmount = totalAmount - subtotal;
 
@@ -73,16 +72,75 @@ class InvoiceService {
   }
 
   /**
-   * Generate invoice PDF and save to file
-   * @param {object} invoiceData - Invoice details
-   * @returns {Promise<Buffer>} PDF buffer
+   * Convert number to words (Indian format)
+   */
+  numberToWords(num) {
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+      'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    if (num === 0) return 'Zero';
+
+    const convertLessThanThousand = (n) => {
+      if (n === 0) return '';
+      if (n < 20) return ones[n];
+      if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + ones[n % 10] : '');
+      return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + convertLessThanThousand(n % 100) : '');
+    };
+
+    const convertToIndian = (n) => {
+      if (n === 0) return '';
+
+      let result = '';
+
+      // Crores (10,000,000)
+      if (n >= 10000000) {
+        result += convertLessThanThousand(Math.floor(n / 10000000)) + ' Crore ';
+        n %= 10000000;
+      }
+
+      // Lakhs (100,000)
+      if (n >= 100000) {
+        result += convertLessThanThousand(Math.floor(n / 100000)) + ' Lakh ';
+        n %= 100000;
+      }
+
+      // Thousands
+      if (n >= 1000) {
+        result += convertLessThanThousand(Math.floor(n / 1000)) + ' Thousand ';
+        n %= 1000;
+      }
+
+      // Hundreds, Tens, Ones
+      if (n > 0) {
+        result += convertLessThanThousand(n);
+      }
+
+      return result.trim();
+    };
+
+    const rupees = Math.floor(num);
+    const paise = Math.round((num - rupees) * 100);
+
+    let result = 'Rupees ' + convertToIndian(rupees);
+    if (paise > 0) {
+      result += ' and ' + convertToIndian(paise) + ' Paise';
+    }
+    result += ' Only.';
+
+    return result;
+  }
+
+  /**
+   * Generate invoice PDF with new design
    */
   async generateInvoicePDF(invoiceData) {
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({
           margin: 50,
-          size: 'A4'
+          size: 'A4',
+          bufferPages: true
         });
 
         const chunks = [];
@@ -90,132 +148,243 @@ class InvoiceService {
         doc.on('end', () => resolve(Buffer.concat(chunks)));
         doc.on('error', reject);
 
-        // Header - INVOICE title
-        doc.fontSize(24).font('Helvetica-Bold').text('INVOICE', { align: 'left' });
-        doc.moveDown(0.5);
+        // ============ PAGE 1 ============
 
-        // Company Info
-        doc.fontSize(12).font('Helvetica-Bold').text(COMPANY_INFO.name);
-        doc.fontSize(10).font('Helvetica')
-          .text(COMPANY_INFO.address)
-          .text(`GSTIN: ${COMPANY_INFO.gstin}`)
-          .text(`CIN: ${COMPANY_INFO.cin}`)
-          .moveDown(0.3)
-          .text(`Email: ${COMPANY_INFO.email}`)
-          .text(`Phone: ${COMPANY_INFO.phone}`)
-          .text(`Website: ${COMPANY_INFO.website}`);
+        // Header line
+        const headerY = 40;
+        doc.fontSize(10).font('Helvetica-Bold').fillColor(BLUE_COLOR)
+          .text('Motopsy Technologies Pvt. Ltd.', 50, headerY);
+        doc.fontSize(10).font('Helvetica').fillColor(BLUE_COLOR)
+          .text('Tax Invoice / Receipt', 400, headerY, { width: 145, align: 'right' });
 
-        doc.moveDown(0.5);
+        // Blue line under header
+        doc.moveTo(50, headerY + 15).lineTo(545, headerY + 15).strokeColor(BLUE_COLOR).lineWidth(1).stroke();
 
-        // Horizontal line
-        doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-        doc.moveDown(0.5);
-
-        // Invoice Details
-        doc.fontSize(11).font('Helvetica-Bold')
-          .text(`Invoice Number: `, { continued: true })
-          .font('Helvetica').text(`# ${invoiceData.invoiceNumber}`);
-
-        doc.font('Helvetica-Bold')
-          .text(`Invoice Date: `, { continued: true })
-          .font('Helvetica').text(invoiceData.invoiceDate);
-
-        doc.moveDown(0.3);
-        doc.font('Helvetica-Bold').text('Bill To:');
-        doc.font('Helvetica')
-          .text(invoiceData.customerName);
-
-        if (invoiceData.customerGstin) {
-          doc.text(invoiceData.customerGstin);
-        }
-
-        doc.text(invoiceData.customerEmail);
-
-        if (invoiceData.customerPhone) {
-          doc.text(invoiceData.customerPhone);
-        }
-
-        doc.moveDown(0.5);
-
-        // Horizontal line
-        doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-        doc.moveDown(0.5);
-
-        // Description of Services
-        doc.fontSize(11).font('Helvetica-Bold').text('Description of Services:');
-        doc.moveDown(0.5);
-
-        // Table Header
-        const tableTop = doc.y;
-        const col1 = 50;   // Sr. No.
-        const col2 = 90;   // Description
-        const col3 = 320;  // Quantity
-        const col4 = 380;  // Unit Price
-        const col5 = 470;  // Total Amount
-
-        doc.fontSize(10).font('Helvetica-Bold');
-        doc.text('Sr. No.', col1, tableTop);
-        doc.text('Description', col2, tableTop);
-        doc.text('Quantity', col3, tableTop);
-        doc.text('Unit Price (INR)', col4, tableTop);
-        doc.text('Total (INR)', col5, tableTop);
-
-        // Table Row
-        const rowY = tableTop + 20;
-        doc.font('Helvetica');
-        doc.text('1', col1, rowY);
-        doc.text(invoiceData.description, col2, rowY);
-        doc.text(String(invoiceData.quantity), col3, rowY);
-        doc.text(this.formatCurrency(invoiceData.unitPrice), col4, rowY);
-        doc.text(this.formatCurrency(invoiceData.subtotal), col5, rowY);
-
+        // Main Title
         doc.moveDown(2);
+        doc.fontSize(28).font('Helvetica-Bold').fillColor(BLUE_COLOR)
+          .text('TAX INVOICE / RECEIPT', 50, 80, { align: 'center' });
 
-        // Horizontal line
-        const lineY = rowY + 30;
-        doc.moveTo(50, lineY).lineTo(545, lineY).stroke();
+        // Company Name and CIN
+        doc.fontSize(14).font('Helvetica-Bold').fillColor(BLUE_COLOR)
+          .text(COMPANY_INFO.name, { align: 'center' });
+        doc.fontSize(10).font('Helvetica-Oblique').fillColor('#333')
+          .text(`(CIN: ${COMPANY_INFO.cin})`, { align: 'center' });
 
-        // Totals section - using right-aligned layout
-        const totalsY = lineY + 15;
-        const labelX = 320;  // Left position for labels
-        const valueX = 480;  // Left position for values
-        doc.fontSize(10);
+        doc.moveDown(1.5);
 
-        doc.font('Helvetica-Bold').text('Subtotal:', labelX, totalsY, { width: 150, align: 'right' });
-        doc.font('Helvetica').text(`INR ${this.formatCurrency(invoiceData.subtotal)}`, valueX, totalsY);
+        // Company Details Section
+        const detailsStartY = doc.y;
+        const labelX = 50;
+        const valueX = 160;
 
-        doc.font('Helvetica-Bold').text(`GST (@ ${GST_RATE}%):`, labelX, totalsY + 18, { width: 150, align: 'right' });
-        doc.font('Helvetica').text(`INR ${this.formatCurrency(invoiceData.gstAmount)}`, valueX, totalsY + 18);
+        doc.fontSize(10).font('Helvetica-Bold').fillColor('#000')
+          .text('Registered Office:', labelX, detailsStartY);
+        doc.font('Helvetica').text(COMPANY_INFO.address, valueX, detailsStartY);
 
-        doc.font('Helvetica-Bold').text('Total Amount Payable:', labelX, totalsY + 36, { width: 150, align: 'right' });
-        doc.font('Helvetica-Bold').text(`INR ${this.formatCurrency(invoiceData.totalAmount)}`, valueX, totalsY + 36);
+        doc.font('Helvetica-Bold').text('GSTIN:', labelX, detailsStartY + 15);
+        doc.font('Helvetica').text(COMPANY_INFO.gstin, valueX, detailsStartY + 15);
+
+        doc.font('Helvetica-Bold').text('Email:', labelX, detailsStartY + 30);
+        doc.font('Helvetica').text(COMPANY_INFO.email, valueX, detailsStartY + 30);
+
+        doc.font('Helvetica-Bold').text('Phone:', labelX, detailsStartY + 45);
+        doc.font('Helvetica').text(COMPANY_INFO.phone, valueX, detailsStartY + 45);
+
+        doc.font('Helvetica-Bold').text('Website:', labelX, detailsStartY + 60);
+        doc.font('Helvetica').text(COMPANY_INFO.website, valueX, detailsStartY + 60);
 
         doc.moveDown(4);
 
-        // Payment Details
-        const paymentY = totalsY + 70;
-        doc.fontSize(11).font('Helvetica-Bold').text('Payment Details:', 50, paymentY);
+        // Invoice Details Row
+        const invoiceRowY = detailsStartY + 90;
+
+        // Left column
+        doc.font('Helvetica-Bold').text('Invoice No:', labelX, invoiceRowY);
+        doc.font('Helvetica').text(`#${invoiceData.invoiceNumber}`, valueX, invoiceRowY);
+
+        doc.font('Helvetica-Bold').text('Place of Supply:', labelX, invoiceRowY + 15);
+        doc.font('Helvetica').text(COMPANY_INFO.placeOfSupply, valueX, invoiceRowY + 15);
+
+        // Right column
+        const rightLabelX = 350;
+        const rightValueX = 450;
+
+        doc.font('Helvetica-Bold').text('Date of Issue:', rightLabelX, invoiceRowY);
+        doc.font('Helvetica').text(invoiceData.invoiceDate, rightValueX, invoiceRowY);
+
+        doc.font('Helvetica-Bold').text('Payment Status:', rightLabelX, invoiceRowY + 15);
+        doc.font('Helvetica').text('Paid / Online', rightValueX, invoiceRowY + 15);
+
+        // Bill To and Service Delivery Section
+        const billToY = invoiceRowY + 45;
+
+        // Blue background for section header
+        doc.rect(50, billToY, 245, 18).fillColor('#E3F2FD').fill();
+        doc.rect(300, billToY, 245, 18).fillColor('#E3F2FD').fill();
+
+        doc.fontSize(10).font('Helvetica-Bold').fillColor('#000')
+          .text('Bill To (Customer Details):', 55, billToY + 4);
+        doc.text('Service Delivery:', 305, billToY + 4);
+
+        // Bill To Details
+        const billDetailsY = billToY + 25;
+        doc.font('Helvetica-Bold').text('Name:', 55, billDetailsY);
+        doc.font('Helvetica').text(invoiceData.customerName, 100, billDetailsY);
+
+        doc.font('Helvetica-Bold').text('Email:', 55, billDetailsY + 15);
+        doc.font('Helvetica').text(invoiceData.customerEmail, 100, billDetailsY + 15);
+
+        doc.font('Helvetica-Bold').text('GSTIN (if B2B):', 55, billDetailsY + 30);
+        doc.font('Helvetica').text(invoiceData.customerGstin || 'N/A', 140, billDetailsY + 30);
+
+        // Service Delivery
+        doc.font('Helvetica').text('Delivered Electronically via Online Portal', 305, billDetailsY);
+
+        doc.moveDown(4);
+
+        // Service Table
+        const tableY = billDetailsY + 60;
+
+        // Table Header with blue background
+        doc.rect(50, tableY, 495, 20).fillColor('#E3F2FD').fill();
+
+        const col1 = 55;   // Sr.
+        const col2 = 80;   // Description
+        const col3 = 280;  // SAC Code
+        const col4 = 345;  // Qty
+        const col5 = 385;  // Rate
+        const col6 = 470;  // Taxable Value
+
+        doc.fontSize(9).font('Helvetica-Bold').fillColor('#000');
+        doc.text('Sr.', col1, tableY + 5);
+        doc.text('Description of Service', col2, tableY + 5);
+        doc.text('SAC Code', col3, tableY + 5);
+        doc.text('Qty', col4, tableY + 5);
+        doc.text('Rate (Rs.)', col5, tableY + 5);
+        doc.text('Taxable Value (Rs.)', col6, tableY + 5);
+
+        // Table Row
+        const rowY = tableY + 25;
+        doc.font('Helvetica');
+        doc.text('1', col1, rowY);
+        doc.text(invoiceData.description, col2, rowY);
+        doc.text(SAC_CODE, col3, rowY);
+        doc.text(String(invoiceData.quantity), col4, rowY);
+        doc.text(this.formatCurrency(invoiceData.unitPrice), col5, rowY);
+        doc.text(this.formatCurrency(invoiceData.subtotal), col6, rowY);
+
+        // Line under row
+        doc.moveTo(50, rowY + 18).lineTo(545, rowY + 18).strokeColor('#ccc').lineWidth(0.5).stroke();
+
+        // Totals Section
+        const totalsY = rowY + 30;
+        const totalsLabelX = 350;
+        const totalsValueX = 500;
+
+        doc.font('Helvetica').text('Total Taxable Value (A)', totalsLabelX, totalsY);
+        doc.text(this.formatCurrency(invoiceData.subtotal), totalsValueX, totalsY, { align: 'right', width: 45 });
+
+        doc.text(`GST (@${GST_RATE}%)`, totalsLabelX, totalsY + 15);
+        doc.text(this.formatCurrency(invoiceData.gstAmount), totalsValueX, totalsY + 15, { align: 'right', width: 45 });
+
+        // Grand Total with background
+        doc.rect(50, totalsY + 32, 495, 20).fillColor('#E3F2FD').fill();
+        doc.fontSize(10).font('Helvetica-Bold').fillColor('#000')
+          .text('Grand Total', 55, totalsY + 37);
+        doc.text(`Rs. ${this.formatCurrency(invoiceData.totalAmount)}`, totalsValueX, totalsY + 37, { align: 'right', width: 45 });
+
+        // Amount in Words
+        const amountWordsY = totalsY + 65;
+        doc.fontSize(10).font('Helvetica-Bold').text('Amount in Words: ', 50, amountWordsY, { continued: true });
+        doc.font('Helvetica').text(this.numberToWords(invoiceData.totalAmount));
+
+        // Payment Details Box
+        const paymentBoxY = amountWordsY + 30;
+        doc.rect(50, paymentBoxY, 495, 35).strokeColor('#000').lineWidth(0.5).stroke();
+
+        // Vertical line in middle
+        doc.moveTo(297, paymentBoxY).lineTo(297, paymentBoxY + 35).stroke();
+
+        doc.fontSize(9).font('Helvetica-Bold').text('Payment Mode: ', 55, paymentBoxY + 5, { continued: true });
+        doc.font('Helvetica').text('Online / Gateway');
+        doc.font('Helvetica-Bold').text('Account Name: ', 55, paymentBoxY + 18, { continued: true });
+        doc.font('Helvetica').text(COMPANY_INFO.bank.accountName);
+
+        doc.font('Helvetica-Bold').text('Bank: ', 305, paymentBoxY + 5, { continued: true });
+        doc.font('Helvetica').text(COMPANY_INFO.bank.name);
+        doc.font('Helvetica-Bold').text('IFSC: ', 305, paymentBoxY + 18, { continued: true });
+        doc.font('Helvetica').text(COMPANY_INFO.bank.ifsc);
+
+        // Terms and Conditions
+        const termsY = paymentBoxY + 55;
+        doc.fontSize(14).font('Helvetica-Bold').fillColor('#000')
+          .text('Terms and Conditions', 50, termsY);
+
+        doc.moveDown(0.5);
+        doc.fontSize(9).font('Helvetica');
+
+        const terms = [
+          { title: 'Nature of Service:', text: 'This invoice is for "Online Information Retrieval Services." The report is a digital product delivered instantly upon successful payment.' },
+          { title: 'Delivery Timeline:', text: 'While we endeavor to provide reports on a real-time basis, occasional delays may occur due to downtime in government or private enterprise databases. In such cases where the report is not generated instantly, it will be assembled and shared via your registered email within a maximum of 24 hours.' },
+          { title: 'Data Accuracy:', text: 'Reports are generated based on available data from government registries and third-party sources. Motopsy Technologies Pvt. Ltd. does not guarantee the absolute accuracy of external data.' },
+          { title: 'Refund Policy:', text: 'Since the service is consumed immediately upon generation, payments for reports are non-refundable.' }
+        ];
+
+        let currentY = termsY + 25;
+        terms.forEach((term, index) => {
+          doc.font('Helvetica').text(`${index + 1}. `, 50, currentY, { continued: true });
+          doc.font('Helvetica-Bold').text(term.title + ' ', { continued: true });
+          doc.font('Helvetica').text(term.text, { width: 495 });
+          currentY = doc.y + 5;
+        });
+
+        // Page number for page 1
+        doc.fontSize(9).font('Helvetica').fillColor('#666')
+          .text('Page 1', 50, 780, { align: 'right', width: 495 });
+
+        // ============ PAGE 2 ============
+        doc.addPage();
+
+        // Header line (same as page 1)
+        doc.fontSize(10).font('Helvetica-Bold').fillColor(BLUE_COLOR)
+          .text('Motopsy Technologies Pvt. Ltd.', 50, headerY);
+        doc.fontSize(10).font('Helvetica').fillColor(BLUE_COLOR)
+          .text('Tax Invoice / Receipt', 400, headerY, { width: 145, align: 'right' });
+        doc.moveTo(50, headerY + 15).lineTo(545, headerY + 15).strokeColor(BLUE_COLOR).lineWidth(1).stroke();
+
+        // Remaining Terms
+        doc.moveDown(2);
+        doc.fontSize(9).font('Helvetica').fillColor('#000');
+
+        const remainingTerms = [
+          { title: 'Compliance:', text: 'This invoice is generated in accordance with the Central Goods and Services Tax (CGST) Act, 2017.' },
+          { title: 'Jurisdiction:', text: 'All disputes are subject to the exclusive jurisdiction of courts in Noida, Uttar Pradesh, India.' },
+          { title: 'E & O.E:', text: 'Errors and Omissions Excepted.' }
+        ];
+
+        currentY = 70;
+        remainingTerms.forEach((term, index) => {
+          doc.font('Helvetica').text(`${index + 5}. `, 50, currentY, { continued: true });
+          doc.font('Helvetica-Bold').text(term.title + ' ', { continued: true });
+          doc.font('Helvetica').text(term.text, { width: 495 });
+          currentY = doc.y + 5;
+        });
+
+        // Authorised Signatory Section
+        const sigY = 250;
         doc.fontSize(10).font('Helvetica')
-          .text(`Bank Name: ${COMPANY_INFO.bank.name}`, 50, paymentY + 18)
-          .text(`Account Name: ${COMPANY_INFO.bank.accountName}`, 50, paymentY + 33)
-          .text(`Account Number: ${COMPANY_INFO.bank.accountNumber}`, 50, paymentY + 48)
-          .text(`IFSC Code: ${COMPANY_INFO.bank.ifsc}`, 50, paymentY + 63);
+          .text(`For ${COMPANY_INFO.name}`, 300, sigY, { align: 'right', width: 245 });
 
-        // Horizontal line before signature
-        doc.moveTo(50, paymentY + 90).lineTo(545, paymentY + 90).stroke();
+        doc.moveDown(4);
+        doc.font('Helvetica-Bold')
+          .text('Authorised Signatory', 300, sigY + 60, { align: 'right', width: 245 });
+        doc.font('Helvetica').fontSize(9)
+          .text('(Digital Receipt - No Physical Signature Required)', 300, sigY + 75, { align: 'right', width: 245 });
 
-        // Authorized Signatory section
-        const signY = paymentY + 110;
-        doc.fontSize(10).font('Helvetica-Bold').text('Authorized Signatory', 50, signY);
-
-        // Footer with company stamp info
-        const footerY = signY + 60;
-        doc.fontSize(12).font('Helvetica-Bold').text('MOTOPSY Technologies Pvt. Ltd.', 50, footerY, { align: 'center' });
-        doc.fontSize(9).font('Helvetica')
-          .text('F-101, T-17', { align: 'center' })
-          .text('Lotus Boulevard, Sector-100', { align: 'center' })
-          .text('Noida-201301, UP', { align: 'center' })
-          .text(`Ph- ${COMPANY_INFO.phone}, ${COMPANY_INFO.website}`, { align: 'center' });
+        // Page number for page 2
+        doc.fontSize(9).font('Helvetica').fillColor('#666')
+          .text('Page 2', 50, 780, { align: 'right', width: 495 });
 
         doc.end();
       } catch (error) {
@@ -225,7 +394,7 @@ class InvoiceService {
   }
 
   /**
-   * Format number as currency
+   * Format number as currency (Indian format)
    */
   formatCurrency(amount) {
     return amount.toLocaleString('en-IN', {
@@ -247,8 +416,6 @@ class InvoiceService {
 
   /**
    * Generate and save invoice
-   * @param {object} params - Invoice parameters
-   * @returns {Promise<object>} Invoice record and PDF buffer
    */
   async createInvoice({
     paymentHistoryId,
