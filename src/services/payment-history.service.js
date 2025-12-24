@@ -16,6 +16,7 @@ class PaymentHistoryService {
       method: payment.method,
       status: payment.status,
       reportGenerated: payment.vehicle_detail_request_id ? true : false,
+      registrationNumber: payment.registration_number || null,
       userId: payment.user_id,
       user: user ? {
         id: user.id,

@@ -56,8 +56,10 @@ class OrderService {
    * Transform payment history to Order DTO matching frontend interface
    * @param {Object} payment - Payment history with associations
    * @param {number|null} vehicleDetailId - Optional vehicleDetailId from lookup
+   * @param {number|null} ncrbReportId - Optional ncrbReportId from lookup
+   * @param {string|null} apiSource - API source (surepass/apiclub) from vehicle_details
    */
-  transformToOrderDto(payment, vehicleDetailId = null, ncrbReportId = null) {
+  transformToOrderDto(payment, vehicleDetailId = null, ncrbReportId = null, apiSource = null) {
     const user = payment.User || null;
     // VehicleDetailRequests is an array (hasMany), get the first one
     const vehicleRequest = (payment.VehicleDetailRequests && payment.VehicleDetailRequests.length > 0)
@@ -92,7 +94,8 @@ class OrderService {
       couponId: payment.coupon_id || null,
       couponCode: coupon?.coupon_code || null,
       couponName: coupon?.coupon_name || null,
-      ncrbReportId: ncrbReportId
+      ncrbReportId: ncrbReportId,
+      apiSource: apiSource
     };
   }
 
@@ -155,16 +158,18 @@ class OrderService {
 
       // Look up vehicleDetailIds from vehicle_details table (by vehicle_detail_request_id)
       let vehicleDetailMap = {};
+      let apiSourceMap = {};
       if (vehicleRequestIds.length > 0) {
         const vehicleDetails = await VehicleDetail.findAll({
           where: {
             vehicle_detail_request_id: { [Op.in]: vehicleRequestIds }
           },
-          attributes: ['id', 'vehicle_detail_request_id']
+          attributes: ['id', 'vehicle_detail_request_id', 'api_source']
         });
-        // Create map: vehicleRequestId -> vehicleDetailId
+        // Create map: vehicleRequestId -> vehicleDetailId and apiSource
         vehicleDetails.forEach(vd => {
           vehicleDetailMap[vd.vehicle_detail_request_id] = vd.id;
+          apiSourceMap[vd.id] = vd.api_source || null;
         });
       }
 
@@ -189,12 +194,13 @@ class OrderService {
               user_id: pair.userId,
               registration_number: pair.registrationNumber
             },
-            attributes: ['id'],
+            attributes: ['id', 'api_source'],
             order: [['created_at', 'DESC']]
           });
 
           if (vehicleDetail) {
             vehicleDetailMap[pair.requestId] = vehicleDetail.id;
+            apiSourceMap[vehicleDetail.id] = vehicleDetail.api_source || null;
           }
         }
       }
@@ -217,14 +223,15 @@ class OrderService {
         });
       }
 
-      // Transform to Order DTOs with vehicleDetailId and ncrbReportId
+      // Transform to Order DTOs with vehicleDetailId, ncrbReportId, and apiSource
       const orders = payments.map(payment => {
         const vehicleRequestId = (payment.VehicleDetailRequests && payment.VehicleDetailRequests.length > 0)
           ? payment.VehicleDetailRequests[0].id
           : null;
         const vehicleDetailId = vehicleRequestId ? vehicleDetailMap[vehicleRequestId] || null : null;
         const ncrbReportId = vehicleDetailId ? ncrbReportMap[vehicleDetailId] || null : null;
-        return this.transformToOrderDto(payment, vehicleDetailId, ncrbReportId);
+        const apiSource = vehicleDetailId ? apiSourceMap[vehicleDetailId] || null : null;
+        return this.transformToOrderDto(payment, vehicleDetailId, ncrbReportId, apiSource);
       });
 
       logger.info(`Found ${orders.length} orders (total: ${total})`);

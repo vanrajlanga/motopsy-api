@@ -252,6 +252,9 @@ class PaymentService {
       paymentHistory.method = paymentMethod;
       paymentHistory.transaction_id = razorpayPaymentId;
       paymentHistory.modified_at = new Date();
+      // Store vehicle details in payment history for tracking
+      paymentHistory.registration_number = registrationNumber ? registrationNumber.toUpperCase().replace(/\s/g, '') : null;
+      paymentHistory.kms_driven = request.KmsDriven || request.kmsDriven || null;
       await paymentHistory.save();
 
       logger.info(`Payment verified successfully: ${razorpayPaymentId}, VehicleDetailRequestId: ${vehicleDetailRequest.id}`);
