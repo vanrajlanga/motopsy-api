@@ -31,10 +31,12 @@ class UserController extends ApiController {
   /**
    * GET /api/user/total-user-count
    * Get total user count
+   * Supports optional startDate and endDate query params for filtering
    */
   async getTotalUserCount(req, res, next) {
     try {
-      const result = await userService.getTotalUserCountAsync();
+      const { startDate, endDate } = req.query;
+      const result = await userService.getTotalUserCountAsync(startDate, endDate);
       return this.fromResult(result, res);
     } catch (error) {
       next(error);

@@ -34,7 +34,8 @@ class PhysicalVerificationController extends BaseController {
 
   async getCount(req, res, next) {
     try {
-      const count = await physicalVerificationService.getCountAsync();
+      const { startDate, endDate } = req.query;
+      const count = await physicalVerificationService.getCountAsync(startDate, endDate);
       // .NET returns raw integer, not wrapped in Result
       return res.status(200).json(count);
     } catch (error) {

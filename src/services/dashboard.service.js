@@ -50,22 +50,62 @@ class DashboardService {
   }
 
   /**
+   * Get earnings for a specific date range
+   */
+  async getEarningsForDateRangeAsync(startDate, endDate) {
+    const whereClause = {
+      status: 1 // Successful
+    };
+
+    if (startDate && endDate) {
+      whereClause.payment_date = {
+        [Op.between]: [new Date(startDate), new Date(endDate + ' 23:59:59')]
+      };
+    }
+
+    const result = await PaymentHistory.sum('amount', { where: whereClause });
+    return result || 0;
+  }
+
+  /**
    * Get total monthly earning (admin only)
    * Returns MonthlyRevenueDto { currentMonthRevenue, monthlyRelativeRevenue }
    * Matches .NET API: GetMonthlyRevenue
+   * Supports optional date range filtering
    */
-  async getTotalMonthlyEarningAsync() {
+  async getTotalMonthlyEarningAsync(startDate = null, endDate = null) {
     try {
-      const currentMonthEarnings = await this.getCurrentMonthEarningsAsync();
-      const prevMonthEarnings = await this.getPreviousMonthEarningsAsync();
+      let currentEarnings;
+      let prevEarnings;
+
+      if (startDate && endDate) {
+        // If date range is provided, calculate earnings for that range
+        currentEarnings = await this.getEarningsForDateRangeAsync(startDate, endDate);
+
+        // Calculate previous period earnings (same duration before start date)
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const duration = end.getTime() - start.getTime();
+        const prevEndDate = new Date(start.getTime() - 1);
+        const prevStartDate = new Date(prevEndDate.getTime() - duration);
+
+        prevEarnings = await this.getEarningsForDateRangeAsync(
+          prevStartDate.toISOString().split('T')[0],
+          prevEndDate.toISOString().split('T')[0]
+        );
+      } else {
+        // Default behavior - current month vs previous month
+        currentEarnings = await this.getCurrentMonthEarningsAsync();
+        prevEarnings = await this.getPreviousMonthEarningsAsync();
+      }
 
       let monthlyRelativeRevenue;
 
-      // If previous month revenue is 0, assign current month revenue to monthly relative revenue
-      if (prevMonthEarnings === 0) {
-        monthlyRelativeRevenue = currentMonthEarnings;
+      // If previous period revenue is 0, assign current period revenue to monthly relative revenue
+      if (prevEarnings === 0) {
+        monthlyRelativeRevenue = currentEarnings > 0 ? 100 : 0;
       } else {
-        monthlyRelativeRevenue = Math.round(((currentMonthEarnings - prevMonthEarnings) / prevMonthEarnings) * 100 * 100) / 100; // Round to 2 decimal places
+        monthlyRelativeRevenue = Math.round(((currentEarnings - prevEarnings) / prevEarnings) * 100 * 100) / 100; // Round to 2 decimal places
       }
 
       // Handle NaN
@@ -74,7 +114,7 @@ class DashboardService {
       }
 
       return Result.success({
-        currentMonthRevenue: currentMonthEarnings,
+        currentMonthRevenue: currentEarnings,
         monthlyRelativeRevenue: monthlyRelativeRevenue
       });
     } catch (error) {

@@ -245,10 +245,19 @@ class VehicleReportService {
   /**
    * Get vehicle history report count
    * Matches .NET: GetVehicleHistoryReportsCountAsync - returns Result<int>
+   * Supports optional date range filtering
    */
-  async getVehicleHistoryReportsCountAsync() {
+  async getVehicleHistoryReportsCountAsync(startDate = null, endDate = null) {
     try {
-      const count = await VehicleDetail.count();
+      const whereClause = {};
+
+      if (startDate && endDate) {
+        whereClause.created_at = {
+          [Op.between]: [new Date(startDate), new Date(endDate + ' 23:59:59')]
+        };
+      }
+
+      const count = await VehicleDetail.count({ where: whereClause });
       return Result.success(count);
     } catch (error) {
       logger.error('Get count error:', error);

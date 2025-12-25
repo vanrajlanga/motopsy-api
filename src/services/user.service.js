@@ -85,12 +85,23 @@ class UserService {
 
   /**
    * Get total user count (excluding admins)
+   * Supports optional date range filtering by created_at
    */
-  async getTotalUserCountAsync() {
+  async getTotalUserCountAsync(startDate = null, endDate = null) {
     try {
-      const count = await User.count({
-        where: { is_admin: false }
-      });
+      logger.info(`getTotalUserCountAsync called with startDate: ${startDate}, endDate: ${endDate}`);
+      const whereClause = { is_admin: false };
+
+      if (startDate && endDate) {
+        whereClause.created_at = {
+          [Op.between]: [new Date(startDate), new Date(endDate + ' 23:59:59')]
+        };
+        logger.info(`Filtering users by date range: ${startDate} to ${endDate}`);
+      }
+
+      logger.info(`whereClause: ${JSON.stringify(whereClause)}`);
+      const count = await User.count({ where: whereClause });
+      logger.info(`User count result: ${count}`);
       // Return number directly matching .NET API
       return Result.success(count);
     } catch (error) {

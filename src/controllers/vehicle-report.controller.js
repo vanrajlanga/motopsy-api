@@ -87,10 +87,12 @@ class VehicleReportController extends BaseController {
   /**
    * GET /api/vehicleReport/get-vehicle-history-report-count
    * Matches .NET: GetVehicleHistoryReportCount
+   * Supports optional startDate and endDate query params for filtering
    */
   async getVehicleHistoryReportCount(req, res, next) {
     try {
-      const result = await vehicleReportService.getVehicleHistoryReportsCountAsync();
+      const { startDate, endDate } = req.query;
+      const result = await vehicleReportService.getVehicleHistoryReportsCountAsync(startDate, endDate);
       return this.fromResult(result, res);
     } catch (error) {
       next(error);

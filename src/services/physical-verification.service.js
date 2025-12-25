@@ -1,5 +1,6 @@
 const PhysicalVerification = require('../models/physical-verification.model');
 const { sequelize } = require('../config/database');
+const { Op } = require('sequelize');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
 const { toDataSourceResult } = require('../utils/kendo-datasource');
@@ -129,10 +130,19 @@ class PhysicalVerificationService {
   /**
    * Get physical verification count
    * Matches .NET: Returns raw integer
+   * Supports optional date range filtering
    */
-  async getCountAsync() {
+  async getCountAsync(startDate = null, endDate = null) {
     try {
-      const count = await PhysicalVerification.count();
+      const whereClause = {};
+
+      if (startDate && endDate) {
+        whereClause.created_at = {
+          [Op.between]: [new Date(startDate), new Date(endDate + ' 23:59:59')]
+        };
+      }
+
+      const count = await PhysicalVerification.count({ where: whereClause });
       return count;  // Return raw number to match .NET
     } catch (error) {
       logger.error('Get count error:', error);
