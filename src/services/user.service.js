@@ -89,19 +89,15 @@ class UserService {
    */
   async getTotalUserCountAsync(startDate = null, endDate = null) {
     try {
-      logger.info(`getTotalUserCountAsync called with startDate: ${startDate}, endDate: ${endDate}`);
       const whereClause = { is_admin: false };
 
       if (startDate && endDate) {
         whereClause.created_at = {
           [Op.between]: [new Date(startDate), new Date(endDate + ' 23:59:59')]
         };
-        logger.info(`Filtering users by date range: ${startDate} to ${endDate}`);
       }
 
-      logger.info(`whereClause: ${JSON.stringify(whereClause)}`);
       const count = await User.count({ where: whereClause });
-      logger.info(`User count result: ${count}`);
       // Return number directly matching .NET API
       return Result.success(count);
     } catch (error) {
