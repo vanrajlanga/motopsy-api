@@ -106,11 +106,22 @@ class OrderService {
   async getOrderListAsync(request) {
     try {
       const { take, skip, filter } = request;
+      const hasNcrbFilter = filter && filter.ncrbStatus && filter.ncrbStatus !== 'all';
 
       // Build where clause
       let whereClause = {};
       if (filter && filter.status !== undefined && filter.status !== null) {
         whereClause.status = filter.status;
+      }
+
+      // Add date range filter on payment_date (order date)
+      if (filter && filter.startDate && filter.endDate) {
+        // Parse dates and set time boundaries (local time)
+        const startDateObj = new Date(filter.startDate + 'T00:00:00');
+        const endDateObj = new Date(filter.endDate + 'T23:59:59');
+        whereClause.payment_date = {
+          [Op.between]: [startDateObj, endDateObj]
+        };
       }
 
       // Build query options
@@ -137,16 +148,20 @@ class OrderService {
             required: false // LEFT JOIN
           }
         ],
-        order: [['payment_date', 'DESC']],
-        offset: skip || 0
+        order: [['payment_date', 'DESC']]
       };
 
-      if (take && take > 0) {
-        queryOptions.limit = take;
+      // If NCRB filter is applied, fetch all records first then filter and paginate manually
+      // Otherwise, use database pagination
+      if (!hasNcrbFilter) {
+        queryOptions.offset = skip || 0;
+        if (take && take > 0) {
+          queryOptions.limit = take;
+        }
       }
 
-      // Get total count
-      const total = await PaymentHistory.count({ where: whereClause });
+      // Get total count (without NCRB filter for now)
+      let total = await PaymentHistory.count({ where: whereClause });
 
       // Get data
       const payments = await PaymentHistory.findAll(queryOptions);
@@ -224,7 +239,7 @@ class OrderService {
       }
 
       // Transform to Order DTOs with vehicleDetailId, ncrbReportId, and apiSource
-      const orders = payments.map(payment => {
+      let orders = payments.map(payment => {
         const vehicleRequestId = (payment.VehicleDetailRequests && payment.VehicleDetailRequests.length > 0)
           ? payment.VehicleDetailRequests[0].id
           : null;
@@ -233,6 +248,25 @@ class OrderService {
         const apiSource = vehicleDetailId ? apiSourceMap[vehicleDetailId] || null : null;
         return this.transformToOrderDto(payment, vehicleDetailId, ncrbReportId, apiSource);
       });
+
+      // Apply NCRB filter if specified
+      if (hasNcrbFilter) {
+        if (filter.ncrbStatus === 'uploaded') {
+          // Only show completed orders with NCRB report uploaded
+          orders = orders.filter(order => order.ncrbReportId !== null && order.status === 1);
+        } else if (filter.ncrbStatus === 'pending') {
+          // Only show completed orders with vehicle detail but without NCRB report
+          orders = orders.filter(order => order.ncrbReportId === null && order.vehicleDetailId !== null && order.status === 1);
+        }
+
+        // Update total count after NCRB filtering
+        total = orders.length;
+
+        // Apply manual pagination after NCRB filter
+        const startIndex = skip || 0;
+        const endIndex = take ? startIndex + take : orders.length;
+        orders = orders.slice(startIndex, endIndex);
+      }
 
       logger.info(`Found ${orders.length} orders (total: ${total})`);
       return Result.success({
