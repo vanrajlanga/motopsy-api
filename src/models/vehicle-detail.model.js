@@ -303,6 +303,22 @@ const VehicleDetail = sequelize.define('vehicle_details', {
     allowNull: true,
     comment: 'API used to fetch RC data: surepass, apiclub'
   },
+  // Resale calculation fields
+  user_provided_resale_data: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    comment: 'User-provided data for manual resale calculation (make, model, year, exShowroomPrice)'
+  },
+  resale_calculation_source: {
+    type: DataTypes.ENUM('system', 'user'),
+    allowNull: true,
+    comment: 'Source of resale calculation: system (auto) or user (manual)'
+  },
+  resale_price_range: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    comment: 'Calculated resale price range (Excellent, VeryGood, Good, Fair)'
+  },
   created_at: {
     type: DataTypes.DATE,
     allowNull: false,

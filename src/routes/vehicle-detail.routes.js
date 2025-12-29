@@ -15,4 +15,7 @@ router.get('/paid-vehicle-detail-failed-reports', authenticate, requireAdmin, (r
 // Get pending reports
 router.get('/pending-reports', authenticate, (req, res, next) => vehicleDetailController.getPendingReports(req, res, next));
 
+// Calculate resale value manually (when auto-calculation fails)
+router.post('/calculate-resale', authenticate, (req, res, next) => vehicleDetailController.calculateResale(req, res, next));
+
 module.exports = router;

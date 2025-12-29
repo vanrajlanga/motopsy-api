@@ -54,6 +54,39 @@ class VehicleDetailController extends BaseController {
       next(error);
     }
   }
+
+  /**
+   * POST /api/vehicle-detail/calculate-resale
+   * Calculate resale value using user-provided data (when auto-calculation fails)
+   */
+  async calculateResale(req, res, next) {
+    try {
+      const { vehicleDetailId, make, model, year, exShowroomPrice, kmsDriven } = req.body;
+
+      if (!vehicleDetailId) {
+        return res.status(400).json({
+          success: false,
+          message: 'vehicleDetailId is required'
+        });
+      }
+
+      const result = await vehicleDetailService.calculateResaleManually(vehicleDetailId, {
+        make,
+        model,
+        year,
+        exShowroomPrice,
+        kmsDriven
+      });
+
+      if (result.success) {
+        return res.status(200).json(result);
+      } else {
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new VehicleDetailController();

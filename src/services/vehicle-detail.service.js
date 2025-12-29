@@ -362,40 +362,77 @@ class VehicleDetailService {
     // ========== OBV (Orange Book Value) Calculation ==========
     // Merged from obv.service.js - calculates resale value in same API call
     let priceRange = null;
+    let resaleDataMissing = false;
+    let resaleCalculationSource = null;
+    let missingFields = [];
+    let availableData = {};
+
     try {
-      // Extract make, model, year from API response
-      const make = this.extractMakeFromDescription(vehicleDetail.maker_description || vehicleDetail.manufacturer);
-      const model = this.extractModelFromDescription(vehicleDetail.maker_model || vehicleDetail.model);
-      const year = this.extractYearFromManufacturingDate(vehicleDetail.manufacturing_date_formatted);
-      const noOfOwners = vehicleDetail.owner_number || '1';
+      // Check if user has already provided resale data manually
+      if (vehicleDetail.resale_calculation_source === 'user' && vehicleDetail.resale_price_range) {
+        // Use the saved user-provided resale calculation
+        priceRange = typeof vehicleDetail.resale_price_range === 'string'
+          ? JSON.parse(vehicleDetail.resale_price_range)
+          : vehicleDetail.resale_price_range;
+        resaleCalculationSource = 'user';
+        logger.info(`Using user-provided resale data for vehicle ${vehicleDetail.id}`);
+      } else {
+        // Extract make, model, year from API response
+        const make = this.extractMakeFromDescription(vehicleDetail.maker_description || vehicleDetail.manufacturer);
+        const model = this.extractModelFromDescription(vehicleDetail.maker_model || vehicleDetail.model);
+        const year = this.extractYearFromManufacturingDate(vehicleDetail.manufacturing_date_formatted);
+        const noOfOwners = vehicleDetail.owner_number || '1';
 
-      if (make && model && year) {
-        // Get ex-showroom price from VehicleSpecification table
-        let originalPrice = await this.lookupExShowroomPrice(make, model, vehicleDetail.variant);
+        // Track available data for frontend
+        if (make) availableData.make = make;
+        if (model) availableData.model = model;
+        if (year) availableData.year = year;
 
-        if (originalPrice) {
-          // Calculate resale value using resaleValueService
-          const resaleResult = resaleValueService.calculateResaleValue({
-            originalPrice: originalPrice,
-            make: make,
-            year: year,
-            kmsDriven: kmsDriven ? parseInt(kmsDriven) : null,
-            state: stateMapping ? stateMapping.state_name : null,
-            stateCode: stateCode,
-            city: stateMapping ? stateMapping.state_capital : null,
-            noOfOwners: noOfOwners
-          });
+        // Track missing fields
+        if (!make) missingFields.push('make');
+        if (!model) missingFields.push('model');
+        if (!year) missingFields.push('year');
 
-          if (resaleResult.isSuccess) {
-            priceRange = resaleResult.value;
-            logger.info(`OBV calculated for ${make} ${model}: Good range ₹${priceRange.Good.range_from} - ₹${priceRange.Good.range_to}`);
+        if (make && model && year) {
+          // Get ex-showroom price from VehicleSpecification table
+          let originalPrice = await this.lookupExShowroomPrice(make, model, vehicleDetail.variant);
+
+          if (originalPrice) {
+            availableData.exShowroomPrice = originalPrice;
+
+            // Calculate resale value using resaleValueService
+            const resaleResult = resaleValueService.calculateResaleValue({
+              originalPrice: originalPrice,
+              make: make,
+              year: year,
+              kmsDriven: kmsDriven ? parseInt(kmsDriven) : null,
+              state: stateMapping ? stateMapping.state_name : null,
+              stateCode: stateCode,
+              city: stateMapping ? stateMapping.state_capital : null,
+              noOfOwners: noOfOwners
+            });
+
+            if (resaleResult.isSuccess) {
+              priceRange = resaleResult.value;
+              resaleCalculationSource = 'system';
+              logger.info(`OBV calculated for ${make} ${model}: Good range ₹${priceRange.Good.range_from} - ₹${priceRange.Good.range_to}`);
+            } else {
+              resaleDataMissing = true;
+              missingFields.push('calculationFailed');
+            }
+          } else {
+            resaleDataMissing = true;
+            missingFields.push('exShowroomPrice');
+            logger.info(`No ex-showroom price found for ${make} ${model}, skipping OBV calculation`);
           }
         } else {
-          logger.info(`No ex-showroom price found for ${make} ${model}, skipping OBV calculation`);
+          resaleDataMissing = true;
         }
       }
     } catch (obvError) {
       logger.error('Error calculating OBV:', obvError);
+      resaleDataMissing = true;
+      missingFields.push('error');
       // Continue without OBV - not critical
     }
 
@@ -411,7 +448,12 @@ class VehicleDetailService {
       vehicleAge: vehicleAge,
       state: stateMapping ? stateMapping.state_name : '',
       // OBV data - new field merged from /api/obv/enterprise-used-price-range
-      priceRange: priceRange
+      priceRange: priceRange,
+      // Resale calculation metadata
+      resaleDataMissing: resaleDataMissing,
+      resaleCalculationSource: resaleCalculationSource,
+      missingFields: missingFields.length > 0 ? missingFields : null,
+      availableData: Object.keys(availableData).length > 0 ? availableData : null
     };
   }
 
@@ -425,51 +467,50 @@ class VehicleDetailService {
     try {
       const { Op } = require('sequelize');
 
-      // Build search conditions - require price to exist
-      const whereConditions = {
-        price_breakdown_ex_showroom_price: {
-          [Op.and]: [
-            { [Op.ne]: null },
-            { [Op.ne]: '' }
-          ]
-        }
-      };
-
-      // Step 1: Try EXACT model match first
-      let specs = await VehicleSpecification.findAll({
-        where: {
-          ...whereConditions,
-          naming_make: { [Op.like]: `%${make}%` },
-          naming_model: model
-        },
-        limit: 10,
-        order: [['id', 'DESC']]
-      });
-
-      // Step 2: If no exact match, try model at START
-      if (specs.length === 0) {
-        specs = await VehicleSpecification.findAll({
+      // Helper to find specs with any price field
+      const findSpecs = async (makeCondition, modelCondition) => {
+        // Try price_breakdown_ex_showroom_price first
+        let specs = await VehicleSpecification.findAll({
           where: {
-            ...whereConditions,
-            naming_make: { [Op.like]: `%${make}%` },
-            naming_model: { [Op.like]: `${model}%` }
+            naming_make: makeCondition,
+            naming_model: modelCondition,
+            price_breakdown_ex_showroom_price: {
+              [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }]
+            }
           },
           limit: 10,
           order: [['id', 'DESC']]
         });
+
+        // If not found, try keydata_key_price (contains prices like "Rs. 36.96 Lakh")
+        if (specs.length === 0) {
+          specs = await VehicleSpecification.findAll({
+            where: {
+              naming_make: makeCondition,
+              naming_model: modelCondition,
+              keydata_key_price: {
+                [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }]
+              }
+            },
+            limit: 10,
+            order: [['id', 'DESC']]
+          });
+        }
+
+        return specs;
+      };
+
+      // Step 1: Try EXACT model match first
+      let specs = await findSpecs({ [Op.like]: `%${make}%` }, model);
+
+      // Step 2: If no exact match, try model at START
+      if (specs.length === 0) {
+        specs = await findSpecs({ [Op.like]: `%${make}%` }, { [Op.like]: `${model}%` });
       }
 
       // Step 3: Fallback to contains match
       if (specs.length === 0) {
-        specs = await VehicleSpecification.findAll({
-          where: {
-            ...whereConditions,
-            naming_make: { [Op.like]: `%${make}%` },
-            naming_model: { [Op.like]: `%${model}%` }
-          },
-          limit: 10,
-          order: [['id', 'DESC']]
-        });
+        specs = await findSpecs({ [Op.like]: `%${make}%` }, { [Op.like]: `%${model}%` });
       }
 
       // If variant provided, filter further
@@ -487,9 +528,13 @@ class VehicleDetailService {
       }
 
       // Get the first matching spec's price
+      // Prefer keydata_key_price (variant-specific) over price_breakdown_ex_showroom_price (base model price)
       const spec = specs[0];
-      const priceStr = spec.price_breakdown_ex_showroom_price;
-      return this.parsePriceString(priceStr);
+      let price = this.parsePriceString(spec.keydata_key_price);
+      if (!price) {
+        price = this.parsePriceString(spec.price_breakdown_ex_showroom_price);
+      }
+      return price;
     } catch (error) {
       logger.error('Error looking up ex-showroom price:', error);
       return null;
@@ -498,12 +543,33 @@ class VehicleDetailService {
 
   /**
    * Parse price string to number
-   * Handles Indian number formats like "₹ 10,49,000.00" or "Rs. 10,00,000"
+   * Handles formats: "₹ 10,49,000.00", "Rs. 10,00,000", "Rs. 36.96 Lakh", "Rs. 1.50 Crore"
    */
   parsePriceString(priceStr) {
     if (!priceStr) return null;
 
-    // Remove currency symbols and spaces
+    const upperStr = priceStr.toUpperCase();
+
+    // Handle "Lakh" format: "Rs. 36.96 Lakh" -> 3696000
+    if (upperStr.includes('LAKH')) {
+      // Match numbers like 36.96 or 36 (digit followed by optional decimal)
+      const match = priceStr.match(/\d+\.?\d*/);
+      if (match) {
+        const lakhValue = parseFloat(match[0]);
+        return isNaN(lakhValue) ? null : Math.round(lakhValue * 100000);
+      }
+    }
+
+    // Handle "Crore" format: "Rs. 1.50 Crore" -> 15000000
+    if (upperStr.includes('CRORE')) {
+      const match = priceStr.match(/\d+\.?\d*/);
+      if (match) {
+        const croreValue = parseFloat(match[0]);
+        return isNaN(croreValue) ? null : Math.round(croreValue * 10000000);
+      }
+    }
+
+    // Handle regular format: "₹ 10,49,000.00" or "Rs. 10,00,000"
     let cleanedPrice = priceStr
       .replace(/[₹?]/g, '')
       .replace(/Rs\.?/gi, '')
@@ -512,7 +578,7 @@ class VehicleDetailService {
       .trim();
 
     const price = parseFloat(cleanedPrice);
-    return isNaN(price) ? null : price;
+    return isNaN(price) ? null : Math.round(price);
   }
 
   /**
@@ -943,14 +1009,20 @@ class VehicleDetailService {
       'MG': 'MG',
       'JEEP': 'Jeep',
       'MERCEDES': 'Mercedes-Benz',
+      'DAIMLER': 'Mercedes-Benz',       // Parent company of Mercedes-Benz
       'BMW': 'BMW',
+      'BAYERISCHE': 'BMW',              // BMW's full German name (Bayerische Motoren Werke)
       'AUDI': 'Audi',
       'JAGUAR': 'Jaguar',
       'LAND ROVER': 'Land Rover',
+      'JLR': 'Jaguar',                  // Jaguar Land Rover
       'PORSCHE': 'Porsche',
       'LEXUS': 'Lexus',
       'VOLVO': 'Volvo',
       'MINI': 'Mini',
+      'FIAT': 'Fiat',
+      'CHEVROLET': 'Chevrolet',
+      'GENERAL MOTORS': 'Chevrolet',    // GM parent company
       'BAJAJ': 'Bajaj',
       'HERO': 'Hero',
       'TVS': 'TVS',
@@ -968,7 +1040,19 @@ class VehicleDetailService {
       'VESPA': 'Vespa',
       'ATHER': 'Ather',
       'OLA': 'Ola Electric',
-      'SIMPLE': 'Simple Energy'
+      'SIMPLE': 'Simple Energy',
+      'CITROEN': 'Citroen',
+      'PEUGEOT': 'Peugeot',
+      'FERRARI': 'Ferrari',
+      'LAMBORGHINI': 'Lamborghini',
+      'MASERATI': 'Maserati',
+      'BENTLEY': 'Bentley',
+      'ROLLS': 'Rolls-Royce',
+      'ASTON': 'Aston Martin',
+      'BUGATTI': 'Bugatti',
+      'ISUZU': 'Isuzu',
+      'FORCE': 'Force Motors',
+      'EICHER': 'Eicher'
     };
 
     const upper = description.toUpperCase();
@@ -987,6 +1071,8 @@ class VehicleDetailService {
    * Extract model name from description
    * E.g., "SELTOS G1.5 6MT HTE" -> "Seltos"
    * E.g., "TATA PUNCH ADV 1.2P MT BS6PH2" -> "Punch" (skip brand name)
+   * E.g., "CLA200 CDI" -> "CLA" (Mercedes pattern)
+   * E.g., "320D SPORT" -> "3 Series" (BMW pattern)
    */
   extractModelFromDescription(description) {
     if (!description) return null;
@@ -1017,6 +1103,33 @@ class VehicleDetailService {
       'SONET X LINE': 'Sonet X Line'
     };
 
+    // Mercedes model patterns: Extract letters before numbers
+    // E.g., CLA200 -> CLA, GLA200 -> GLA, A200 -> A-Class
+    const mercedesLetterToClass = {
+      'A': 'A-Class', 'B': 'B-Class', 'C': 'C-Class', 'E': 'E-Class',
+      'S': 'S-Class', 'G': 'G-Class', 'M': 'M-Class', 'R': 'R-Class', 'V': 'V-Class'
+    };
+    const mercedesMultiLetterModels = ['CLA', 'CLK', 'CLS', 'CLE', 'GLA', 'GLB', 'GLC', 'GLE', 'GLS',
+                                        'SLK', 'SLC', 'SL', 'EQA', 'EQB', 'EQC', 'EQE', 'EQS', 'AMG',
+                                        'ML', 'GL', 'SLS', 'SLR', 'CLK', 'CL'];
+
+    // BMW series patterns: Number at start indicates series
+    // E.g., 320D -> 3 Series, 520D -> 5 Series, 730LD -> 7 Series
+    const bmwSeriesMap = {
+      '1': '1 Series', '2': '2 Series', '3': '3 Series', '4': '4 Series',
+      '5': '5 Series', '6': '6 Series', '7': '7 Series', '8': '8 Series'
+    };
+
+    // Models where numbers are integral part of the name (should NOT be stripped)
+    const keepNumberModels = ['I10', 'I20', 'I30', 'I40', 'IX20', 'IX35', 'IX55',  // Hyundai
+                              'A1', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8',           // Audi A series
+                              'Q2', 'Q3', 'Q5', 'Q7', 'Q8',                        // Audi Q series
+                              'S3', 'S4', 'S5', 'S6', 'S7', 'S8',                  // Audi S series
+                              'RS3', 'RS4', 'RS5', 'RS6', 'RS7',                   // Audi RS series
+                              'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'X7',           // BMW X series
+                              'Z3', 'Z4', 'M2', 'M3', 'M4', 'M5', 'M6', 'M8',     // BMW Z/M series
+                              'TT', 'R8', 'E2O'];                                  // Other special models
+
     let startIndex = 0;
 
     // Check if first word is a brand prefix - if so, start from second word
@@ -1034,9 +1147,50 @@ class VehicleDetailService {
       }
     }
 
-    // Default: use single word model name
-    let modelWord = words[startIndex] || words[0];
+    // Get the model word
+    let modelWord = (words[startIndex] || words[0]).toUpperCase();
 
+    // Check if it's a "keep number" model (e.g., i20, X1, A4) - return as-is
+    if (keepNumberModels.includes(modelWord)) {
+      // Proper case for these models
+      if (modelWord.startsWith('I') && modelWord.length <= 3) {
+        return 'i' + modelWord.slice(1);  // i10, i20, i30
+      }
+      return modelWord;  // X1, A4, Q5 etc.
+    }
+
+    // Check for BMW series pattern: starts with digit followed by more chars (e.g., 320D, 520D)
+    const bmwSeriesMatch = modelWord.match(/^([1-8])\d{2}/);
+    if (bmwSeriesMatch) {
+      const seriesNum = bmwSeriesMatch[1];
+      if (bmwSeriesMap[seriesNum]) {
+        return bmwSeriesMap[seriesNum];
+      }
+    }
+
+    // Check for Mercedes pattern: letters followed by numbers (e.g., CLA200, GLA220, A200)
+    const mercedesMatch = modelWord.match(/^([A-Z]+)(\d+)/);
+    if (mercedesMatch) {
+      const letterPart = mercedesMatch[1];
+
+      // Check if it's a multi-letter Mercedes model (CLA, GLA, GLC, etc.)
+      if (mercedesMultiLetterModels.includes(letterPart)) {
+        return letterPart;
+      }
+
+      // Check if it's a single-letter Mercedes class (A, C, E, S, etc.)
+      if (mercedesLetterToClass[letterPart]) {
+        return mercedesLetterToClass[letterPart];
+      }
+
+      // For other patterns with letters followed by numbers, just use the letters
+      // Only if letters are 2+ chars (to avoid breaking models like "i20" which we handle above)
+      if (letterPart.length >= 2) {
+        return letterPart.charAt(0).toUpperCase() + letterPart.slice(1).toLowerCase();
+      }
+    }
+
+    // Default: use single word model name
     // Capitalize properly (e.g., "SELTOS" -> "Seltos", "PUNCH" -> "Punch")
     return modelWord.charAt(0).toUpperCase() + modelWord.slice(1).toLowerCase();
   }
@@ -1222,6 +1376,114 @@ class VehicleDetailService {
       noOfSeatingRows: data.capacity_no_of_seating_rows,
       seatingCapacity: data.capacity_seating_capacity || data.keydata_key_seatingcapacity
     };
+  }
+
+  /**
+   * Calculate resale value manually using user-provided data
+   * This is called when system cannot auto-calculate (missing make, model, year, or price)
+   * @param {number} vehicleDetailId - The vehicle detail record ID
+   * @param {Object} userData - User-provided data { make, model, year, exShowroomPrice, kmsDriven }
+   * @returns {Object} - { success, priceRange, error }
+   */
+  async calculateResaleManually(vehicleDetailId, userData) {
+    try {
+      const { make, model, year, exShowroomPrice, kmsDriven } = userData;
+
+      // Validate required fields
+      if (!make || !model || !year || !exShowroomPrice) {
+        return {
+          success: false,
+          error: 'Missing required fields: make, model, year, and exShowroomPrice are required'
+        };
+      }
+
+      // Validate year
+      const yearNum = parseInt(year);
+      const currentYear = new Date().getFullYear();
+      if (isNaN(yearNum) || yearNum < 1990 || yearNum > currentYear) {
+        return {
+          success: false,
+          error: `Invalid year: must be between 1990 and ${currentYear}`
+        };
+      }
+
+      // Validate exShowroomPrice
+      const priceNum = parseFloat(exShowroomPrice);
+      if (isNaN(priceNum) || priceNum <= 0) {
+        return {
+          success: false,
+          error: 'Invalid ex-showroom price: must be a positive number'
+        };
+      }
+
+      // Find the vehicle detail record
+      const vehicleDetail = await VehicleDetail.findByPk(vehicleDetailId);
+      if (!vehicleDetail) {
+        return {
+          success: false,
+          error: 'Vehicle detail not found'
+        };
+      }
+
+      // Get state info from registration number
+      const registrationNumber = vehicleDetail.registration_number;
+      const stateCode = registrationNumber ? registrationNumber.substring(0, 2).toUpperCase() : null;
+      let stateMapping = null;
+      if (stateCode) {
+        stateMapping = await StateMapping.findOne({
+          where: { state_code: stateCode }
+        });
+      }
+
+      // Calculate resale value using resaleValueService
+      const resaleResult = resaleValueService.calculateResaleValue({
+        originalPrice: priceNum,
+        make: make,
+        year: yearNum.toString(),
+        kmsDriven: kmsDriven ? parseInt(kmsDriven) : null,
+        state: stateMapping ? stateMapping.state_name : null,
+        stateCode: stateCode,
+        city: stateMapping ? stateMapping.state_capital : null,
+        noOfOwners: vehicleDetail.owner_number || '1'
+      });
+
+      if (!resaleResult.isSuccess) {
+        return {
+          success: false,
+          error: 'Resale calculation failed'
+        };
+      }
+
+      // Save the user-provided data and calculated resale to database
+      const userProvidedData = {
+        make,
+        model,
+        year: yearNum,
+        exShowroomPrice: priceNum,
+        kmsDriven: kmsDriven ? parseInt(kmsDriven) : null,
+        calculatedAt: new Date().toISOString()
+      };
+
+      await vehicleDetail.update({
+        user_provided_resale_data: JSON.stringify(userProvidedData),
+        resale_calculation_source: 'user',
+        resale_price_range: JSON.stringify(resaleResult.value)
+      });
+
+      logger.info(`Manual resale calculated for vehicle ${vehicleDetailId}: ${make} ${model} ${year}, Price: ₹${priceNum}`);
+
+      return {
+        success: true,
+        priceRange: resaleResult.value,
+        resaleCalculationSource: 'user'
+      };
+    } catch (error) {
+      logger.error('Error calculating manual resale:', error);
+      return {
+        success: false,
+        error: error.message || 'An error occurred during resale calculation'
+      };
+    }
   }
 }
 
