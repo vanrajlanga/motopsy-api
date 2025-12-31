@@ -339,26 +339,45 @@ class ResaleValueService {
       // Ensure percentage is between 10% and 95%
       const clampedPercent = Math.max(0.10, Math.min(0.95, finalPercent));
 
-      // Calculate base resale value (Good condition)
+      // Calculate base resale value (Good condition = reference point)
       const goodValue = Math.round(originalPrice * clampedPercent);
 
-      // Calculate condition-based values
-      // From Excel: Avg = 85%, Good = 100%, Excellent = 110%
-      const excellentValue = Math.round(goodValue * 1.10);
-      const veryGoodValue = Math.round(goodValue * 1.05);
-      const fairValue = Math.round(goodValue * 0.85);
+      // Non-overlapping price ranges using midpoint-based boundaries
+      // Keeps original min/max bounds while using midpoints for internal divisions
+      //
+      // Step 1: Calculate condition centers (from original multipliers)
+      const excellentCenter = goodValue * 1.10;
+      const veryGoodCenter = goodValue * 1.05;
+      const goodCenter = goodValue * 1.00;
+      const fairCenter = goodValue * 0.85;
 
-      // Create price ranges (±5% for range)
-      const createRange = (value) => ({
-        range_from: Math.round(value * 0.95),
-        range_to: Math.round(value * 1.05)
-      });
+      // Step 2: Keep original outer bounds (±5% from extreme centers)
+      const excellentUpper = Math.round(excellentCenter * 1.05);  // Original max
+      const fairLower = Math.round(fairCenter * 0.95);            // Original min
 
+      // Step 3: Calculate midpoints for internal boundaries (no overlap)
+      const midExcellentVeryGood = Math.round((excellentCenter + veryGoodCenter) / 2);
+      const midVeryGoodGood = Math.round((veryGoodCenter + goodCenter) / 2);
+      const midGoodFair = Math.round((goodCenter + fairCenter) / 2);
+
+      // Step 4: Build non-overlapping adjacent ranges
       const result = {
-        Excellent: createRange(excellentValue),
-        VeryGood: createRange(veryGoodValue),
-        Good: createRange(goodValue),
-        Fair: createRange(fairValue)
+        Excellent: {
+          range_from: midExcellentVeryGood,
+          range_to: excellentUpper
+        },
+        VeryGood: {
+          range_from: midVeryGoodGood,
+          range_to: midExcellentVeryGood
+        },
+        Good: {
+          range_from: midGoodFair,
+          range_to: midVeryGoodGood
+        },
+        Fair: {
+          range_from: fairLower,
+          range_to: midGoodFair
+        }
       };
 
       logger.info(`Resale calculation result: Age=${vehicleAge}yrs, Base=${(baseRetained * 100).toFixed(1)}%, ` +
