@@ -82,6 +82,19 @@ class CouponController extends BaseController {
   }
 
   /**
+   * GET /api/coupon/active - Get active coupons for display (public - no auth required)
+   */
+  async getActiveCoupons(req, res, next) {
+    try {
+      console.log('>>> getActiveCoupons controller called - PUBLIC ROUTE');
+      const result = await couponService.getActiveCouponsAsync();
+      return this.fromResult(result, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /api/coupon/:id/usage-history - Get usage history for a coupon (admin)
    */
   async getUsageHistory(req, res, next) {

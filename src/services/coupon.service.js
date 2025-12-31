@@ -306,6 +306,47 @@ class CouponService {
   }
 
   /**
+   * Get active coupons for public display (authenticated users)
+   * Returns only active and non-expired coupons
+   */
+  async getActiveCouponsAsync() {
+    try {
+      const now = new Date();
+
+      const coupons = await Coupon.findAll({
+        where: {
+          is_active: true,
+          [Op.or]: [
+            { expiry_date: null },
+            { expiry_date: { [Op.gt]: now } }
+          ]
+        },
+        order: [['created_at', 'DESC']],
+        limit: 10
+      });
+
+      // Transform to DTOs
+      const transformedCoupons = coupons.map(coupon => ({
+        id: coupon.id,
+        couponCode: coupon.coupon_code,
+        couponName: coupon.coupon_name,
+        discountType: coupon.discount_type,
+        discountValue: parseFloat(coupon.discount_value),
+        description: coupon.description,
+        expiryDate: coupon.expiry_date,
+        maxUses: coupon.max_uses,
+        currentUses: coupon.current_uses,
+        minOrderAmount: coupon.min_order_amount ? parseFloat(coupon.min_order_amount) : null
+      }));
+
+      return Result.success(transformedCoupons);
+    } catch (error) {
+      logger.error('Get active coupons error:', error);
+      return Result.failure(error.message || 'Failed to get active coupons');
+    }
+  }
+
+  /**
    * Record coupon usage (called after successful payment)
    */
   async recordUsageAsync(couponId, userId, paymentHistoryId, originalAmount, discountAmount, finalAmount) {
