@@ -55,19 +55,28 @@ class VehicleDetailService {
   /**
    * Transform vehicle detail from database format (snake_case) to API format (camelCase)
    * Matches .NET API VehicleDetailDto response format with sensitive data masking
+   * @param {Object} vehicleDetail - Vehicle detail from database
+   * @param {boolean} isAdmin - Whether user is admin (skip masking if true)
    */
-  transformVehicleDetail(vehicleDetail) {
+  transformVehicleDetail(vehicleDetail, isAdmin = false) {
     if (!vehicleDetail) return null;
 
     const data = vehicleDetail.toJSON ? vehicleDetail.toJSON() : vehicleDetail;
 
-    // Mask sensitive fields - matches .NET HideSensitiveStringsInVehicleDetails
-    const maskedOwnerName = this.maskSensitiveString(data.owner_name);
-    const maskedFatherName = this.maskSensitiveString(data.father_name);
-    const maskedPresentAddress = this.maskSensitiveString(data.present_address);
-    const maskedPermanentAddress = this.maskSensitiveString(data.permanent_address);
-    const maskedMobileNumber = data.mobile_number ?
-      data.mobile_number.substring(0, 2) + '******' + data.mobile_number.slice(-2) : null;
+    console.log('DEBUG - transformVehicleDetail:', {
+      isAdmin,
+      ownerName: data.owner_name,
+      shouldMask: !isAdmin
+    });
+
+    // Mask sensitive fields only if user is NOT admin
+    const maskedOwnerName = isAdmin ? data.owner_name : this.maskSensitiveString(data.owner_name);
+    const maskedFatherName = isAdmin ? data.father_name : this.maskSensitiveString(data.father_name);
+    const maskedPresentAddress = isAdmin ? data.present_address : this.maskSensitiveString(data.present_address);
+    const maskedPermanentAddress = isAdmin ? data.permanent_address : this.maskSensitiveString(data.permanent_address);
+    const maskedMobileNumber = isAdmin
+      ? data.mobile_number
+      : (data.mobile_number ? data.mobile_number.substring(0, 2) + '******' + data.mobile_number.slice(-2) : null);
 
     return {
       id: data.id,
@@ -307,8 +316,9 @@ class VehicleDetailService {
    * @param {Object} vehicleDetail - Vehicle detail from database
    * @param {number} userId - User ID
    * @param {number} kmsDriven - Kilometers driven (optional, from frontend)
+   * @param {boolean} isAdmin - Whether user is admin (skip masking if true)
    */
-  async buildVehicleDetailResponse(vehicleDetail, userId, kmsDriven = null) {
+  async buildVehicleDetailResponse(vehicleDetail, userId, kmsDriven = null, isAdmin = false) {
     const vehicleDetailId = vehicleDetail.id;
 
     // Get challan details for this vehicle
@@ -438,7 +448,7 @@ class VehicleDetailService {
 
     // Return response matching frontend expectations
     return {
-      vehicleDetail: this.transformVehicleDetail(vehicleDetail),
+      vehicleDetail: this.transformVehicleDetail(vehicleDetail, isAdmin),
       vehicleChallanDetails: transformedChallans,
       vehicleSpecification: transformedSpec,
       ncrbReportAvailable: ncrbReport !== null,
@@ -585,7 +595,7 @@ class VehicleDetailService {
    * Get vehicle detail by ID and user ID
    * Returns VehicleHistoryReportDetailDto matching .NET API
    */
-  async getVehicleDetailByIdAsync(id, userId) {
+  async getVehicleDetailByIdAsync(id, userId, isAdmin = false) {
     try {
       // Get vehicle detail by ID (not restricted by userId in .NET)
       const vehicleDetail = await VehicleDetail.findByPk(id);
@@ -598,7 +608,7 @@ class VehicleDetailService {
       const kmsDriven = vehicleDetail.kms_driven;
 
       // Build the response using shared method with stored kmsDriven
-      const response = await this.buildVehicleDetailResponse(vehicleDetail, userId, kmsDriven);
+      const response = await this.buildVehicleDetailResponse(vehicleDetail, userId, kmsDriven, isAdmin);
 
       return Result.success(response);
     } catch (error) {

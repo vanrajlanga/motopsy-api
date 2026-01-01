@@ -23,7 +23,14 @@ class VehicleDetailController extends BaseController {
   async getVehicleDetailById(req, res, next) {
     try {
       const { id, userId } = req.params;
-      const result = await vehicleDetailService.getVehicleDetailByIdAsync(parseInt(id), parseInt(userId));
+      const isAdmin = req.user?.isAdmin || false;
+      console.log('DEBUG - getVehicleDetailById:', {
+        id,
+        userId,
+        isAdmin,
+        userObj: req.user
+      });
+      const result = await vehicleDetailService.getVehicleDetailByIdAsync(parseInt(id), parseInt(userId), isAdmin);
       return this.fromResult(result, res);
     } catch (error) {
       next(error);
