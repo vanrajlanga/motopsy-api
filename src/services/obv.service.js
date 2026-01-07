@@ -85,8 +85,129 @@ class ObvService {
    */
   extractModelFromDescription(description) {
     if (!description) return null;
-    const firstWord = description.split(/\s+/)[0];
-    return firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
+
+    const words = description.split(/\s+/);
+    if (words.length === 0) return null;
+
+    // Brand names that appear in MakerModel - if first word matches, use second word
+    const brandPrefixes = ['TATA', 'MARUTI', 'MAHINDRA', 'HYUNDAI', 'HONDA', 'TOYOTA',
+                           'FORD', 'VOLKSWAGEN', 'SKODA', 'RENAULT', 'NISSAN', 'MG',
+                           'JEEP', 'MERCEDES', 'BMW', 'AUDI', 'JAGUAR', 'CHEVROLET',
+                           'FIAT', 'DATSUN', 'ISUZU', 'FORCE', 'EICHER', 'HERO',
+                           'BAJAJ', 'TVS', 'ROYAL', 'YAMAHA', 'SUZUKI', 'KAWASAKI',
+                           'KTM', 'HARLEY', 'DUCATI', 'TRIUMPH', 'BENELLI', 'APRILIA'];
+
+    // Compound model names that include a suffix (e.g., "Celerio X", "Grand i10", "Swift Dzire")
+    const compoundModels = {
+      'CELERIO X': 'Celerio X',
+      'GRAND I10': 'Grand i10',
+      'GRAND I10 NIOS': 'Grand i10 Nios',
+      'SWIFT DZIRE': 'Swift Dzire',
+      'VENUE N LINE': 'Venue N Line',
+      'CITY E': 'City e',
+      'BALENO RS': 'Baleno RS',
+      'POLO GT': 'Polo GT',
+      'JAZZ X': 'Jazz X',
+      'SELTOS X LINE': 'Seltos X Line',
+      'SONET X LINE': 'Sonet X Line'
+    };
+
+    // Mercedes model patterns: Extract letters before numbers
+    // E.g., CLA200 -> CLA, GLA200 -> GLA, A200 -> A-Class
+    const mercedesLetterToClass = {
+      'A': 'A-Class', 'B': 'B-Class', 'C': 'C-Class', 'E': 'E-Class',
+      'S': 'S-Class', 'G': 'G-Class', 'M': 'M-Class', 'R': 'R-Class', 'V': 'V-Class'
+    };
+    const mercedesMultiLetterModels = ['CLA', 'CLK', 'CLS', 'CLE', 'GLA', 'GLB', 'GLC', 'GLE', 'GLS',
+                                        'SLK', 'SLC', 'SL', 'EQA', 'EQB', 'EQC', 'EQE', 'EQS', 'AMG',
+                                        'ML', 'GL', 'SLS', 'SLR', 'CLK', 'CL'];
+
+    // BMW series patterns: Number at start indicates series
+    // E.g., 320D -> 3 Series, 520D -> 5 Series, 730LD -> 7 Series
+    const bmwSeriesMap = {
+      '1': '1 Series', '2': '2 Series', '3': '3 Series', '4': '4 Series',
+      '5': '5 Series', '6': '6 Series', '7': '7 Series', '8': '8 Series'
+    };
+
+    // Models where numbers are integral part of the name (should NOT be stripped)
+    const keepNumberModels = ['I10', 'I20', 'I30', 'I40', 'IX20', 'IX35', 'IX55',  // Hyundai
+                              'A1', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8',           // Audi A series
+                              'Q2', 'Q3', 'Q5', 'Q7', 'Q8',                        // Audi Q series
+                              'S3', 'S4', 'S5', 'S6', 'S7', 'S8',                  // Audi S series
+                              'RS3', 'RS4', 'RS5', 'RS6', 'RS7',                   // Audi RS series
+                              'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'X7',           // BMW X series
+                              'Z3', 'Z4', 'M2', 'M3', 'M4', 'M5', 'M6', 'M8',     // BMW Z/M series
+                              'TT', 'R8', 'E2O'];                                  // Other special models
+
+    let startIndex = 0;
+
+    // Check if first word is a brand prefix - if so, start from second word
+    if (words.length > 1 && brandPrefixes.includes(words[0].toUpperCase())) {
+      startIndex = 1;
+    }
+
+    // Check for compound model names first (check first 3 words after brand)
+    for (let numWords = 3; numWords >= 2; numWords--) {
+      if (words.length >= startIndex + numWords) {
+        const potentialCompound = words.slice(startIndex, startIndex + numWords).join(' ').toUpperCase();
+        if (compoundModels[potentialCompound]) {
+          return compoundModels[potentialCompound];
+        }
+      }
+    }
+
+    // Get the model word
+    let modelWord = (words[startIndex] || words[0]).toUpperCase();
+
+    // Check if it's a "keep number" model (e.g., i20, X1, A4) - return as-is
+    if (keepNumberModels.includes(modelWord)) {
+      // Proper case for these models
+      if (modelWord.startsWith('I') && modelWord.length <= 3) {
+        return 'i' + modelWord.slice(1);  // i10, i20, i30
+      }
+      return modelWord;  // X1, A4, Q5 etc.
+    }
+
+    // Check for BMW series pattern: starts with digit followed by more chars (e.g., 320D, 520D)
+    const bmwSeriesMatch = modelWord.match(/^([1-8])\d{2}/);
+    if (bmwSeriesMatch) {
+      const seriesNum = bmwSeriesMatch[1];
+      if (bmwSeriesMap[seriesNum]) {
+        return bmwSeriesMap[seriesNum];
+      }
+    }
+
+    // Check for Mercedes pattern: letters followed by numbers (e.g., CLA200, GLA220, A200)
+    const mercedesMatch = modelWord.match(/^([A-Z]+)(\d+)/);
+    if (mercedesMatch) {
+      const letterPart = mercedesMatch[1];
+
+      // Check if it's a multi-letter Mercedes model (CLA, GLA, GLC, etc.)
+      if (mercedesMultiLetterModels.includes(letterPart)) {
+        return letterPart;
+      }
+
+      // Check if it's a single-letter Mercedes class (A, C, E, S, etc.)
+      if (mercedesLetterToClass[letterPart]) {
+        return mercedesLetterToClass[letterPart];
+      }
+
+      // For other patterns with letters followed by numbers, just use the letters
+      // Only if letters are 2+ chars (to avoid breaking models like "i20" which we handle above)
+      if (letterPart.length >= 2) {
+        return letterPart.charAt(0).toUpperCase() + letterPart.slice(1).toLowerCase();
+      }
+    }
+
+    // Check for standalone single-letter Mercedes models (e.g., "C" from "C 220 D")
+    // These don't have numbers attached but should map to their class names
+    if (modelWord.length === 1 && mercedesLetterToClass[modelWord]) {
+      return mercedesLetterToClass[modelWord];
+    }
+
+    // Default: use single word model name
+    // Capitalize properly (e.g., "SELTOS" -> "Seltos", "PUNCH" -> "Punch")
+    return modelWord.charAt(0).toUpperCase() + modelWord.slice(1).toLowerCase();
   }
 
   /**

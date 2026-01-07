@@ -164,6 +164,11 @@ class VehicleDetailService {
         return Result.failure('Registration number is required');
       }
 
+      // Validate mandatory fields from user input
+      if (!make || !model || !version) {
+        return Result.failure('Vehicle make, model, and version are required');
+      }
+
       // Get user - matches .NET logic: if userId not provided, get user from email
       let user;
       if (!userId || userId === 0) {
@@ -207,6 +212,14 @@ class VehicleDetailService {
           registrationDate = null;
         }
       }
+
+      // Store user-provided make/model/version from DB-first dropdowns (Droom fallback)
+      const userProvidedData = {
+        make: make,
+        model: model,
+        version: version,
+        providedAt: new Date().toISOString()
+      };
 
       let vehicleDetail = await VehicleDetail.create({
         id: nextId,
@@ -276,6 +289,8 @@ class VehicleDetailService {
         challan_details: rcData.challanDetails,
         variant: rcData.variant,
         kms_driven: kmsDriven ? parseInt(kmsDriven) : null,
+        // Store user-provided make/model/version for future retrieval
+        user_provided_resale_data: JSON.stringify(userProvidedData),
         status: 'Completed',
         api_source: rcData._source || 'unknown',
         created_at: new Date()
@@ -302,7 +317,8 @@ class VehicleDetailService {
       }
 
       // Return full response matching frontend expectations
-      return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId, kmsDriven));
+      // Pass user-provided make/model/version to avoid extraction mismatches
+      return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId, kmsDriven, make, model, version));
     } catch (error) {
       logger.error('Get vehicle details error:', error.message || error);
       return Result.failure(error.message || 'Failed to get vehicle details');
@@ -316,9 +332,12 @@ class VehicleDetailService {
    * @param {Object} vehicleDetail - Vehicle detail from database
    * @param {number} userId - User ID
    * @param {number} kmsDriven - Kilometers driven (optional, from frontend)
+   * @param {string} userMake - User-provided make (optional, preferred over extraction)
+   * @param {string} userModel - User-provided model (optional, preferred over extraction)
+   * @param {string} userVersion - User-provided version (optional, preferred over extraction)
    * @param {boolean} isAdmin - Whether user is admin (skip masking if true)
    */
-  async buildVehicleDetailResponse(vehicleDetail, userId, kmsDriven = null, isAdmin = false) {
+  async buildVehicleDetailResponse(vehicleDetail, userId, kmsDriven = null, userMake = null, userModel = null, userVersion = null, isAdmin = false) {
     const vehicleDetailId = vehicleDetail.id;
 
     // Get challan details for this vehicle
@@ -351,10 +370,9 @@ class VehicleDetailService {
     // Calculate vehicle age from ManufacturingDateFormatted
     const vehicleAge = this.calculateVehicleAge(vehicleDetail.manufacturing_date_formatted);
 
-    // Get vehicle specification using smart matching
-    // Now ALWAYS uses make, model, version from API response (Surepass/APIclub)
-    // instead of frontend input for consistency
-    let vehicleSpecification = await this.findVehicleSpecification(vehicleDetail);
+    // Get vehicle specification using user-provided make/model/version
+    // This avoids extraction mismatches from API response
+    let vehicleSpecification = await this.findVehicleSpecification(vehicleDetail, userMake, userModel, userVersion);
 
     // Transform challan details to match frontend ChallanDetailsInterface
     const transformedChallans = challanDetails.map(challan => ({
@@ -387,9 +405,9 @@ class VehicleDetailService {
         resaleCalculationSource = 'user';
         logger.info(`Using user-provided resale data for vehicle ${vehicleDetail.id}`);
       } else {
-        // Extract make, model, year from API response
-        const make = this.extractMakeFromDescription(vehicleDetail.maker_description || vehicleDetail.manufacturer);
-        const model = this.extractModelFromDescription(vehicleDetail.maker_model || vehicleDetail.model);
+        // Use user-provided make/model, or fallback to extraction ONLY if not provided
+        const make = userMake || this.extractMakeFromDescription(vehicleDetail.maker_description || vehicleDetail.manufacturer);
+        const model = userModel || this.extractModelFromDescription(vehicleDetail.maker_model || vehicleDetail.model);
         const year = this.extractYearFromManufacturingDate(vehicleDetail.manufacturing_date_formatted);
         const noOfOwners = vehicleDetail.owner_number || '1';
 
@@ -607,8 +625,23 @@ class VehicleDetailService {
       // Use stored kms_driven for consistent OBV calculation
       const kmsDriven = vehicleDetail.kms_driven;
 
-      // Build the response using shared method with stored kmsDriven
-      const response = await this.buildVehicleDetailResponse(vehicleDetail, userId, kmsDriven, isAdmin);
+      // Retrieve stored user-provided make/model/version if available
+      let userMake = null, userModel = null, userVersion = null;
+      if (vehicleDetail.user_provided_resale_data) {
+        try {
+          const userData = typeof vehicleDetail.user_provided_resale_data === 'string'
+            ? JSON.parse(vehicleDetail.user_provided_resale_data)
+            : vehicleDetail.user_provided_resale_data;
+          userMake = userData.make || null;
+          userModel = userData.model || null;
+          userVersion = userData.version || null;
+        } catch (err) {
+          logger.error('Error parsing user_provided_resale_data:', err);
+        }
+      }
+
+      // Build the response using shared method with stored values
+      const response = await this.buildVehicleDetailResponse(vehicleDetail, userId, kmsDriven, userMake, userModel, userVersion, isAdmin);
 
       return Result.success(response);
     } catch (error) {
@@ -787,11 +820,14 @@ class VehicleDetailService {
   /**
    * Find vehicle specification using smart matching
    * Matches .NET VehicleSpecificationRepository.GetVehicleSpecificationByVehicleDetails
-   * Now ALWAYS extracts make, model, version from vehicleDetail (Surepass/APIclub response)
-   * instead of relying on frontend input for consistency
+   * Now PREFERS user-provided make/model/version to avoid extraction mismatches
+   * Falls back to extraction only if user values not provided
    * @param {Object} vehicleDetail - Vehicle detail with maker_description/maker_model
+   * @param {string} userMake - User-provided make (optional, preferred over extraction)
+   * @param {string} userModel - User-provided model (optional, preferred over extraction)
+   * @param {string} userVersion - User-provided version (optional, preferred over extraction)
    */
-  async findVehicleSpecification(vehicleDetail) {
+  async findVehicleSpecification(vehicleDetail, userMake = null, userModel = null, userVersion = null) {
     try {
       const { Op } = require('sequelize');
 
@@ -800,19 +836,10 @@ class VehicleDetailService {
         return null;
       }
 
-      // ALWAYS extract make, model, version from API response (Surepass/APIclub)
-      // This ensures consistency regardless of what user fills in modal
-
-      // Extract make from maker_description (e.g., "KIA INDIA PRIVATE LIMITED" -> "Kia")
-      const makerDesc = vehicleDetail.maker_description || vehicleDetail.manufacturer || '';
-      const make = this.extractMakeFromDescription(makerDesc);
-
-      // Extract model from maker_model (e.g., "SELTOS G1.5 6MT HTE" -> "Seltos")
-      const makerModel = vehicleDetail.maker_model || vehicleDetail.model || '';
-      const model = this.extractModelFromDescription(makerModel);
-
-      // Extract version from maker_model (e.g., "SELTOS G1.5 6MT HTE" -> "G1.5 6MT HTE")
-      const version = this.extractVersionFromDescription(makerModel);
+      // Prefer user-provided values, fallback to extraction only if not provided
+      const make = userMake || this.extractMakeFromDescription(vehicleDetail.maker_description || vehicleDetail.manufacturer || '');
+      const model = userModel || this.extractModelFromDescription(vehicleDetail.maker_model || vehicleDetail.model || '');
+      const version = userVersion || this.extractVersionFromDescription(vehicleDetail.maker_model || vehicleDetail.model || '');
 
       // Extract year from manufacturing date for potential future use
       const year = this.extractYearFromManufacturingDate(vehicleDetail.manufacturing_date_formatted);
