@@ -8,6 +8,7 @@ const StateMapping = require('../models/state-mapping.model');
 const UserVehicleDetail = require('../models/user-vehicle-detail.model');
 const LostVehicle = require('../models/lost-vehicle.model');
 const VehicleSpecification = require('../models/vehicle-specification.model');
+const CustomVehicleEntry = require('../models/custom-vehicle-entry.model');
 const { sequelize } = require('../config/database');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
@@ -157,7 +158,9 @@ class VehicleDetailService {
         version,
         vehicleDetailRequestId,
         userId,
-        kmsDriven  // Only field needed from frontend for OBV calculation
+        kmsDriven,  // Only field needed from frontend for OBV calculation
+        exShowroomPrice,  // User-provided ex-showroom price for custom entries
+        isCustomEntry  // Flag indicating this is a custom vehicle entry
       } = request;
 
       if (!registrationNumber) {
@@ -316,6 +319,35 @@ class VehicleDetailService {
         }
       }
 
+      // Link custom vehicle entry if this is a custom entry
+      if (isCustomEntry) {
+        try {
+          const { Op } = require('sequelize');
+
+          // Find the most recent custom entry for this user with matching make/model/version
+          const customEntry = await CustomVehicleEntry.findOne({
+            where: {
+              user_id: resolvedUserId,
+              custom_make: make,
+              custom_model: model,
+              custom_version: version,
+              vehicle_detail_id: null  // Only update entries not yet linked
+            },
+            order: [['created_at', 'DESC']]
+          });
+
+          if (customEntry) {
+            await customEntry.update({
+              vehicle_detail_id: vehicleDetail.id
+            });
+            logger.info(`Linked custom vehicle entry ${customEntry.id} with vehicle detail ${vehicleDetail.id}`);
+          }
+        } catch (customEntryError) {
+          logger.error('Error linking custom vehicle entry:', customEntryError);
+          // Continue - not critical
+        }
+      }
+
       // Return full response matching frontend expectations
       // Pass user-provided make/model/version to avoid extraction mismatches
       return Result.success(await this.buildVehicleDetailResponse(vehicleDetail, resolvedUserId, kmsDriven, make, model, version));
@@ -422,8 +454,14 @@ class VehicleDetailService {
         if (!year) missingFields.push('year');
 
         if (make && model && year) {
-          // Get ex-showroom price from VehicleSpecification table
-          let originalPrice = await this.lookupExShowroomPrice(make, model, vehicleDetail.variant);
+          // Get ex-showroom price - use custom entry price if provided, otherwise lookup
+          let originalPrice;
+          if (isCustomEntry && exShowroomPrice) {
+            originalPrice = parseFloat(exShowroomPrice);
+            logger.info(`Using custom entry ex-showroom price: ₹${originalPrice}`);
+          } else {
+            originalPrice = await this.lookupExShowroomPrice(make, model, vehicleDetail.variant);
+          }
 
           if (originalPrice) {
             availableData.exShowroomPrice = originalPrice;
@@ -442,7 +480,7 @@ class VehicleDetailService {
 
             if (resaleResult.isSuccess) {
               priceRange = resaleResult.value;
-              resaleCalculationSource = 'system';
+              resaleCalculationSource = isCustomEntry ? 'custom_entry' : 'system';
               logger.info(`OBV calculated for ${make} ${model}: Good range ₹${priceRange.Good.range_from} - ₹${priceRange.Good.range_to}`);
             } else {
               resaleDataMissing = true;
