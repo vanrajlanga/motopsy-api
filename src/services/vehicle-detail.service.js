@@ -167,10 +167,7 @@ class VehicleDetailService {
         return Result.failure('Registration number is required');
       }
 
-      // Validate mandatory fields from user input
-      if (!make || !model || !version) {
-        return Result.failure('Vehicle make, model, and version are required');
-      }
+      // Make/model/version are now optional - will be extracted from RC API response if not provided
 
       // Get user - matches .NET logic: if userId not provided, get user from email
       let user;
@@ -454,14 +451,8 @@ class VehicleDetailService {
         if (!year) missingFields.push('year');
 
         if (make && model && year) {
-          // Get ex-showroom price - use custom entry price if provided, otherwise lookup
-          let originalPrice;
-          if (isCustomEntry && exShowroomPrice) {
-            originalPrice = parseFloat(exShowroomPrice);
-            logger.info(`Using custom entry ex-showroom price: ₹${originalPrice}`);
-          } else {
-            originalPrice = await this.lookupExShowroomPrice(make, model, vehicleDetail.variant);
-          }
+          // Get ex-showroom price from vehicle specifications database
+          const originalPrice = await this.lookupExShowroomPrice(make, model, vehicleDetail.variant);
 
           if (originalPrice) {
             availableData.exShowroomPrice = originalPrice;
@@ -480,7 +471,7 @@ class VehicleDetailService {
 
             if (resaleResult.isSuccess) {
               priceRange = resaleResult.value;
-              resaleCalculationSource = isCustomEntry ? 'custom_entry' : 'system';
+              resaleCalculationSource = 'system';
               logger.info(`OBV calculated for ${make} ${model}: Good range ₹${priceRange.Good.range_from} - ₹${priceRange.Good.range_to}`);
             } else {
               resaleDataMissing = true;
@@ -856,10 +847,22 @@ class VehicleDetailService {
     }
   }
   /**
-   * Find vehicle specification using smart matching
+   * Find vehicle specification using smart matching with comprehensive scoring
    * Matches .NET VehicleSpecificationRepository.GetVehicleSpecificationByVehicleDetails
    * Now PREFERS user-provided make/model/version to avoid extraction mismatches
    * Falls back to extraction only if user values not provided
+   *
+   * SCORING SYSTEM:
+   * - Engine capacity match: +100 points (keydata_key_engine vs cubic_capacity)
+   * - Variant name match: +100 points (naming_version vs maker_model)
+   * - Fuel type match: +80 points (keydata_key_fueltype vs fuel_type)
+   * - Transmission match: +60 points (naming_version vs maker_model)
+   * - Color match (primary): +50 points (colors_color_name vs color)
+   * - Color match (secondary): +30 points
+   * - Year range match: +50 points (naming_model year suffix vs manufacturing_date)
+   * - Emission standard match: +40 points (enginetransmission_emissionstandard vs norms_type)
+   * - No year suffix bonus: +20 points (current model preference)
+   *
    * @param {Object} vehicleDetail - Vehicle detail with maker_description/maker_model
    * @param {string} userMake - User-provided make (optional, preferred over extraction)
    * @param {string} userModel - User-provided model (optional, preferred over extraction)
@@ -879,15 +882,21 @@ class VehicleDetailService {
       const model = userModel || this.extractModelFromDescription(vehicleDetail.maker_model || vehicleDetail.model || '');
       const version = userVersion || this.extractVersionFromDescription(vehicleDetail.maker_model || vehicleDetail.model || '');
 
-      // Extract year from manufacturing date for potential future use
+      // Extract year from manufacturing date for year range matching
       const year = this.extractYearFromManufacturingDate(vehicleDetail.manufacturing_date_formatted);
+      const manufacturingYear = year ? parseInt(year) : null;
+
+      // Extract additional RC data for matching
+      const rcCubicCapacity = vehicleDetail.cubic_capacity ? parseInt(vehicleDetail.cubic_capacity) : null;
+      const rcColor = (vehicleDetail.color || '').toUpperCase();
+      const rcNormsType = (vehicleDetail.norms_type || '').toUpperCase();
 
       if (!make || !model) {
         logger.info('Cannot find specification: make or model not available');
         return null;
       }
 
-      logger.info(`Finding specification for: make=${make}, model=${model}, version=${version}, year=${year}`);
+      logger.info(`Finding specification for: make=${make}, model=${model}, version=${version}, year=${year}, cc=${rcCubicCapacity}, color=${rcColor}, norms=${rcNormsType}`);
 
       // Always use partial match to include year-suffixed models (e.g., "Celerio [2017-2021]")
       // This ensures we get both exact matches AND year-suffixed variants
@@ -920,144 +929,375 @@ class VehicleDetailService {
       // Get fuel type from API response for filtering
       const fuelTypeRaw = (vehicleDetail.fuel_type || vehicleDetail.fuelType || '').toLowerCase();
 
-      // Handle dual-fuel types like "petrol/cng", "petrol/lpg"
+      // Handle dual-fuel types like "petrol/cng", "petrol/lpg", "diesel/hybrid"
       const fuelTypes = fuelTypeRaw.split('/').map(f => f.trim()).filter(f => f);
       const primaryFuel = fuelTypes[0] || '';
       const hasCNG = fuelTypes.includes('cng') || fuelTypeRaw.includes('cng');
       const hasLPG = fuelTypes.includes('lpg') || fuelTypeRaw.includes('lpg');
+      // HYBRID detection - highest priority for modern vehicles
+      const hasHybrid = fuelTypes.includes('hybrid') || fuelTypeRaw.includes('hybrid');
+      const hasElectric = fuelTypes.includes('electric') || fuelTypeRaw.includes('electric');
 
-      // Filter candidates by fuel type first (if available)
-      if (primaryFuel && ['petrol', 'diesel', 'cng', 'electric', 'lpg'].includes(primaryFuel)) {
-        const fuelFilteredCandidates = candidates.filter(c => {
-          const candidateFuel = (c.keydata_key_fueltype || c.enginetransmission_fueltype || '').toLowerCase();
+      // Version-based data extraction
+      const versionUpper = version ? version.toUpperCase() : '';
 
-          // For dual-fuel vehicles, prefer CNG/LPG variants if available
-          if (hasCNG && candidateFuel.includes('cng')) return true;
-          if (hasLPG && candidateFuel.includes('lpg')) return true;
+      // Check if version has (O) suffix - indicates optional/variant
+      const hasOptionalSuffix = versionUpper.includes('(O)') || versionUpper.includes('(OPT)') || versionUpper.includes('OPT');
 
-          // Otherwise match primary fuel
-          return candidateFuel === primaryFuel || candidateFuel.includes(primaryFuel);
-        });
+      // Known variant codes to look for (order matters - more specific first)
+      const kiaVariants = ['GTX PLUS', 'HTK PLUS', 'HTX PLUS', 'GTX', 'HTK', 'HTX', 'HTE', 'GRAVITY'];
+      const marutiVariants = ['ZXI PLUS', 'VXI PLUS', 'LXI', 'VXI', 'ZXI', 'LDI', 'VDI', 'ZDI'];
+      const hyundaiVariants = ['SPORTZ', 'ASTA', 'MAGNA', 'ERA', 'SX', 'S'];
+      const tataVariants = ['ACCOMPLISHED S', 'ACCOMPLISHED', 'CREATIVE S', 'CREATIVE', 'PURE S', 'PURE', 'XZ PLUS', 'XZA PLUS', 'XZ', 'XZA', 'XT', 'XTA', 'XM', 'XMA', 'XE'];
+      const hondaVariants = ['ZX', 'VX', 'V', 'S', 'E'];
+      const allVariantCodes = [...kiaVariants, ...marutiVariants, ...hyundaiVariants, ...tataVariants, ...hondaVariants];
 
-        if (fuelFilteredCandidates.length > 0) {
-          logger.info(`Filtered to ${fuelFilteredCandidates.length} candidates matching fuel type: ${fuelTypeRaw}`);
-          candidates = fuelFilteredCandidates;
+      // Extract variant code from API version string
+      let apiVariantCode = null;
+      for (const code of allVariantCodes) {
+        if (versionUpper.includes(code)) {
+          apiVariantCode = code;
+          break;
         }
       }
 
-      // If version provided, do improved fuzzy matching
-      if (version) {
-        const versionUpper = version.toUpperCase();
-        let bestMatch = null;
-        let bestScore = 0;
+      // Extract engine displacement (e.g., "1.5", "1.4", "2.0")
+      const engineMatch = version ? version.match(/(\d+\.\d+)/) : null;
+      const apiEngineSize = engineMatch ? engineMatch[1] : null;
 
-        // Check if version has (O) suffix - indicates optional/variant
-        const hasOptionalSuffix = versionUpper.includes('(O)') || versionUpper.includes('(OPT)') || versionUpper.includes('OPT');
+      // Extract transmission type (order matters - check specific first)
+      const apiTransmission = versionUpper.includes('AMT') ? 'AMT' :
+                             versionUpper.includes('CVT') ? 'CVT' :
+                             versionUpper.includes('DCT') ? 'DCT' :
+                             versionUpper.includes('7DCA') || versionUpper.includes('7DCT') ? 'DCT' :
+                             versionUpper.includes('IMT') ? 'IMT' :
+                             versionUpper.includes('AT') ? 'AT' :
+                             versionUpper.includes('6MT') || versionUpper.includes('5MT') || versionUpper.includes('MT') ? 'MT' : null;
 
-        // Known variant codes to look for (order matters - more specific first)
-        // Kia variants
-        const kiaVariants = ['GTX PLUS', 'HTK PLUS', 'HTX PLUS', 'GTX', 'HTK', 'HTX', 'HTE', 'GRAVITY'];
-        // Maruti variants
-        const marutiVariants = ['ZXI PLUS', 'VXI PLUS', 'LXI', 'VXI', 'ZXI', 'LDI', 'VDI', 'ZDI'];
-        // Hyundai variants
-        const hyundaiVariants = ['SPORTZ', 'ASTA', 'MAGNA', 'ERA', 'SX', 'S'];
-        // Tata variants
-        const tataVariants = ['XZ PLUS', 'XZA PLUS', 'XZ', 'XZA', 'XT', 'XTA', 'XM', 'XMA', 'XE'];
-        // Honda variants
-        const hondaVariants = ['ZX', 'VX', 'V', 'S', 'E'];
+      // Parse RC color for matching
+      const colorTokens = this.parseRCColor(rcColor);
 
-        const allVariantCodes = [...kiaVariants, ...marutiVariants, ...hyundaiVariants, ...tataVariants, ...hondaVariants];
+      logger.info(`Matching params: variant=${apiVariantCode}, engine=${apiEngineSize}, transmission=${apiTransmission}, colorTokens=${colorTokens.join(',')}, hasHybrid=${hasHybrid}, hasElectric=${hasElectric}`);
 
-        // Extract variant code from API version string
-        let apiVariantCode = null;
-        for (const code of allVariantCodes) {
-          if (versionUpper.includes(code)) {
-            apiVariantCode = code;
-            break;
+      // Score all candidates
+      let bestMatch = null;
+      let bestScore = -1;
+
+      for (const candidate of candidates) {
+        let score = 0;
+        const candidateVersion = (candidate.naming_version || '').toUpperCase();
+        const candidateModel = (candidate.naming_model || '').toUpperCase();
+        const candidateEngine = (candidate.keydata_key_engine || '').toString();
+        const candidateFuel = (candidate.keydata_key_fueltype || candidate.enginetransmission_fueltype || '').toLowerCase();
+        const candidateColor = (candidate.colors_color_name || '').toUpperCase();
+        const candidateEmission = (candidate.enginetransmission_emissionstandard || '').toUpperCase();
+
+        // 1. HYBRID/ELECTRIC MATCH (+150 points) - HIGHEST PRIORITY
+        // Hybrid vehicles are specific variants - must match hybrid with hybrid
+        const specIsHybrid = candidateFuel.includes('hybrid') || candidateFuel.includes('mild hybrid');
+        const specIsElectric = candidateFuel.includes('electric') && !candidateFuel.includes('hybrid');
+
+        if (hasHybrid) {
+          if (specIsHybrid) {
+            score += 150;  // Strong match for hybrid
+            // Additional bonus if primary fuel also matches (diesel/hybrid -> diesel hybrid)
+            if (primaryFuel && candidateFuel.includes(primaryFuel)) {
+              score += 50;  // Diesel hybrid matches diesel/hybrid
+            }
+          } else {
+            score -= 100;  // Penalty for non-hybrid when RC shows hybrid
+          }
+        } else if (hasElectric) {
+          if (specIsElectric) {
+            score += 150;  // Strong match for pure electric
+          } else {
+            score -= 100;  // Penalty for non-electric when RC shows electric
+          }
+        } else {
+          // Non-hybrid RC - penalize hybrid specs
+          if (specIsHybrid || specIsElectric) {
+            score -= 50;  // Penalty for hybrid/electric when RC is conventional
           }
         }
 
-        // Extract engine displacement (e.g., "1.5", "1.4", "2.0")
-        const engineMatch = version.match(/(\d+\.\d+)/);
-        const apiEngineSize = engineMatch ? engineMatch[1] : null;
-
-        // Extract transmission type (order matters - check specific first)
-        const apiTransmission = versionUpper.includes('AMT') ? 'AMT' :
-                               versionUpper.includes('CVT') ? 'CVT' :
-                               versionUpper.includes('DCT') ? 'DCT' :
-                               versionUpper.includes('IMT') ? 'IMT' :
-                               versionUpper.includes('AT') ? 'AT' :
-                               versionUpper.includes('6MT') || versionUpper.includes('5MT') || versionUpper.includes('MT') ? 'MT' : null;
-
-        logger.info(`Version parsing: variant=${apiVariantCode}, engine=${apiEngineSize}, transmission=${apiTransmission}, hasOptional=${hasOptionalSuffix}`);
-
-        for (const candidate of candidates) {
-          if (!candidate.naming_version) continue;
-
-          const candidateVersion = candidate.naming_version.toUpperCase();
-          let score = 0;
-
-          // Score for variant code match (highest priority)
-          if (apiVariantCode) {
-            if (candidateVersion.includes(apiVariantCode)) {
-              score += 100; // High score for variant match
+        // 2. ENGINE CAPACITY MATCH (+100 points)
+        if (rcCubicCapacity && candidateEngine) {
+          // Extract numeric engine capacity from spec (e.g., "1199 cc" -> 1199)
+          const specEngineMatch = candidateEngine.match(/(\d+)/);
+          if (specEngineMatch) {
+            const specEngineCC = parseInt(specEngineMatch[1]);
+            // Allow ±50cc tolerance for engine matching
+            if (Math.abs(specEngineCC - rcCubicCapacity) <= 50) {
+              score += 100;
             }
-          }
-
-          // Score for (O)/(OPT) suffix match
-          const candidateHasOptional = candidateVersion.includes('(O)') || candidateVersion.includes('(OPT)') || candidateVersion.includes('OPT');
-          if (hasOptionalSuffix && candidateHasOptional) {
-            score += 40; // Bonus for matching optional suffix
-          } else if (!hasOptionalSuffix && !candidateHasOptional) {
-            score += 10; // Small bonus if both don't have optional
-          }
-
-          // Score for engine size match
-          if (apiEngineSize && candidateVersion.includes(apiEngineSize)) {
-            score += 50;
-          }
-
-          // Score for transmission match
-          if (apiTransmission) {
-            if (candidateVersion.includes(apiTransmission)) {
-              score += 30;
-            }
-          }
-
-          // Score for CNG match if dual-fuel vehicle
-          if (hasCNG) {
-            const candidateFuel = (candidate.keydata_key_fueltype || '').toLowerCase();
-            if (candidateFuel.includes('cng') || candidateVersion.includes('CNG')) {
-              score += 60; // Prefer CNG variant for dual-fuel vehicles
-            }
-          }
-
-          // Bonus: Prefer versions without year range suffix for general match
-          if (!candidateVersion.includes('[')) {
-            score += 5;
-          }
-
-          if (score > bestScore) {
-            bestScore = score;
-            bestMatch = candidate;
           }
         }
 
-        if (bestMatch) {
-          logger.info(`Best match: ${bestMatch.naming_version} with score ${bestScore}`);
-          return bestMatch;
+        // 3. VARIANT NAME MATCH (+100 points)
+        if (apiVariantCode && candidateVersion.includes(apiVariantCode)) {
+          score += 100;
         }
 
-        // Fallback to first candidate if no scoring match
-        return candidates[0];
+        // 4. FUEL TYPE MATCH (+80 points) - for non-hybrid conventional fuels
+        if (primaryFuel && !hasHybrid && !hasElectric) {
+          if (hasCNG && candidateFuel.includes('cng')) {
+            score += 80;  // CNG match for dual-fuel
+          } else if (hasLPG && candidateFuel.includes('lpg')) {
+            score += 80;  // LPG match for dual-fuel
+          } else if (candidateFuel === primaryFuel || candidateFuel.includes(primaryFuel)) {
+            score += 80;  // Primary fuel match
+          }
+        }
+
+        // 5. TRANSMISSION MATCH (+60 points)
+        if (apiTransmission) {
+          if (candidateVersion.includes(apiTransmission)) {
+            score += 60;
+          } else if (apiTransmission === 'DCT' && (candidateVersion.includes('7DCA') || candidateVersion.includes('7DCT'))) {
+            score += 60;  // DCT variant match
+          }
+        }
+
+        // 6. COLOR MATCH (+50 primary, +30 secondary)
+        if (colorTokens.length > 0 && candidateColor) {
+          const colorMatchScore = this.calculateColorMatchScore(colorTokens, candidateColor);
+          score += colorMatchScore;
+        }
+
+        // 7. YEAR RANGE MATCH / CURRENT MODEL BONUS
+        // Current models (no year suffix) should be preferred for recent vehicles (2020+)
+        if (manufacturingYear) {
+          if (!candidateModel.includes('[')) {
+            // Current model (no year suffix)
+            if (manufacturingYear >= 2022) {
+              score += 80;  // Strong bonus for current model with recent vehicle
+            } else if (manufacturingYear >= 2020) {
+              score += 40;  // Moderate bonus
+            } else {
+              score += 10;  // Small bonus for older vehicles
+            }
+          } else {
+            // Model with year range suffix
+            const yearRangeScore = this.calculateYearRangeScore(candidateModel, manufacturingYear);
+            score += yearRangeScore;
+          }
+        }
+
+        // 8. EMISSION STANDARD MATCH (+40 points, +60 for Phase 2)
+        if (rcNormsType && candidateEmission) {
+          const rcEmission = this.normalizeEmissionStandard(rcNormsType);
+          const specEmission = this.normalizeEmissionStandard(candidateEmission);
+          if (rcEmission && specEmission) {
+            if (rcEmission === specEmission) {
+              score += 60;  // Exact match (including phase)
+            } else if (rcEmission.startsWith('BS6') && specEmission.startsWith('BS6')) {
+              score += 30;  // BS6 family match (BS6 vs BS6PH2)
+            }
+          }
+        }
+
+        // 9. Optional suffix match
+        const candidateHasOptional = candidateVersion.includes('(O)') || candidateVersion.includes('(OPT)');
+        if (hasOptionalSuffix && candidateHasOptional) {
+          score += 30;
+        } else if (!hasOptionalSuffix && !candidateHasOptional) {
+          score += 5;
+        }
+
+        // 10. Engine size from version string match (+50 points)
+        if (apiEngineSize && candidateVersion.includes(apiEngineSize)) {
+          score += 50;
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = candidate;
+        }
       }
 
-      // No version - return first match
+      if (bestMatch) {
+        logger.info(`Best match: ${bestMatch.naming_model} - ${bestMatch.naming_version} with score ${bestScore}`);
+        return bestMatch;
+      }
+
+      // Fallback to first candidate if no scoring match
       return candidates[0];
     } catch (error) {
       logger.error('Error finding vehicle specification:', error);
       return null;
     }
+  }
+
+  /**
+   * Parse RC color string into searchable tokens
+   * E.g., "PURGRY BKONX" -> ["Pure", "Grey", "Black", "Onyx"]
+   * E.g., "OBSIDIAN BLACK" -> ["Obsidian", "Black"]
+   * E.g., "SILVER" -> ["Silver"]
+   */
+  parseRCColor(rcColor) {
+    if (!rcColor) return [];
+
+    // Full color names - check these first (exact match)
+    const fullColorNames = {
+      'BLACK': 'Black', 'WHITE': 'White', 'SILVER': 'Silver', 'GREY': 'Grey', 'GRAY': 'Grey',
+      'BLUE': 'Blue', 'RED': 'Red', 'GREEN': 'Green', 'YELLOW': 'Yellow', 'ORANGE': 'Orange',
+      'BROWN': 'Brown', 'MAROON': 'Maroon', 'BEIGE': 'Beige', 'GOLD': 'Gold', 'GOLDEN': 'Gold',
+      'CREAM': 'Cream', 'PINK': 'Pink', 'VIOLET': 'Violet', 'PURPLE': 'Purple',
+      'OBSIDIAN': 'Obsidian', 'ONYX': 'Onyx', 'PEARL': 'Pearl', 'COPPER': 'Copper',
+      'TEAL': 'Teal', 'TURQUOISE': 'Turquoise', 'NAVY': 'Navy', 'BRONZE': 'Bronze',
+      'CHAMPAGNE': 'Champagne', 'IVORY': 'Ivory', 'BURGUNDY': 'Burgundy', 'CHARCOAL': 'Charcoal',
+      'GRAPHITE': 'Graphite', 'METALLIC': 'Metallic', 'TITANIUM': 'Titanium', 'PLATINUM': 'Platinum',
+      'MOJAVE': 'Mojave', 'SELENITE': 'Selenite', 'SODALITE': 'Sodalite', 'OPALITH': 'Opalith'
+    };
+
+    // Abbreviations for compressed RC color codes (used only for short words)
+    const colorAbbreviations = {
+      'PUR': 'Pure', 'GRY': 'Grey', 'BK': 'Black', 'BLK': 'Black',
+      'ONX': 'Onyx', 'WHT': 'White', 'WH': 'White', 'SLV': 'Silver', 'SLVR': 'Silver',
+      'BLU': 'Blue', 'RD': 'Red', 'GRN': 'Green', 'GR': 'Green',
+      'YLW': 'Yellow', 'YL': 'Yellow', 'ORG': 'Orange', 'OR': 'Orange',
+      'BRN': 'Brown', 'BR': 'Brown', 'MRN': 'Maroon', 'BGE': 'Beige', 'GLD': 'Gold',
+      'CRM': 'Cream', 'PNK': 'Pink', 'VLT': 'Violet', 'PRP': 'Purple', 'TRQ': 'Turquoise',
+      'ATM': 'Atomic', 'ROYAL': 'Royal', 'PRL': 'Pearl', 'CPR': 'Copper'
+    };
+
+    const tokens = [];
+    const words = rcColor.split(/[\s,]+/);
+
+    for (const word of words) {
+      if (!word || word.length < 2) continue;
+
+      const upperWord = word.toUpperCase();
+      let matched = false;
+
+      // First, check for full color name (exact match)
+      if (fullColorNames[upperWord]) {
+        tokens.push(fullColorNames[upperWord]);
+        matched = true;
+      }
+
+      // If not a full name and word is short (likely abbreviated), check abbreviations
+      if (!matched && word.length <= 6) {
+        // For short words, check if word starts with or equals an abbreviation
+        for (const [abbrev, fullName] of Object.entries(colorAbbreviations)) {
+          if (upperWord === abbrev || (upperWord.length <= 4 && upperWord.startsWith(abbrev))) {
+            tokens.push(fullName);
+            matched = true;
+            break;  // Only match one abbreviation per word
+          }
+        }
+
+        // For compound abbreviated words like "BKONX" or "PURGRY"
+        if (!matched && word.length >= 4) {
+          for (const [abbrev, fullName] of Object.entries(colorAbbreviations)) {
+            if (upperWord.includes(abbrev) && abbrev.length >= 2) {
+              tokens.push(fullName);
+              matched = true;
+            }
+          }
+        }
+      }
+
+      // If still no match and word is long enough, use as-is (capitalized)
+      if (!matched && word.length > 3) {
+        tokens.push(word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+      }
+    }
+
+    return [...new Set(tokens)]; // Remove duplicates
+  }
+
+  /**
+   * Calculate color match score between RC color tokens and spec color name
+   * Returns +50 for primary color match, +30 for secondary color match
+   */
+  calculateColorMatchScore(colorTokens, specColorName) {
+    let score = 0;
+    const specColorUpper = specColorName.toUpperCase();
+
+    // Primary color is first token, secondary is rest
+    if (colorTokens.length > 0) {
+      const primaryColor = colorTokens[0].toUpperCase();
+      if (specColorUpper.includes(primaryColor)) {
+        score += 50;  // Primary color match
+      }
+    }
+
+    // Check secondary colors
+    for (let i = 1; i < colorTokens.length; i++) {
+      const secondaryColor = colorTokens[i].toUpperCase();
+      if (specColorUpper.includes(secondaryColor)) {
+        score += 30;  // Secondary color match
+        break;  // Only count one secondary match
+      }
+    }
+
+    return score;
+  }
+
+  /**
+   * Calculate year range matching score
+   * Returns +50 if RC year falls within model's year range
+   * Returns +40 if no year suffix and recent vehicle (2023+)
+   * Returns +10 if no year suffix and older vehicle
+   */
+  calculateYearRangeScore(modelName, manufacturingYear) {
+    if (!manufacturingYear) return 0;
+
+    // Extract year range from model name like "Curvv [2024-2027]" or "C-Class [2018-2022]"
+    const yearRangeMatch = modelName.match(/\[(\d{4})-(\d{4})\]/);
+
+    if (yearRangeMatch) {
+      const startYear = parseInt(yearRangeMatch[1]);
+      const endYear = parseInt(yearRangeMatch[2]);
+
+      // Check if manufacturing year falls within range
+      if (manufacturingYear >= startYear && manufacturingYear <= endYear) {
+        return 50;  // Year within range
+      }
+      return 0;  // Year outside range
+    }
+
+    // No year suffix - current model
+    if (!modelName.includes('[')) {
+      if (manufacturingYear >= 2023) {
+        return 40;  // Current model for recent vehicles
+      }
+      return 10;  // Some bonus for current model with older vehicle
+    }
+
+    return 0;
+  }
+
+  /**
+   * Normalize emission standard to comparable format
+   * E.g., "BS6", "BS-VI", "BHARAT STAGE VI", "BS 6" -> "BS6"
+   */
+  normalizeEmissionStandard(emission) {
+    if (!emission) return null;
+
+    const upper = emission.toUpperCase();
+
+    // Map various formats to standardized version
+    if (upper.includes('BS6') || upper.includes('BS-6') || upper.includes('BS 6') ||
+        upper.includes('BHARAT STAGE VI') || upper.includes('BS-VI') || upper.includes('BSVI')) {
+      // Check for Phase 2
+      if (upper.includes('PH2') || upper.includes('PHASE 2') || upper.includes('PHASE2') || upper.includes('PHASE-2')) {
+        return 'BS6PH2';
+      }
+      return 'BS6';
+    }
+
+    if (upper.includes('BS4') || upper.includes('BS-4') || upper.includes('BS 4') ||
+        upper.includes('BHARAT STAGE IV') || upper.includes('BS-IV') || upper.includes('BSIV')) {
+      return 'BS4';
+    }
+
+    if (upper.includes('BS3') || upper.includes('BS-3') || upper.includes('BHARAT STAGE III')) {
+      return 'BS3';
+    }
+
+    return null;
   }
 
   /**
@@ -1263,6 +1503,17 @@ class VehicleDetailService {
       if (letterPart.length >= 2) {
         return letterPart.charAt(0).toUpperCase() + letterPart.slice(1).toLowerCase();
       }
+    }
+
+    // Check for single-letter Mercedes models without numbers (e.g., "C 220 D" -> "C" -> "C-Class")
+    // This handles cases where model is a single letter like "C", "E", "S" followed by space and numbers
+    if (modelWord.length === 1 && mercedesLetterToClass[modelWord]) {
+      return mercedesLetterToClass[modelWord];
+    }
+
+    // Check for multi-letter Mercedes models without numbers (e.g., "GLA", "GLC", "CLA" as standalone)
+    if (mercedesMultiLetterModels.includes(modelWord)) {
+      return modelWord;
     }
 
     // Default: use single word model name
