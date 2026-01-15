@@ -12,6 +12,9 @@ const { sequelize } = require('../config/database');
 // Import models index to ensure associations are loaded
 const models = require('../models/index');
 
+// Import vehicle detail service for spec matching
+const vehicleDetailService = require('./vehicle-detail.service');
+
 class OrderService {
   /**
    * Get status name from status code
@@ -58,8 +61,9 @@ class OrderService {
    * @param {number|null} vehicleDetailId - Optional vehicleDetailId from lookup
    * @param {number|null} ncrbReportId - Optional ncrbReportId from lookup
    * @param {string|null} apiSource - API source (surepass/apiclub) from vehicle_details
+   * @param {string|null} namingVersionId - Vehicle specification naming_versionId
    */
-  transformToOrderDto(payment, vehicleDetailId = null, ncrbReportId = null, apiSource = null) {
+  transformToOrderDto(payment, vehicleDetailId = null, ncrbReportId = null, apiSource = null, namingVersionId = null) {
     const user = payment.User || null;
     // VehicleDetailRequests is an array (hasMany), get the first one
     const vehicleRequest = (payment.VehicleDetailRequests && payment.VehicleDetailRequests.length > 0)
@@ -95,7 +99,8 @@ class OrderService {
       couponCode: coupon?.coupon_code || null,
       couponName: coupon?.coupon_name || null,
       ncrbReportId: ncrbReportId,
-      apiSource: apiSource
+      apiSource: apiSource,
+      namingVersionId: namingVersionId
     };
   }
 
@@ -220,7 +225,7 @@ class OrderService {
         }
       }
 
-      // Get all vehicleDetailIds to look up NCRB reports
+      // Get all vehicleDetailIds to look up NCRB reports and vehicle specifications
       const vehicleDetailIds = Object.values(vehicleDetailMap).filter(id => id);
 
       // Look up NCRB reports for vehicle details
@@ -238,7 +243,30 @@ class OrderService {
         });
       }
 
-      // Transform to Order DTOs with vehicleDetailId, ncrbReportId, and apiSource
+      // Look up vehicle specifications (naming_versionId) for each vehicle detail
+      let namingVersionIdMap = {};
+      if (vehicleDetailIds.length > 0) {
+        // Fetch full vehicle details for spec matching
+        const fullVehicleDetails = await VehicleDetail.findAll({
+          where: {
+            id: { [Op.in]: vehicleDetailIds }
+          }
+        });
+
+        // Run specification matching for each vehicle detail
+        for (const vd of fullVehicleDetails) {
+          try {
+            const spec = await vehicleDetailService.findVehicleSpecification(vd);
+            if (spec && spec.naming_versionId) {
+              namingVersionIdMap[vd.id] = spec.naming_versionId;
+            }
+          } catch (err) {
+            logger.warn(`Failed to find spec for vehicle detail ${vd.id}:`, err.message);
+          }
+        }
+      }
+
+      // Transform to Order DTOs with vehicleDetailId, ncrbReportId, apiSource, and namingVersionId
       let orders = payments.map(payment => {
         const vehicleRequestId = (payment.VehicleDetailRequests && payment.VehicleDetailRequests.length > 0)
           ? payment.VehicleDetailRequests[0].id
@@ -246,7 +274,8 @@ class OrderService {
         const vehicleDetailId = vehicleRequestId ? vehicleDetailMap[vehicleRequestId] || null : null;
         const ncrbReportId = vehicleDetailId ? ncrbReportMap[vehicleDetailId] || null : null;
         const apiSource = vehicleDetailId ? apiSourceMap[vehicleDetailId] || null : null;
-        return this.transformToOrderDto(payment, vehicleDetailId, ncrbReportId, apiSource);
+        const namingVersionId = vehicleDetailId ? namingVersionIdMap[vehicleDetailId] || null : null;
+        return this.transformToOrderDto(payment, vehicleDetailId, ncrbReportId, apiSource, namingVersionId);
       });
 
       // Apply NCRB filter if specified
