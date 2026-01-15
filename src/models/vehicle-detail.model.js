@@ -319,6 +319,22 @@ const VehicleDetail = sequelize.define('vehicle_details', {
     allowNull: true,
     comment: 'Calculated resale price range (Excellent, VeryGood, Good, Fair)'
   },
+  // Vehicle Specification Matching Result
+  matched_spec_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'Matched vehicle_specifications.id from matching algorithm'
+  },
+  matching_score: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'Score achieved by the matched specification'
+  },
+  matching_log: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    comment: 'Detailed log of matching algorithm (input, breakdown, candidates)'
+  },
   created_at: {
     type: DataTypes.DATE,
     allowNull: false,

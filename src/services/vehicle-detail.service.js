@@ -399,9 +399,34 @@ class VehicleDetailService {
     // Calculate vehicle age from ManufacturingDateFormatted
     const vehicleAge = this.calculateVehicleAge(vehicleDetail.manufacturing_date_formatted);
 
-    // Get vehicle specification using user-provided make/model/version
-    // This avoids extraction mismatches from API response
-    let vehicleSpecification = await this.findVehicleSpecification(vehicleDetail, userMake, userModel, userVersion);
+    // Get vehicle specification - use saved match or run matching algorithm
+    let vehicleSpecification = null;
+
+    // Check if we already have a saved matching result
+    if (vehicleDetail.matched_spec_id) {
+      // Use the saved spec for consistency
+      vehicleSpecification = await VehicleSpecification.findByPk(vehicleDetail.matched_spec_id);
+      logger.info(`Using saved vehicle specification (ID: ${vehicleDetail.matched_spec_id}) for vehicle ${vehicleDetailId}`);
+    } else {
+      // Run matching algorithm and save the result
+      const matchResult = await this.findVehicleSpecification(vehicleDetail, userMake, userModel, userVersion);
+      vehicleSpecification = matchResult.spec;
+
+      // Save matching result to database for future consistency
+      if (matchResult.matchingLog) {
+        try {
+          await vehicleDetail.update({
+            matched_spec_id: matchResult.spec ? matchResult.spec.id : null,
+            matching_score: matchResult.matchingLog.score || null,
+            matching_log: matchResult.matchingLog
+          });
+          logger.info(`Saved matching result for vehicle ${vehicleDetailId}: spec_id=${matchResult.spec?.id}, score=${matchResult.matchingLog.score}`);
+        } catch (saveError) {
+          logger.error(`Failed to save matching result for vehicle ${vehicleDetailId}:`, saveError);
+          // Continue - matching result save is not critical for the response
+        }
+      }
+    }
 
     // Transform challan details to match frontend ChallanDetailsInterface
     const transformedChallans = challanDetails.map(challan => ({
@@ -919,6 +944,21 @@ class VehicleDetailService {
         });
       }
 
+      // Step 4: If model is just brand name fragment (e.g., "Benz" from "MERCEDES BENZ"),
+      // fetch ALL specs for the make and rely on scoring algorithm (cc, fuel, etc.)
+      if (candidates.length === 0 && rcCubicCapacity) {
+        const brandFragments = ['BENZ', 'ROVER', 'MARTIN', 'ROMEO', 'ROYCE'];
+        if (brandFragments.includes(model.toUpperCase())) {
+          logger.info(`Model "${model}" appears to be a brand fragment, fetching all ${make} specs for CC-based matching`);
+          // Fetch ALL specs for the make (no limit) since we need to score by engine capacity
+          candidates = await VehicleSpecification.findAll({
+            where: {
+              naming_make: { [Op.like]: `%${make}%` }
+            }
+          });
+        }
+      }
+
       if (candidates.length === 0) {
         logger.info(`No specifications found for make=${make}, model=${model}`);
         return null;
@@ -979,12 +1019,35 @@ class VehicleDetailService {
 
       logger.info(`Matching params: variant=${apiVariantCode}, engine=${apiEngineSize}, transmission=${apiTransmission}, colorTokens=${colorTokens.join(',')}, hasHybrid=${hasHybrid}, hasElectric=${hasElectric}`);
 
+      // Build input log for matching
+      const matchingInput = {
+        make,
+        model,
+        version,
+        cubicCapacity: rcCubicCapacity,
+        fuelType: fuelTypeRaw,
+        color: rcColor,
+        normsType: rcNormsType,
+        manufacturingYear,
+        extractedVariant: apiVariantCode,
+        extractedTransmission: apiTransmission,
+        extractedEngineSize: apiEngineSize
+      };
+
       // Score all candidates
       let bestMatch = null;
       let bestScore = -1;
+      let bestBreakdown = {};
+      let fallbackUsed = null;
+
+      // Check if brand fragment fallback was used
+      if (model && ['BENZ', 'ROVER', 'MARTIN', 'ROMEO', 'ROYCE'].includes(model.toUpperCase())) {
+        fallbackUsed = 'brand_fragment';
+      }
 
       for (const candidate of candidates) {
         let score = 0;
+        const breakdown = {};
         const candidateVersion = (candidate.naming_version || '').toUpperCase();
         const candidateModel = (candidate.naming_model || '').toUpperCase();
         const candidateEngine = (candidate.keydata_key_engine || '').toString();
@@ -993,59 +1056,80 @@ class VehicleDetailService {
         const candidateEmission = (candidate.enginetransmission_emissionstandard || '').toUpperCase();
 
         // 1. HYBRID/ELECTRIC MATCH (+150 points) - HIGHEST PRIORITY
-        // Hybrid vehicles are specific variants - must match hybrid with hybrid
         const specIsHybrid = candidateFuel.includes('hybrid') || candidateFuel.includes('mild hybrid');
         const specIsElectric = candidateFuel.includes('electric') && !candidateFuel.includes('hybrid');
 
         if (hasHybrid) {
           if (specIsHybrid) {
-            score += 150;  // Strong match for hybrid
-            // Additional bonus if primary fuel also matches (diesel/hybrid -> diesel hybrid)
+            score += 150;
+            breakdown.hybridMatch = { points: 150, reason: 'RC hybrid matches spec hybrid' };
             if (primaryFuel && candidateFuel.includes(primaryFuel)) {
-              score += 50;  // Diesel hybrid matches diesel/hybrid
+              score += 50;
+              breakdown.hybridFuelBonus = { points: 50, reason: `${primaryFuel}/hybrid matches ${candidateFuel}` };
             }
           } else {
-            score -= 100;  // Penalty for non-hybrid when RC shows hybrid
+            score -= 100;
+            breakdown.hybridPenalty = { points: -100, reason: 'RC is hybrid but spec is not' };
           }
         } else if (hasElectric) {
           if (specIsElectric) {
-            score += 150;  // Strong match for pure electric
+            score += 150;
+            breakdown.electricMatch = { points: 150, reason: 'RC electric matches spec electric' };
           } else {
-            score -= 100;  // Penalty for non-electric when RC shows electric
+            score -= 100;
+            breakdown.electricPenalty = { points: -100, reason: 'RC is electric but spec is not' };
           }
         } else {
-          // Non-hybrid RC - penalize hybrid specs
           if (specIsHybrid || specIsElectric) {
-            score -= 50;  // Penalty for hybrid/electric when RC is conventional
+            score -= 50;
+            breakdown.conventionalPenalty = { points: -50, reason: 'RC is conventional but spec is hybrid/electric' };
           }
         }
 
         // 2. ENGINE CAPACITY MATCH (+100 points)
-        if (rcCubicCapacity && candidateEngine) {
-          // Extract numeric engine capacity from spec (e.g., "1199 cc" -> 1199)
-          const specEngineMatch = candidateEngine.match(/(\d+)/);
-          if (specEngineMatch) {
-            const specEngineCC = parseInt(specEngineMatch[1]);
-            // Allow ±50cc tolerance for engine matching
-            if (Math.abs(specEngineCC - rcCubicCapacity) <= 50) {
-              score += 100;
+        if (rcCubicCapacity) {
+          if (candidateEngine) {
+            const specEngineMatch = candidateEngine.match(/(\d+)/);
+            if (specEngineMatch) {
+              const specEngineCC = parseInt(specEngineMatch[1]);
+              const ccDiff = Math.abs(specEngineCC - rcCubicCapacity);
+              if (ccDiff <= 50) {
+                score += 100;
+                breakdown.engineCapacity = { points: 100, reason: `${rcCubicCapacity}cc matches ${specEngineCC}cc (diff: ${ccDiff}cc)` };
+              } else {
+                breakdown.engineCapacity = { points: 0, reason: `${rcCubicCapacity}cc vs ${specEngineCC}cc (diff: ${ccDiff}cc too large)` };
+              }
+            } else {
+              breakdown.engineCapacity = { points: 0, reason: `Spec engine "${candidateEngine}" - no CC found` };
             }
+          } else {
+            breakdown.engineCapacity = { points: 0, reason: 'Spec has no engine data' };
           }
         }
 
         // 3. VARIANT NAME MATCH (+100 points)
-        if (apiVariantCode && candidateVersion.includes(apiVariantCode)) {
-          score += 100;
+        if (apiVariantCode) {
+          if (candidateVersion.includes(apiVariantCode)) {
+            score += 100;
+            breakdown.variantName = { points: 100, reason: `Variant "${apiVariantCode}" found in version` };
+          } else {
+            breakdown.variantName = { points: 0, reason: `Variant "${apiVariantCode}" not in "${candidateVersion}"` };
+          }
         }
 
-        // 4. FUEL TYPE MATCH (+80 points) - for non-hybrid conventional fuels
+        // 4. FUEL TYPE MATCH (+80 points)
         if (primaryFuel && !hasHybrid && !hasElectric) {
           if (hasCNG && candidateFuel.includes('cng')) {
-            score += 80;  // CNG match for dual-fuel
+            score += 80;
+            breakdown.fuelType = { points: 80, reason: 'CNG match' };
           } else if (hasLPG && candidateFuel.includes('lpg')) {
-            score += 80;  // LPG match for dual-fuel
+            score += 80;
+            breakdown.fuelType = { points: 80, reason: 'LPG match' };
           } else if (candidateFuel === primaryFuel || candidateFuel.includes(primaryFuel)) {
-            score += 80;  // Primary fuel match
+            score += 80;
+            breakdown.fuelType = { points: 80, reason: `${primaryFuel} matches ${candidateFuel}` };
+          } else {
+            breakdown.fuelType = { points: 0, reason: `${primaryFuel} does not match ${candidateFuel}` };
           }
         }
 
@@ -1053,78 +1137,138 @@ class VehicleDetailService {
         if (apiTransmission) {
           if (candidateVersion.includes(apiTransmission)) {
             score += 60;
+            breakdown.transmission = { points: 60, reason: `${apiTransmission} found in version` };
           } else if (apiTransmission === 'DCT' && (candidateVersion.includes('7DCA') || candidateVersion.includes('7DCT'))) {
-            score += 60;  // DCT variant match
+            score += 60;
+            breakdown.transmission = { points: 60, reason: 'DCT variant match (7DCA/7DCT)' };
+          } else {
+            breakdown.transmission = { points: 0, reason: `${apiTransmission} not found in version` };
           }
         }
 
         // 6. COLOR MATCH (+50 primary, +30 secondary)
-        if (colorTokens.length > 0 && candidateColor) {
-          const colorMatchScore = this.calculateColorMatchScore(colorTokens, candidateColor);
-          score += colorMatchScore;
+        if (colorTokens.length > 0) {
+          if (candidateColor) {
+            const colorMatchScore = this.calculateColorMatchScore(colorTokens, candidateColor);
+            if (colorMatchScore > 0) {
+              score += colorMatchScore;
+              breakdown.color = { points: colorMatchScore, reason: `Color tokens [${colorTokens.join(',')}] match ${candidateColor}` };
+            } else {
+              breakdown.color = { points: 0, reason: `Color [${colorTokens.join(',')}] does not match ${candidateColor}` };
+            }
+          } else {
+            breakdown.color = { points: 0, reason: 'Spec has no color data' };
+          }
         }
 
         // 7. YEAR RANGE MATCH / CURRENT MODEL BONUS
-        // Current models (no year suffix) should be preferred for recent vehicles (2020+)
         if (manufacturingYear) {
           if (!candidateModel.includes('[')) {
-            // Current model (no year suffix)
+            let yearPoints = 10;
+            let yearReason = 'Current model (no year suffix)';
             if (manufacturingYear >= 2022) {
-              score += 80;  // Strong bonus for current model with recent vehicle
+              yearPoints = 80;
+              yearReason = 'Current model + recent vehicle (2022+)';
             } else if (manufacturingYear >= 2020) {
-              score += 40;  // Moderate bonus
+              yearPoints = 40;
+              yearReason = 'Current model + vehicle 2020-2021';
+            }
+            score += yearPoints;
+            breakdown.yearRange = { points: yearPoints, reason: yearReason };
+          } else {
+            const yearRangeScore = this.calculateYearRangeScore(candidateModel, manufacturingYear);
+            if (yearRangeScore > 0) {
+              score += yearRangeScore;
+              breakdown.yearRange = { points: yearRangeScore, reason: `Year ${manufacturingYear} within ${candidateModel}` };
             } else {
-              score += 10;  // Small bonus for older vehicles
+              breakdown.yearRange = { points: 0, reason: `Year ${manufacturingYear} not in range ${candidateModel}` };
+            }
+          }
+        }
+
+        // 8. EMISSION STANDARD MATCH (+60 exact, +30 family)
+        if (rcNormsType) {
+          const rcEmission = this.normalizeEmissionStandard(rcNormsType);
+          if (candidateEmission) {
+            const specEmission = this.normalizeEmissionStandard(candidateEmission);
+            if (rcEmission && specEmission) {
+              if (rcEmission === specEmission) {
+                score += 60;
+                breakdown.emission = { points: 60, reason: `${rcEmission} exact match` };
+              } else if (rcEmission.startsWith('BS6') && specEmission.startsWith('BS6')) {
+                score += 30;
+                breakdown.emission = { points: 30, reason: `BS6 family match (${rcEmission} vs ${specEmission})` };
+              } else {
+                breakdown.emission = { points: 0, reason: `${rcEmission} does not match ${specEmission}` };
+              }
             }
           } else {
-            // Model with year range suffix
-            const yearRangeScore = this.calculateYearRangeScore(candidateModel, manufacturingYear);
-            score += yearRangeScore;
+            breakdown.emission = { points: 0, reason: 'Spec has no emission data' };
           }
         }
 
-        // 8. EMISSION STANDARD MATCH (+40 points, +60 for Phase 2)
-        if (rcNormsType && candidateEmission) {
-          const rcEmission = this.normalizeEmissionStandard(rcNormsType);
-          const specEmission = this.normalizeEmissionStandard(candidateEmission);
-          if (rcEmission && specEmission) {
-            if (rcEmission === specEmission) {
-              score += 60;  // Exact match (including phase)
-            } else if (rcEmission.startsWith('BS6') && specEmission.startsWith('BS6')) {
-              score += 30;  // BS6 family match (BS6 vs BS6PH2)
-            }
-          }
-        }
-
-        // 9. Optional suffix match
+        // 9. Optional suffix match (+30 or +5)
         const candidateHasOptional = candidateVersion.includes('(O)') || candidateVersion.includes('(OPT)');
         if (hasOptionalSuffix && candidateHasOptional) {
           score += 30;
+          breakdown.optionalSuffix = { points: 30, reason: 'Both have (O)/(OPT) suffix' };
         } else if (!hasOptionalSuffix && !candidateHasOptional) {
           score += 5;
+          breakdown.optionalSuffix = { points: 5, reason: 'Neither has optional suffix' };
+        } else {
+          breakdown.optionalSuffix = { points: 0, reason: hasOptionalSuffix ? 'RC has optional but spec does not' : 'Spec has optional but RC does not' };
         }
 
         // 10. Engine size from version string match (+50 points)
-        if (apiEngineSize && candidateVersion.includes(apiEngineSize)) {
-          score += 50;
+        if (apiEngineSize) {
+          if (candidateVersion.includes(apiEngineSize)) {
+            score += 50;
+            breakdown.engineSize = { points: 50, reason: `Engine size ${apiEngineSize} in version` };
+          } else {
+            breakdown.engineSize = { points: 0, reason: `Engine size ${apiEngineSize} not in version` };
+          }
         }
 
         if (score > bestScore) {
           bestScore = score;
           bestMatch = candidate;
+          bestBreakdown = breakdown;
         }
       }
 
+      // Build complete matching log
+      const matchingLog = {
+        timestamp: new Date().toISOString(),
+        input: matchingInput,
+        candidatesConsidered: candidates.length,
+        fallbackUsed,
+        matched: bestMatch ? {
+          specId: bestMatch.id,
+          namingVersionId: bestMatch.naming_versionId,
+          model: bestMatch.naming_model,
+          version: bestMatch.naming_version,
+          fuelType: bestMatch.keydata_key_fueltype,
+          engine: bestMatch.keydata_key_engine
+        } : null,
+        score: bestScore,
+        scoreBreakdown: bestBreakdown
+      };
+
       if (bestMatch) {
         logger.info(`Best match: ${bestMatch.naming_model} - ${bestMatch.naming_version} with score ${bestScore}`);
-        return bestMatch;
+        // Return object with spec and matching log
+        return { spec: bestMatch, matchingLog };
       }
 
       // Fallback to first candidate if no scoring match
-      return candidates[0];
+      if (candidates[0]) {
+        return { spec: candidates[0], matchingLog };
+      }
+
+      return { spec: null, matchingLog };
     } catch (error) {
       logger.error('Error finding vehicle specification:', error);
-      return null;
+      return { spec: null, matchingLog: { error: error.message } };
     }
   }
 

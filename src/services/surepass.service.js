@@ -1,6 +1,7 @@
 const axios = require('axios');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
+const apiLogger = require('../utils/api-logger');
 
 class SurepassService {
   constructor() {
@@ -64,19 +65,40 @@ class SurepassService {
    * @private
    */
   async _getSurepassRCDetails(registrationNumber) {
+    const cleanRegNum = registrationNumber.replace(/\s/g, '').toUpperCase();
+    const requestUrl = `${this.apiUrl}/rc/rc-full`;
+    const requestBody = { id_number: cleanRegNum };
+    const startTime = Date.now();
+
     try {
       logger.info(`[Surepass] RC full details for: ${registrationNumber}`);
 
       const response = await axios.post(
-        `${this.apiUrl}/rc/rc-full`,
-        {
-          id_number: registrationNumber.replace(/\s/g, '').toUpperCase()
-        },
+        requestUrl,
+        requestBody,
         {
           headers: this.headers,
           timeout: 30000
         }
       );
+
+      // Log successful API call
+      apiLogger.log({
+        registrationNumber: cleanRegNum,
+        apiSource: 'surepass',
+        endpoint: 'rc-full',
+        request: {
+          url: requestUrl,
+          method: 'POST',
+          headers: this.headers,
+          body: requestBody
+        },
+        response: {
+          status: response.status,
+          data: response.data,
+          duration: Date.now() - startTime
+        }
+      });
 
       if (response.data.success) {
         const data = response.data.data;
@@ -151,6 +173,25 @@ class SurepassService {
     } catch (error) {
       logger.error('[Surepass] RC full details error:', error.message);
 
+      // Log failed API call
+      apiLogger.log({
+        registrationNumber: cleanRegNum,
+        apiSource: 'surepass',
+        endpoint: 'rc-full',
+        request: {
+          url: requestUrl,
+          method: 'POST',
+          headers: this.headers,
+          body: requestBody
+        },
+        response: error.response ? {
+          status: error.response.status,
+          data: error.response.data,
+          duration: Date.now() - startTime
+        } : null,
+        error: error.message
+      });
+
       if (error.response) {
         return Result.failure(error.response.data?.message || 'RC verification failed');
       }
@@ -205,21 +246,44 @@ class SurepassService {
    * @private
    */
   async _getSurepassChallanDetails(chassisNumber, engineNumber, registrationNumber) {
+    const cleanRegNum = registrationNumber.replace(/\s/g, '').toUpperCase();
+    const requestUrl = `${this.apiUrl}/rc/rc-related/challan-details`;
+    const requestBody = {
+      chassis_number: chassisNumber,
+      engine_number: engineNumber,
+      rc_number: cleanRegNum
+    };
+    const startTime = Date.now();
+
     try {
       logger.info(`[Surepass] Challan details for: ${registrationNumber}`);
 
       const response = await axios.post(
-        `${this.apiUrl}/rc/rc-related/challan-details`,
-        {
-          chassis_number: chassisNumber,
-          engine_number: engineNumber,
-          rc_number: registrationNumber.replace(/\s/g, '').toUpperCase()
-        },
+        requestUrl,
+        requestBody,
         {
           headers: this.headers,
           timeout: 30000
         }
       );
+
+      // Log API call
+      apiLogger.log({
+        registrationNumber: cleanRegNum,
+        apiSource: 'surepass',
+        endpoint: 'challan',
+        request: {
+          url: requestUrl,
+          method: 'POST',
+          headers: this.headers,
+          body: requestBody
+        },
+        response: {
+          status: response.status,
+          data: response.data,
+          duration: Date.now() - startTime
+        }
+      });
 
       if (response.data.success) {
         const data = response.data.data;
@@ -258,6 +322,26 @@ class SurepassService {
       }
     } catch (error) {
       logger.error('[Surepass] Challan details error:', error.message);
+
+      // Log failed API call
+      apiLogger.log({
+        registrationNumber: cleanRegNum,
+        apiSource: 'surepass',
+        endpoint: 'challan',
+        request: {
+          url: requestUrl,
+          method: 'POST',
+          headers: this.headers,
+          body: requestBody
+        },
+        response: error.response ? {
+          status: error.response.status,
+          data: error.response.data,
+          duration: Date.now() - startTime
+        } : null,
+        error: error.message
+      });
+
       // Return failure so failsafe can try APIclub
       return Result.failure(error.message || 'Surepass challan API failed');
     }

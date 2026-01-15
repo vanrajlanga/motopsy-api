@@ -1,6 +1,7 @@
 const axios = require('axios');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
+const apiLogger = require('../utils/api-logger');
 
 /**
  * APIclub Service - Failsafe for Surepass RC Verification
@@ -27,19 +28,40 @@ class ApiclubService {
    * Returns data in Surepass-compatible format for seamless integration
    */
   async getRegistrationDetailsAsync(registrationNumber) {
+    const cleanRegNum = registrationNumber.replace(/\s/g, '').toUpperCase();
+    const requestUrl = `${this.baseUrl}/v1/rc_info`;
+    const requestBody = { vehicleId: cleanRegNum };
+    const startTime = Date.now();
+
     try {
       logger.info(`[APIclub] RC verification for: ${registrationNumber}`);
 
       const response = await axios.post(
-        `${this.baseUrl}/v1/rc_info`,
-        {
-          vehicleId: registrationNumber.replace(/\s/g, '').toUpperCase()
-        },
+        requestUrl,
+        requestBody,
         {
           headers: this.headers,
           timeout: 30000
         }
       );
+
+      // Log API call
+      apiLogger.log({
+        registrationNumber: cleanRegNum,
+        apiSource: 'apiclub',
+        endpoint: 'rc_info',
+        request: {
+          url: requestUrl,
+          method: 'POST',
+          headers: this.headers,
+          body: requestBody
+        },
+        response: {
+          status: response.status,
+          data: response.data,
+          duration: Date.now() - startTime
+        }
+      });
 
       if (response.data.code === 200 && response.data.status === 'success') {
         const data = response.data.response;
@@ -158,6 +180,25 @@ class ApiclubService {
     } catch (error) {
       logger.error('[APIclub] RC verification error:', error);
 
+      // Log failed API call
+      apiLogger.log({
+        registrationNumber: cleanRegNum,
+        apiSource: 'apiclub',
+        endpoint: 'rc_info',
+        request: {
+          url: requestUrl,
+          method: 'POST',
+          headers: this.headers,
+          body: requestBody
+        },
+        response: error.response ? {
+          status: error.response.status,
+          data: error.response.data,
+          duration: Date.now() - startTime
+        } : null,
+        error: error.message
+      });
+
       if (error.response) {
         const status = error.response.status;
         const errorData = error.response.data;
@@ -195,21 +236,44 @@ class ApiclubService {
    * Returns challan data in Surepass-compatible format
    */
   async getChallanDetailsAsync(chassisNumber, engineNumber, registrationNumber) {
+    const cleanRegNum = registrationNumber.replace(/\s/g, '').toUpperCase();
+    const requestUrl = `${this.baseUrl}/v1/challan_info_v2`;
+    const requestBody = {
+      vehicleId: cleanRegNum,
+      chassis: chassisNumber || '',
+      engine_no: engineNumber || ''
+    };
+    const startTime = Date.now();
+
     try {
       logger.info(`[APIclub] Challan details for: ${registrationNumber}`);
 
       const response = await axios.post(
-        `${this.baseUrl}/v1/challan_info_v2`,
-        {
-          vehicleId: registrationNumber.replace(/\s/g, '').toUpperCase(),
-          chassis: chassisNumber || '',
-          engine_no: engineNumber || ''
-        },
+        requestUrl,
+        requestBody,
         {
           headers: this.headers,
           timeout: 30000
         }
       );
+
+      // Log API call
+      apiLogger.log({
+        registrationNumber: cleanRegNum,
+        apiSource: 'apiclub',
+        endpoint: 'challan_info',
+        request: {
+          url: requestUrl,
+          method: 'POST',
+          headers: this.headers,
+          body: requestBody
+        },
+        response: {
+          status: response.status,
+          data: response.data,
+          duration: Date.now() - startTime
+        }
+      });
 
       if (response.data.code === 200 && response.data.status === 'success') {
         const data = response.data.response;
@@ -253,6 +317,25 @@ class ApiclubService {
       }
     } catch (error) {
       logger.error('[APIclub] Challan details error:', error.message);
+
+      // Log failed API call
+      apiLogger.log({
+        registrationNumber: cleanRegNum,
+        apiSource: 'apiclub',
+        endpoint: 'challan_info',
+        request: {
+          url: requestUrl,
+          method: 'POST',
+          headers: this.headers,
+          body: requestBody
+        },
+        response: error.response ? {
+          status: error.response.status,
+          data: error.response.data,
+          duration: Date.now() - startTime
+        } : null,
+        error: error.message
+      });
 
       if (error.response) {
         const status = error.response.status;

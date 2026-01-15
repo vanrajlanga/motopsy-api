@@ -2,6 +2,7 @@ const PaymentHistory = require('../models/payment-history.model');
 const User = require('../models/user.model');
 const VehicleDetailRequest = require('../models/vehicle-detail-request.model');
 const VehicleDetail = require('../models/vehicle-detail.model');
+const VehicleSpecification = require('../models/vehicle-specification.model');
 const NcrbReport = require('../models/ncrb-report.model');
 const Coupon = require('../models/coupon.model');
 const Result = require('../utils/result');
@@ -62,8 +63,9 @@ class OrderService {
    * @param {number|null} ncrbReportId - Optional ncrbReportId from lookup
    * @param {string|null} apiSource - API source (surepass/apiclub) from vehicle_details
    * @param {string|null} namingVersionId - Vehicle specification naming_versionId
+   * @param {Object|null} matchingLog - Vehicle specification matching log
    */
-  transformToOrderDto(payment, vehicleDetailId = null, ncrbReportId = null, apiSource = null, namingVersionId = null) {
+  transformToOrderDto(payment, vehicleDetailId = null, ncrbReportId = null, apiSource = null, namingVersionId = null, matchingLog = null) {
     const user = payment.User || null;
     // VehicleDetailRequests is an array (hasMany), get the first one
     const vehicleRequest = (payment.VehicleDetailRequests && payment.VehicleDetailRequests.length > 0)
@@ -100,7 +102,8 @@ class OrderService {
       couponName: coupon?.coupon_name || null,
       ncrbReportId: ncrbReportId,
       apiSource: apiSource,
-      namingVersionId: namingVersionId
+      namingVersionId: namingVersionId,
+      matchingLog: matchingLog
     };
   }
 
@@ -243,20 +246,39 @@ class OrderService {
         });
       }
 
-      // Look up vehicle specifications (naming_versionId) for each vehicle detail
+      // Look up vehicle specifications (naming_versionId and matching_log) for each vehicle detail
+      // Uses saved matched_spec_id for consistency, falls back to matching algorithm for legacy records
       let namingVersionIdMap = {};
+      let matchingLogMap = {};
       if (vehicleDetailIds.length > 0) {
-        // Fetch full vehicle details for spec matching
+        // Fetch full vehicle details including saved match info
         const fullVehicleDetails = await VehicleDetail.findAll({
           where: {
             id: { [Op.in]: vehicleDetailIds }
           }
         });
 
-        // Run specification matching for each vehicle detail
+        // Get spec for each vehicle detail - prefer saved match for consistency
         for (const vd of fullVehicleDetails) {
           try {
-            const spec = await vehicleDetailService.findVehicleSpecification(vd);
+            let spec = null;
+
+            // Store matching_log from database if available
+            if (vd.matching_log) {
+              matchingLogMap[vd.id] = typeof vd.matching_log === 'string'
+                ? JSON.parse(vd.matching_log)
+                : vd.matching_log;
+            }
+
+            // Use saved matched_spec_id if available (ensures consistency)
+            if (vd.matched_spec_id) {
+              spec = await VehicleSpecification.findByPk(vd.matched_spec_id);
+            } else {
+              // Fall back to matching algorithm for legacy records
+              const matchResult = await vehicleDetailService.findVehicleSpecification(vd);
+              spec = matchResult.spec;
+            }
+
             if (spec && spec.naming_versionId) {
               namingVersionIdMap[vd.id] = spec.naming_versionId;
             }
@@ -266,7 +288,7 @@ class OrderService {
         }
       }
 
-      // Transform to Order DTOs with vehicleDetailId, ncrbReportId, apiSource, and namingVersionId
+      // Transform to Order DTOs with vehicleDetailId, ncrbReportId, apiSource, namingVersionId, and matchingLog
       let orders = payments.map(payment => {
         const vehicleRequestId = (payment.VehicleDetailRequests && payment.VehicleDetailRequests.length > 0)
           ? payment.VehicleDetailRequests[0].id
@@ -275,7 +297,8 @@ class OrderService {
         const ncrbReportId = vehicleDetailId ? ncrbReportMap[vehicleDetailId] || null : null;
         const apiSource = vehicleDetailId ? apiSourceMap[vehicleDetailId] || null : null;
         const namingVersionId = vehicleDetailId ? namingVersionIdMap[vehicleDetailId] || null : null;
-        return this.transformToOrderDto(payment, vehicleDetailId, ncrbReportId, apiSource, namingVersionId);
+        const matchingLog = vehicleDetailId ? matchingLogMap[vehicleDetailId] || null : null;
+        return this.transformToOrderDto(payment, vehicleDetailId, ncrbReportId, apiSource, namingVersionId, matchingLog);
       });
 
       // Apply NCRB filter if specified
