@@ -5,6 +5,7 @@ const VehicleDetail = require('../models/vehicle-detail.model');
 const VehicleSpecification = require('../models/vehicle-specification.model');
 const NcrbReport = require('../models/ncrb-report.model');
 const Coupon = require('../models/coupon.model');
+const VehicleSpecDiscrepancy = require('../models/discrepancy.model');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
 const { Op } = require('sequelize');
@@ -64,8 +65,9 @@ class OrderService {
    * @param {string|null} apiSource - API source (surepass/apiclub) from vehicle_details
    * @param {string|null} namingVersionId - Vehicle specification naming_versionId
    * @param {Object|null} matchingLog - Vehicle specification matching log
+   * @param {Object|null} discrepancyInfo - Discrepancy status info
    */
-  transformToOrderDto(payment, vehicleDetailId = null, ncrbReportId = null, apiSource = null, namingVersionId = null, matchingLog = null) {
+  transformToOrderDto(payment, vehicleDetailId = null, ncrbReportId = null, apiSource = null, namingVersionId = null, matchingLog = null, discrepancyInfo = null) {
     const user = payment.User || null;
     // VehicleDetailRequests is an array (hasMany), get the first one
     const vehicleRequest = (payment.VehicleDetailRequests && payment.VehicleDetailRequests.length > 0)
@@ -103,7 +105,8 @@ class OrderService {
       ncrbReportId: ncrbReportId,
       apiSource: apiSource,
       namingVersionId: namingVersionId,
-      matchingLog: matchingLog
+      matchingLog: matchingLog,
+      discrepancyInfo: discrepancyInfo
     };
   }
 
@@ -180,18 +183,29 @@ class OrderService {
         .map(p => p.VehicleDetailRequests[0].id);
 
       // Look up vehicleDetailIds from vehicle_details table (by vehicle_detail_request_id)
-      let vehicleDetailMap = {};
+      // Store ALL vehicle_details per request (not just one) to properly check discrepancies
+      let vehicleDetailMap = {};           // requestId -> primary vehicleDetailId (most recent)
+      let allVehicleDetailsMap = {};       // requestId -> [array of all vehicleDetailIds]
       let apiSourceMap = {};
       if (vehicleRequestIds.length > 0) {
         const vehicleDetails = await VehicleDetail.findAll({
           where: {
             vehicle_detail_request_id: { [Op.in]: vehicleRequestIds }
           },
-          attributes: ['id', 'vehicle_detail_request_id', 'api_source']
+          attributes: ['id', 'vehicle_detail_request_id', 'api_source', 'created_at'],
+          order: [['created_at', 'DESC']]
         });
-        // Create map: vehicleRequestId -> vehicleDetailId and apiSource
+        // Create maps: requestId -> primary vehicleDetailId AND requestId -> [all vehicleDetailIds]
         vehicleDetails.forEach(vd => {
-          vehicleDetailMap[vd.vehicle_detail_request_id] = vd.id;
+          // Store first (most recent) as primary
+          if (!vehicleDetailMap[vd.vehicle_detail_request_id]) {
+            vehicleDetailMap[vd.vehicle_detail_request_id] = vd.id;
+          }
+          // Store ALL in array
+          if (!allVehicleDetailsMap[vd.vehicle_detail_request_id]) {
+            allVehicleDetailsMap[vd.vehicle_detail_request_id] = [];
+          }
+          allVehicleDetailsMap[vd.vehicle_detail_request_id].push(vd.id);
           apiSourceMap[vd.id] = vd.api_source || null;
         });
       }
@@ -229,14 +243,16 @@ class OrderService {
       }
 
       // Get all vehicleDetailIds to look up NCRB reports and vehicle specifications
+      // Include ALL vehicleDetailIds (not just primary) for discrepancy checks
       const vehicleDetailIds = Object.values(vehicleDetailMap).filter(id => id);
+      const allVehicleDetailIds = Object.values(allVehicleDetailsMap).flat().filter(id => id);
 
-      // Look up NCRB reports for vehicle details
+      // Look up NCRB reports for ALL vehicle details (including corrected reports)
       let ncrbReportMap = {};
-      if (vehicleDetailIds.length > 0) {
+      if (allVehicleDetailIds.length > 0) {
         const ncrbReports = await NcrbReport.findAll({
           where: {
-            vehicle_detail_id: { [Op.in]: vehicleDetailIds }
+            vehicle_detail_id: { [Op.in]: allVehicleDetailIds }
           },
           attributes: ['id', 'vehicle_detail_id']
         });
@@ -246,15 +262,90 @@ class OrderService {
         });
       }
 
-      // Look up vehicle specifications (naming_versionId and matching_log) for each vehicle detail
+      // Look up discrepancy status for each vehicle detail
+      // Check ALL vehicleDetailIds (not just primary) to properly detect flagged reports
+      // Maps: vehicleDetailId -> discrepancy info AND requestId -> combined discrepancy info
+      let discrepancyInfoMap = {};
+      let requestDiscrepancyMap = {};  // requestId -> { hasFlagged, hasCorrected, ... }
+      if (allVehicleDetailIds.length > 0) {
+        // Find discrepancies where any vehicle is the OLD (flagged) report
+        const flaggedDiscrepancies = await VehicleSpecDiscrepancy.findAll({
+          where: {
+            old_vehicle_detail_id: { [Op.in]: allVehicleDetailIds }
+          },
+          attributes: ['old_vehicle_detail_id', 'new_vehicle_detail_id', 'car_not_found', 'created_at']
+        });
+
+        // Find discrepancies where any vehicle is the NEW (corrected) report
+        const correctedDiscrepancies = await VehicleSpecDiscrepancy.findAll({
+          where: {
+            new_vehicle_detail_id: { [Op.in]: allVehicleDetailIds }
+          },
+          attributes: ['old_vehicle_detail_id', 'new_vehicle_detail_id', 'created_at']
+        });
+
+        // Map flagged reports by vehicleDetailId
+        flaggedDiscrepancies.forEach(d => {
+          discrepancyInfoMap[d.old_vehicle_detail_id] = {
+            status: 'flagged',
+            newVehicleDetailId: d.new_vehicle_detail_id,
+            carNotFound: d.car_not_found,
+            createdAt: d.created_at
+          };
+        });
+
+        // Map corrected reports by vehicleDetailId
+        correctedDiscrepancies.forEach(d => {
+          discrepancyInfoMap[d.new_vehicle_detail_id] = {
+            status: 'corrected',
+            originalVehicleDetailId: d.old_vehicle_detail_id,
+            createdAt: d.created_at
+          };
+        });
+
+        // Now build requestDiscrepancyMap by checking ALL vehicleDetailIds for each request
+        // Priority: CORRECTED > FLAGGED (if corrected exists, issue is resolved)
+        for (const [requestId, vdIds] of Object.entries(allVehicleDetailsMap)) {
+          let hasFlagged = false;
+          let hasCorrected = false;
+          let flaggedInfo = null;
+          let correctedInfo = null;
+
+          // Check all vehicle_details for this request
+          for (const vdId of vdIds) {
+            const info = discrepancyInfoMap[vdId];
+            if (info) {
+              if (info.status === 'flagged') {
+                hasFlagged = true;
+                flaggedInfo = { ...info, vehicleDetailId: vdId };
+              } else if (info.status === 'corrected') {
+                hasCorrected = true;
+                correctedInfo = { ...info, vehicleDetailId: vdId };
+              }
+            }
+          }
+
+          // Show both badges when both exist - FLAGGED shows original was flagged, CORRECTED shows it was resolved
+          if (hasFlagged || hasCorrected) {
+            requestDiscrepancyMap[requestId] = {
+              hasFlagged,
+              hasCorrected,
+              flaggedInfo,
+              correctedInfo
+            };
+          }
+        }
+      }
+
+      // Look up vehicle specifications (naming_versionId and matching_log) for ALL vehicle details
       // Uses saved matched_spec_id for consistency, falls back to matching algorithm for legacy records
       let namingVersionIdMap = {};
       let matchingLogMap = {};
-      if (vehicleDetailIds.length > 0) {
+      if (allVehicleDetailIds.length > 0) {
         // Fetch full vehicle details including saved match info
         const fullVehicleDetails = await VehicleDetail.findAll({
           where: {
-            id: { [Op.in]: vehicleDetailIds }
+            id: { [Op.in]: allVehicleDetailIds }
           }
         });
 
@@ -288,18 +379,65 @@ class OrderService {
         }
       }
 
-      // Transform to Order DTOs with vehicleDetailId, ncrbReportId, apiSource, namingVersionId, and matchingLog
-      let orders = payments.map(payment => {
+      // Transform to Order DTOs with vehicleDetailId, ncrbReportId, apiSource, namingVersionId, matchingLog, and discrepancyInfo
+      // When both flagged and corrected exist, create TWO rows - one for each report
+      let orders = [];
+      for (const payment of payments) {
         const vehicleRequestId = (payment.VehicleDetailRequests && payment.VehicleDetailRequests.length > 0)
           ? payment.VehicleDetailRequests[0].id
           : null;
-        const vehicleDetailId = vehicleRequestId ? vehicleDetailMap[vehicleRequestId] || null : null;
-        const ncrbReportId = vehicleDetailId ? ncrbReportMap[vehicleDetailId] || null : null;
-        const apiSource = vehicleDetailId ? apiSourceMap[vehicleDetailId] || null : null;
-        const namingVersionId = vehicleDetailId ? namingVersionIdMap[vehicleDetailId] || null : null;
-        const matchingLog = vehicleDetailId ? matchingLogMap[vehicleDetailId] || null : null;
-        return this.transformToOrderDto(payment, vehicleDetailId, ncrbReportId, apiSource, namingVersionId, matchingLog);
-      });
+        const discrepancyInfo = vehicleRequestId ? requestDiscrepancyMap[vehicleRequestId] || null : null;
+
+        // Check if we have both flagged and corrected - create two rows
+        if (discrepancyInfo && discrepancyInfo.hasFlagged && discrepancyInfo.hasCorrected) {
+          // Row 1: FLAGGED report (original) - shows order #
+          const flaggedVdId = discrepancyInfo.flaggedInfo?.vehicleDetailId;
+          if (flaggedVdId) {
+            const flaggedOrder = this.transformToOrderDto(
+              payment,
+              flaggedVdId,
+              ncrbReportMap[flaggedVdId] || null,
+              apiSourceMap[flaggedVdId] || null,
+              namingVersionIdMap[flaggedVdId] || null,
+              matchingLogMap[flaggedVdId] || null,
+              { hasFlagged: true, hasCorrected: false, flaggedInfo: discrepancyInfo.flaggedInfo, correctedInfo: null }
+            );
+            flaggedOrder.isGroupedRow = true;  // First row of group
+            flaggedOrder.isGroupStart = true;  // Start of group - show order #
+            orders.push(flaggedOrder);
+          }
+
+          // Row 2: CORRECTED report (new) - hide order # (continuation)
+          const correctedVdId = discrepancyInfo.correctedInfo?.vehicleDetailId;
+          if (correctedVdId) {
+            const correctedOrder = this.transformToOrderDto(
+              payment,
+              correctedVdId,
+              ncrbReportMap[correctedVdId] || null,
+              apiSourceMap[correctedVdId] || null,
+              namingVersionIdMap[correctedVdId] || null,
+              matchingLogMap[correctedVdId] || null,
+              { hasFlagged: false, hasCorrected: true, flaggedInfo: null, correctedInfo: discrepancyInfo.correctedInfo }
+            );
+            correctedOrder.isGroupedRow = true;   // Part of group
+            correctedOrder.isGroupStart = false;  // Continuation - hide order #
+            orders.push(correctedOrder);
+          }
+        } else {
+          // Normal case: single row
+          const vehicleDetailId = vehicleRequestId ? vehicleDetailMap[vehicleRequestId] || null : null;
+          const order = this.transformToOrderDto(
+            payment,
+            vehicleDetailId,
+            vehicleDetailId ? ncrbReportMap[vehicleDetailId] || null : null,
+            vehicleDetailId ? apiSourceMap[vehicleDetailId] || null : null,
+            vehicleDetailId ? namingVersionIdMap[vehicleDetailId] || null : null,
+            vehicleDetailId ? matchingLogMap[vehicleDetailId] || null : null,
+            discrepancyInfo
+          );
+          orders.push(order);
+        }
+      }
 
       // Apply NCRB filter if specified
       if (hasNcrbFilter) {

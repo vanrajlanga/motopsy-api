@@ -80,3 +80,40 @@ VALUES ('Motopsy 99% Off', 'motopsy99', 'percentage', 99.00, '99% discount on ve
 -- =====================================================
 -- End of changes for: Dynamic Coupon Codes System
 -- =====================================================
+
+-- =====================================================
+-- Date: 2026-01-19
+-- Feature: Flag Discrepancy - User-flagged vehicle specification mismatches
+-- =====================================================
+
+-- 1. Create vehicle_spec_discrepancies table
+CREATE TABLE IF NOT EXISTS vehicle_spec_discrepancies (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    registration_number VARCHAR(50) NULL,
+    old_vehicle_detail_id INT NOT NULL COMMENT 'Original report that was flagged',
+    old_matched_spec_id INT NULL,
+    old_make VARCHAR(255) NULL,
+    old_model VARCHAR(255) NULL,
+    old_version VARCHAR(255) NULL,
+    new_vehicle_detail_id INT NULL COMMENT 'Corrected report (NULL if car_not_found)',
+    new_matched_spec_id INT NULL,
+    new_make VARCHAR(255) NULL,
+    new_model VARCHAR(255) NULL,
+    new_version VARCHAR(255) NULL,
+    car_not_found TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'True if user selected "My car is not in the list"',
+    user_notes TEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (old_vehicle_detail_id) REFERENCES vehicle_details(id) ON DELETE CASCADE,
+    FOREIGN KEY (new_vehicle_detail_id) REFERENCES vehicle_details(id) ON DELETE SET NULL,
+    INDEX idx_user_id (user_id),
+    INDEX idx_old_vehicle_detail_id (old_vehicle_detail_id),
+    INDEX idx_new_vehicle_detail_id (new_vehicle_detail_id),
+    INDEX idx_registration_number (registration_number),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- End of changes for: Flag Discrepancy Feature
+-- =====================================================

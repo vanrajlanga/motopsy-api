@@ -410,10 +410,10 @@ class VehicleDetailService {
     } else {
       // Run matching algorithm and save the result
       const matchResult = await this.findVehicleSpecification(vehicleDetail, userMake, userModel, userVersion);
-      vehicleSpecification = matchResult.spec;
+      vehicleSpecification = matchResult?.spec || null;
 
       // Save matching result to database for future consistency
-      if (matchResult.matchingLog) {
+      if (matchResult?.matchingLog) {
         try {
           await vehicleDetail.update({
             matched_spec_id: matchResult.spec ? matchResult.spec.id : null,
@@ -914,7 +914,7 @@ class VehicleDetailService {
 
       if (!vehicleDetail) {
         logger.info('Cannot find specification: vehicleDetail not provided');
-        return null;
+        return { spec: null, matchingLog: { error: 'vehicleDetail not provided' } };
       }
 
       // Prefer user-provided values, fallback to extraction only if not provided
@@ -933,7 +933,7 @@ class VehicleDetailService {
 
       if (!make || !model) {
         logger.info('Cannot find specification: make or model not available');
-        return null;
+        return { spec: null, matchingLog: { error: 'make or model not available' } };
       }
 
       logger.info(`Finding specification for: make=${make}, model=${model}, version=${version}, year=${year}, cc=${rcCubicCapacity}, color=${rcColor}, norms=${rcNormsType}`);
@@ -976,7 +976,7 @@ class VehicleDetailService {
 
       if (candidates.length === 0) {
         logger.info(`No specifications found for make=${make}, model=${model}`);
-        return null;
+        return { spec: null, matchingLog: { error: `No specifications found for make=${make}, model=${model}` } };
       }
 
       logger.info(`Found ${candidates.length} specification candidates for ${model}`);
