@@ -476,8 +476,23 @@ class VehicleDetailService {
         if (!year) missingFields.push('year');
 
         if (make && model && year) {
-          // Get ex-showroom price from vehicle specifications database
-          const originalPrice = await this.lookupExShowroomPrice(make, model, vehicleDetail.variant);
+          // PRIORITY 1: Use price from matched spec if available (already matched by algorithm)
+          let originalPrice = null;
+
+          if (vehicleSpecification) {
+            // Get price directly from the matched spec - no need to re-lookup!
+            originalPrice = this.parsePriceString(vehicleSpecification.keydata_key_price) ||
+                           this.parsePriceString(vehicleSpecification.naming_price) ||
+                           this.parsePriceString(vehicleSpecification.price_breakdown_ex_showroom_price);
+            if (originalPrice) {
+              logger.info(`Using price from matched spec ${vehicleSpecification.id}: ₹${originalPrice}`);
+            }
+          }
+
+          // PRIORITY 2: Fallback to make/model lookup only if matched spec has no price
+          if (!originalPrice) {
+            originalPrice = await this.lookupExShowroomPrice(make, model, vehicleDetail.variant);
+          }
 
           if (originalPrice) {
             availableData.exShowroomPrice = originalPrice;

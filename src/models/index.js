@@ -13,6 +13,7 @@ const CouponAuditLog = require('./coupon-audit-log.model');
 const PricingSetting = require('./pricing-setting.model');
 const Invoice = require('./invoice.model');
 const NcrbReport = require('./ncrb-report.model');
+const VehicleSpecDiscrepancy = require('./discrepancy.model');
 
 // Setup associations (only if not already defined)
 
@@ -120,6 +121,30 @@ if (!VehicleDetail.associations.NcrbReport) {
   });
 }
 
+// VehicleSpecDiscrepancy belongs to User
+if (!VehicleSpecDiscrepancy.associations.User) {
+  VehicleSpecDiscrepancy.belongsTo(User, {
+    foreignKey: 'user_id',
+    as: 'User'
+  });
+}
+
+// VehicleSpecDiscrepancy belongs to VehicleDetail (old)
+if (!VehicleSpecDiscrepancy.associations.OldVehicleDetail) {
+  VehicleSpecDiscrepancy.belongsTo(VehicleDetail, {
+    foreignKey: 'old_vehicle_detail_id',
+    as: 'OldVehicleDetail'
+  });
+}
+
+// VehicleSpecDiscrepancy belongs to VehicleDetail (new)
+if (!VehicleSpecDiscrepancy.associations.NewVehicleDetail) {
+  VehicleSpecDiscrepancy.belongsTo(VehicleDetail, {
+    foreignKey: 'new_vehicle_detail_id',
+    as: 'NewVehicleDetail'
+  });
+}
+
 module.exports = {
   sequelize,
   User,
@@ -133,5 +158,6 @@ module.exports = {
   CouponAuditLog,
   PricingSetting,
   Invoice,
-  NcrbReport
+  NcrbReport,
+  VehicleSpecDiscrepancy
 };

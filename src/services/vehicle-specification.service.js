@@ -96,6 +96,82 @@ class VehicleSpecificationService {
   }
 
   /**
+   * Get makes for cascading dropdown
+   */
+  async getMakesAsync() {
+    try {
+      const makes = await VehicleSpecification.findAll({
+        attributes: [[sequelize.fn('DISTINCT', sequelize.col('naming_make')), 'naming_make']],
+        where: { naming_make: { [Op.ne]: null } },
+        order: [['naming_make', 'ASC']],
+        raw: true
+      });
+      return Result.success(makes.map(m => m.naming_make).filter(Boolean).sort());
+    } catch (error) {
+      logger.error('Get makes error:', error);
+      return Result.failure(error.message || 'Failed to get makes');
+    }
+  }
+
+  /**
+   * Get models for a make
+   */
+  async getModelsByMakeAsync(make) {
+    try {
+      if (!make) {
+        return Result.failure('Make is required');
+      }
+      const models = await VehicleSpecification.findAll({
+        attributes: [[sequelize.fn('DISTINCT', sequelize.col('naming_model')), 'naming_model']],
+        where: {
+          naming_make: { [Op.like]: `%${make}%` },
+          naming_model: { [Op.ne]: null }
+        },
+        order: [['naming_model', 'ASC']],
+        raw: true
+      });
+      return Result.success(models.map(m => m.naming_model).filter(Boolean).sort());
+    } catch (error) {
+      logger.error('Get models error:', error);
+      return Result.failure(error.message || 'Failed to get models');
+    }
+  }
+
+  /**
+   * Get versions for a make and model with spec IDs
+   */
+  async getVersionsByMakeModelAsync(make, model) {
+    try {
+      if (!make || !model) {
+        return Result.failure('Make and model are required');
+      }
+      const versions = await VehicleSpecification.findAll({
+        attributes: ['id', 'naming_version', 'naming_make', 'naming_model', 'price_breakdown_ex_showroom_price'],
+        where: {
+          naming_make: { [Op.like]: `%${make}%` },
+          naming_model: { [Op.like]: `%${model}%` },
+          naming_version: { [Op.ne]: null }
+        },
+        order: [['naming_version', 'ASC']],
+        raw: true
+      });
+
+      const result = versions.map(v => ({
+        id: v.id,
+        version: v.naming_version,
+        make: v.naming_make,
+        model: v.naming_model,
+        exShowroomPrice: v.price_breakdown_ex_showroom_price
+      }));
+
+      return Result.success(result);
+    } catch (error) {
+      logger.error('Get versions error:', error);
+      return Result.failure(error.message || 'Failed to get versions');
+    }
+  }
+
+  /**
    * Transform to VehicleSpecificationDto (camelCase)
    */
   transformToDto(spec) {

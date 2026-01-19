@@ -27,6 +27,7 @@ const orderRoutes = require('./src/routes/order.routes');
 const pricingRoutes = require('./src/routes/pricing.routes');
 const invoiceRoutes = require('./src/routes/invoice.routes');
 const customVehicleEntryRoutes = require('./src/routes/custom-vehicle-entry.routes');
+const discrepancyRoutes = require('./src/routes/discrepancy.routes');
 
 const app = express();
 
@@ -114,6 +115,7 @@ app.use('/api/order', orderRoutes);
 app.use('/api/pricing', pricingRoutes);
 app.use('/api/invoice', invoiceRoutes);
 app.use('/api/custom-vehicles', customVehicleEntryRoutes);
+app.use('/api/discrepancy', discrepancyRoutes);
 
 // 404 handler
 app.use((req, res) => {
