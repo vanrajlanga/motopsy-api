@@ -460,8 +460,9 @@ class VehicleDetailService {
         logger.info(`Using user-provided resale data for vehicle ${vehicleDetail.id}`);
       } else {
         // Use user-provided make/model, or fallback to extraction ONLY if not provided
-        const make = userMake || this.extractMakeFromDescription(vehicleDetail.maker_description || vehicleDetail.manufacturer);
-        const model = userModel || this.extractModelFromDescription(vehicleDetail.maker_model || vehicleDetail.model);
+        const modelDescription = vehicleDetail.maker_model || vehicleDetail.model;
+        const make = userMake || this.extractMakeFromDescription(vehicleDetail.maker_description || vehicleDetail.manufacturer, modelDescription);
+        const model = userModel || this.extractModelFromDescription(modelDescription);
         const year = this.extractYearFromManufacturingDate(vehicleDetail.manufacturing_date_formatted);
         const noOfOwners = vehicleDetail.owner_number || '1';
 
@@ -918,9 +919,10 @@ class VehicleDetailService {
       }
 
       // Prefer user-provided values, fallback to extraction only if not provided
-      const make = userMake || this.extractMakeFromDescription(vehicleDetail.maker_description || vehicleDetail.manufacturer || '');
-      const model = userModel || this.extractModelFromDescription(vehicleDetail.maker_model || vehicleDetail.model || '');
-      const version = userVersion || this.extractVersionFromDescription(vehicleDetail.maker_model || vehicleDetail.model || '');
+      const modelDescription = vehicleDetail.maker_model || vehicleDetail.model || '';
+      const make = userMake || this.extractMakeFromDescription(vehicleDetail.maker_description || vehicleDetail.manufacturer || '', modelDescription);
+      const model = userModel || this.extractModelFromDescription(modelDescription);
+      const version = userVersion || this.extractVersionFromDescription(modelDescription);
 
       // Extract year from manufacturing date for year range matching
       const year = this.extractYearFromManufacturingDate(vehicleDetail.manufacturing_date_formatted);
@@ -944,8 +946,8 @@ class VehicleDetailService {
         where: {
           naming_make: { [Op.like]: `%${make}%` },
           naming_model: { [Op.like]: `${model}%` }  // Starts with model (includes year suffixes)
-        },
-        limit: 100  // Increased limit to capture more variants
+        }
+        // No limit - fetch all candidates to ensure correct generation matching
       });
 
       // Step 3: Fallback to contains match (last resort)
@@ -954,8 +956,8 @@ class VehicleDetailService {
           where: {
             naming_make: { [Op.like]: `%${make}%` },
             naming_model: { [Op.like]: `%${model}%` }
-          },
-          limit: 100
+          }
+          // No limit - fetch all candidates
         });
       }
 
@@ -1464,8 +1466,33 @@ class VehicleDetailService {
    * E.g., "KIA INDIA PRIVATE LIMITED" -> "Kia"
    * E.g., "MARUTI SUZUKI INDIA LIMITED" -> "Maruti Suzuki"
    */
-  extractMakeFromDescription(description) {
+  extractMakeFromDescription(description, modelDescription = null) {
     if (!description) return null;
+
+    const upper = description.toUpperCase();
+
+    // Special handling for Jaguar Land Rover - determine make based on model
+    if (upper.includes('JAGUAR') && upper.includes('LAND ROVER')) {
+      // Check if model is a Land Rover model
+      if (modelDescription) {
+        const modelUpper = modelDescription.toUpperCase();
+        const landRoverModels = ['RANGE ROVER', 'DISCOVERY', 'DEFENDER', 'FREELANDER', 'EVOQUE', 'VELAR'];
+        for (const lrModel of landRoverModels) {
+          if (modelUpper.includes(lrModel)) {
+            return 'Land Rover';
+          }
+        }
+        // Jaguar models: F-TYPE, F-PACE, XE, XF, XJ, I-PACE, E-PACE
+        const jaguarModels = ['F-TYPE', 'F-PACE', 'XE', 'XF', 'XJ', 'I-PACE', 'E-PACE'];
+        for (const jModel of jaguarModels) {
+          if (modelUpper.includes(jModel)) {
+            return 'Jaguar';
+          }
+        }
+      }
+      // Default to Land Rover if no specific model match (Range Rover is more common)
+      return 'Land Rover';
+    }
 
     const makeMap = {
       'KIA': 'Kia',
@@ -1487,9 +1514,9 @@ class VehicleDetailService {
       'BMW': 'BMW',
       'BAYERISCHE': 'BMW',              // BMW's full German name (Bayerische Motoren Werke)
       'AUDI': 'Audi',
+      'LAND ROVER': 'Land Rover',       // Check before JAGUAR
       'JAGUAR': 'Jaguar',
-      'LAND ROVER': 'Land Rover',
-      'JLR': 'Jaguar',                  // Jaguar Land Rover
+      'JLR': 'Land Rover',              // Jaguar Land Rover - default to Land Rover
       'PORSCHE': 'Porsche',
       'LEXUS': 'Lexus',
       'VOLVO': 'Volvo',
@@ -1529,7 +1556,7 @@ class VehicleDetailService {
       'EICHER': 'Eicher'
     };
 
-    const upper = description.toUpperCase();
+    // upper is already declared at the top of the function
     for (const [key, value] of Object.entries(makeMap)) {
       if (upper.includes(key)) {
         return value;
@@ -1564,17 +1591,34 @@ class VehicleDetailService {
 
     // Compound model names that include a suffix (e.g., "Celerio X", "Grand i10", "Swift Dzire")
     const compoundModels = {
+      // Maruti Suzuki
+      'ALTO K10': 'Alto K10',
+      'ALTO 800': 'Alto 800',
       'CELERIO X': 'Celerio X',
+      'SWIFT DZIRE': 'Swift Dzire',
+      'BALENO RS': 'Baleno RS',
+      // Hyundai
       'GRAND I10': 'Grand i10',
       'GRAND I10 NIOS': 'Grand i10 Nios',
-      'SWIFT DZIRE': 'Swift Dzire',
       'VENUE N LINE': 'Venue N Line',
+      // Honda
       'CITY E': 'City e',
-      'BALENO RS': 'Baleno RS',
-      'POLO GT': 'Polo GT',
       'JAZZ X': 'Jazz X',
+      // Kia
       'SELTOS X LINE': 'Seltos X Line',
-      'SONET X LINE': 'Sonet X Line'
+      'SONET X LINE': 'Sonet X Line',
+      // Volkswagen
+      'POLO GT': 'Polo GT',
+      // Toyota
+      'FORTUNER SIGMA': 'Fortuner',
+      'INNOVA CRYSTA': 'Innova Crysta',
+      'INNOVA HYCROSS': 'Innova Hycross',
+      // Land Rover / Range Rover (check longer names first)
+      'RANGE ROVER SPORT': 'Range Rover Sport',
+      'RANGE ROVER VELAR': 'Range Rover Velar',
+      'RANGE ROVER EVOQUE': 'Range Rover Evoque',
+      'RANGE ROVER': 'Range Rover',
+      'DISCOVERY SPORT': 'Discovery Sport'
     };
 
     // Mercedes model patterns: Extract letters before numbers
