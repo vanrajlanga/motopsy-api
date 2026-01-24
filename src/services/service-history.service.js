@@ -122,15 +122,30 @@ class ServiceHistoryService {
       });
 
       return Result.success({
-        records: rows.map(record => ({
-          id: record.id,
-          clientId: record.client_id,
-          idNumber: record.id_number,
-          maker: record.maker,
-          totalServices: (record.service_history_details || []).length,
-          searchedAt: record.created_at,
-          searchedBy: record.searched_by,
-        })),
+        records: rows.map(record => {
+          // Parse JSON if it's a string (MySQL might return string for JSON fields)
+          let details = record.service_history_details;
+          if (typeof details === 'string') {
+            try {
+              details = JSON.parse(details);
+            } catch (e) {
+              details = [];
+            }
+          }
+          if (!Array.isArray(details)) {
+            details = [];
+          }
+
+          return {
+            id: record.id,
+            clientId: record.client_id,
+            idNumber: record.id_number,
+            maker: record.maker,
+            totalServices: details.length,
+            searchedAt: record.created_at,
+            searchedBy: record.searched_by,
+          };
+        }),
         total: count,
         page,
         pageSize,
