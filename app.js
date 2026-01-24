@@ -28,6 +28,8 @@ const pricingRoutes = require('./src/routes/pricing.routes');
 const invoiceRoutes = require('./src/routes/invoice.routes');
 const customVehicleEntryRoutes = require('./src/routes/custom-vehicle-entry.routes');
 const discrepancyRoutes = require('./src/routes/discrepancy.routes');
+const roleRoutes = require('./src/routes/role.routes');
+const serviceHistoryRoutes = require('./src/routes/service-history.routes');
 
 const app = express();
 
@@ -116,6 +118,8 @@ app.use('/api/pricing', pricingRoutes);
 app.use('/api/invoice', invoiceRoutes);
 app.use('/api/custom-vehicles', customVehicleEntryRoutes);
 app.use('/api/discrepancy', discrepancyRoutes);
+app.use('/api/admin/roles', roleRoutes);
+app.use('/api/service-history', serviceHistoryRoutes);
 
 // 404 handler
 app.use((req, res) => {

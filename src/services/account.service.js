@@ -1,4 +1,6 @@
 const User = require('../models/user.model');
+const Role = require('../models/role.model');
+const UserRole = require('../models/user-role.model');
 const { sequelize } = require('../config/database');
 const { hashPassword, verifyPassword } = require('../utils/hash.helper');
 const { generateToken, generateEmailToken, generatePasswordResetToken, verifyPurposeToken, generateEmailLoginToken } = require('../utils/jwt.helper');
@@ -186,10 +188,17 @@ class AccountService {
       user.modified_at = new Date();
       await user.save();
 
-      // Generate JWT token (returns { accessToken, validTo, validFrom })
-      const tokenData = generateToken(user);
+      // Fetch user roles
+      const userRoles = await UserRole.findAll({
+        where: { user_id: user.id },
+        include: [{ model: Role, as: 'Role' }]
+      });
+      const roleNames = userRoles.map(ur => ur.Role?.name).filter(Boolean);
 
-      logger.info(`User logged in: ${email}`);
+      // Generate JWT token with roles (returns { accessToken, validTo, validFrom })
+      const tokenData = generateToken(user, roleNames);
+
+      logger.info(`User logged in: ${email}, roles: ${roleNames.join(', ') || 'none'}`);
 
       return Result.success(tokenData);
     } catch (error) {
@@ -349,10 +358,17 @@ class AccountService {
         return Result.failure('Account is locked. Please try again later.');
       }
 
-      // Generate JWT token
-      const tokenData = generateToken(user);
+      // Fetch user roles
+      const userRoles = await UserRole.findAll({
+        where: { user_id: user.id },
+        include: [{ model: Role, as: 'Role' }]
+      });
+      const roleNames = userRoles.map(ur => ur.Role?.name).filter(Boolean);
 
-      logger.info(`User auto-logged in via email link: ${user.email}`);
+      // Generate JWT token with roles
+      const tokenData = generateToken(user, roleNames);
+
+      logger.info(`User auto-logged in via email link: ${user.email}, roles: ${roleNames.join(', ') || 'none'}`);
 
       // Return token with redirect path
       return Result.success({

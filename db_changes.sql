@@ -117,3 +117,65 @@ CREATE TABLE IF NOT EXISTS vehicle_spec_discrepancies (
 -- =====================================================
 -- End of changes for: Flag Discrepancy Feature
 -- =====================================================
+
+-- =====================================================
+-- Date: 2026-01-24
+-- Feature: Role-Based Access Control for Admin Panel
+-- =====================================================
+
+-- NOTE: The 'roles' and 'user_roles' tables already exist in the database
+-- This section only adds initial data if not already present
+
+-- 1. Insert default roles (if not exists)
+INSERT IGNORE INTO roles (id, created_at, modified_at, name, normalized_name) VALUES
+(1, NOW(), NOW(), 'Admin', 'ADMIN'),
+(2, NOW(), NOW(), 'Operator', 'OPERATOR');
+
+-- 2. Assign Admin role to existing admin users (is_admin=1)
+-- Run this only once to migrate existing admins
+INSERT IGNORE INTO user_roles (user_id, role_id)
+SELECT id, 1 FROM users WHERE is_admin = 1;
+
+-- 3. Helper query to assign Operator role to a user
+-- UPDATE: Replace <USER_ID> with actual user ID
+-- INSERT INTO user_roles (user_id, role_id) VALUES (<USER_ID>, 2);
+
+-- 4. Helper query to view all users with their roles
+-- SELECT u.id, u.email, u.first_name, r.name as role
+-- FROM users u
+-- LEFT JOIN user_roles ur ON u.id = ur.user_id
+-- LEFT JOIN roles r ON ur.role_id = r.id
+-- WHERE ur.role_id IS NOT NULL;
+
+-- =====================================================
+-- End of changes for: Role-Based Access Control
+-- =====================================================
+
+-- =====================================================
+-- Date: 2026-01-24
+-- Feature: Service History Module
+-- =====================================================
+
+-- 1. Create service_history table
+CREATE TABLE IF NOT EXISTS service_history (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    client_id VARCHAR(100) NULL COMMENT 'Surepass client_id from response',
+    id_number VARCHAR(50) NOT NULL COMMENT 'Vehicle registration number',
+    maker VARCHAR(50) NOT NULL COMMENT 'Vehicle maker (maruti, hyundai, mahindra)',
+    service_history_details JSON NULL COMMENT 'Array of service records from Surepass',
+    status_code INT NULL COMMENT 'API response status code',
+    success TINYINT(1) DEFAULT 0 COMMENT 'Whether API call was successful',
+    message VARCHAR(255) NULL COMMENT 'API response message',
+    searched_by INT NULL COMMENT 'User ID who performed the search',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (searched_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_id_number (id_number),
+    INDEX idx_maker (maker),
+    INDEX idx_searched_by (searched_by),
+    INDEX idx_created_at (created_at),
+    INDEX idx_success (success)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- End of changes for: Service History Module
+-- =====================================================

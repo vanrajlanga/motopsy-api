@@ -2,6 +2,8 @@ const { sequelize } = require('../config/database');
 
 // Import all models
 const User = require('./user.model');
+const Role = require('./role.model');
+const UserRole = require('./user-role.model');
 const PaymentHistory = require('./payment-history.model');
 const VehicleDetailRequest = require('./vehicle-detail-request.model');
 const VehicleDetail = require('./vehicle-detail.model');
@@ -14,6 +16,7 @@ const PricingSetting = require('./pricing-setting.model');
 const Invoice = require('./invoice.model');
 const NcrbReport = require('./ncrb-report.model');
 const VehicleSpecDiscrepancy = require('./discrepancy.model');
+const ServiceHistory = require('./service-history.model');
 
 // Setup associations (only if not already defined)
 
@@ -145,9 +148,39 @@ if (!VehicleSpecDiscrepancy.associations.NewVehicleDetail) {
   });
 }
 
+// User-Role many-to-many association
+if (!User.associations.Roles) {
+  User.belongsToMany(Role, {
+    through: UserRole,
+    foreignKey: 'user_id',
+    otherKey: 'role_id',
+    as: 'Roles'
+  });
+}
+
+if (!Role.associations.Users) {
+  Role.belongsToMany(User, {
+    through: UserRole,
+    foreignKey: 'role_id',
+    otherKey: 'user_id',
+    as: 'Users'
+  });
+}
+
+// UserRole belongs to User and Role
+if (!UserRole.associations.User) {
+  UserRole.belongsTo(User, { foreignKey: 'user_id', as: 'User' });
+}
+
+if (!UserRole.associations.Role) {
+  UserRole.belongsTo(Role, { foreignKey: 'role_id', as: 'Role' });
+}
+
 module.exports = {
   sequelize,
   User,
+  Role,
+  UserRole,
   PaymentHistory,
   VehicleDetailRequest,
   VehicleDetail,
@@ -159,5 +192,6 @@ module.exports = {
   PricingSetting,
   Invoice,
   NcrbReport,
-  VehicleSpecDiscrepancy
+  VehicleSpecDiscrepancy,
+  ServiceHistory
 };

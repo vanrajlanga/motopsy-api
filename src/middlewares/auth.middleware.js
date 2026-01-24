@@ -27,12 +27,14 @@ const authenticate = (req, res, next) => {
     const email = decoded.unique_name || decoded.email;
     const userId = decoded.sub || decoded.userId;
     const isAdmin = decoded.isAdmin === 'true' || decoded.isAdmin === 'True' || decoded.isAdmin === true || decoded.isAdmin === '1';
+    const roles = decoded.roles || [];
 
     // Attach user info to request
     req.user = {
       email: email,
       userId: userId,
       isAdmin: isAdmin,
+      roles: roles,
       identity: {
         name: email
       }
@@ -85,11 +87,13 @@ const optionalAuth = (req, res, next) => {
       const email = decoded.unique_name || decoded.email;
       const userId = decoded.sub || decoded.userId;
       const isAdmin = decoded.isAdmin === 'true' || decoded.isAdmin === 'True' || decoded.isAdmin === true || decoded.isAdmin === '1';
+      const roles = decoded.roles || [];
 
       req.user = {
         email: email,
         userId: userId,
         isAdmin: isAdmin,
+        roles: roles,
         identity: {
           name: email
         }
@@ -103,8 +107,39 @@ const optionalAuth = (req, res, next) => {
   next();
 };
 
+/**
+ * Role-based authorization middleware
+ * Checks if user has any of the specified roles
+ * @param {string[]} allowedRoles - Array of role names (e.g., ['Admin', 'Operator'])
+ */
+const requireRole = (allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        isSuccess: false,
+        error: 'Unauthorized'
+      });
+    }
+
+    const userRoles = req.user.roles || [];
+    const normalizedAllowed = allowedRoles.map(r => r.toUpperCase());
+    const hasRole = userRoles.some(role => normalizedAllowed.includes(role.toUpperCase()));
+
+    // Also allow if user is admin (backward compatibility)
+    if (!hasRole && !req.user.isAdmin) {
+      return res.status(403).json({
+        isSuccess: false,
+        error: `Forbidden - Requires one of: ${allowedRoles.join(', ')}`
+      });
+    }
+
+    next();
+  };
+};
+
 module.exports = {
   authenticate,
   requireAdmin,
+  requireRole,
   optionalAuth
 };

@@ -9,17 +9,23 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 /**
  * Generate JWT token with user claims (matching .NET format)
  * @param {Object} user - User object
+ * @param {Array} roles - Array of role names (optional)
  * @returns {Object} Token object with accessToken, validTo, validFrom
  */
-const generateToken = (user) => {
+const generateToken = (user, roles = []) => {
   const now = Math.floor(Date.now() / 1000);
   const expiresIn = 24 * 60 * 60; // 24 hours in seconds
   const exp = now + expiresIn;
 
+  // Determine isAdmin from roles or is_admin flag
+  const hasAdminRole = roles.some(r => r.toUpperCase() === 'ADMIN');
+  const isAdmin = hasAdminRole || user.is_admin || user.isAdmin || user.IsAdmin || false;
+
   const payload = {
     sub: String(user.id || user.Id),
     unique_name: user.email || user.Email,
-    isAdmin: String(user.is_admin || user.isAdmin || user.IsAdmin || false),
+    isAdmin: String(isAdmin),
+    roles: roles, // Array of role names
     nbf: now,
     exp: exp,
     iat: now,
