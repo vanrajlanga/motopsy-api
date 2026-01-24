@@ -1,6 +1,7 @@
 const axios = require('axios');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
+const apiLogger = require('../utils/api-logger');
 const ServiceHistory = require('../models/service-history.model');
 const { Op } = require('sequelize');
 
@@ -32,6 +33,7 @@ class ServiceHistoryService {
     try {
       logger.info(`[ServiceHistory] Fetching for: ${cleanRegNum}, maker: ${makerLower}`);
 
+      const startTime = Date.now();
       const response = await axios.post(
         requestUrl,
         requestBody,
@@ -40,6 +42,25 @@ class ServiceHistoryService {
           timeout: 60000 // 60 second timeout for this API
         }
       );
+      const duration = Date.now() - startTime;
+
+      // Log API response to file
+      await apiLogger.log({
+        registrationNumber: cleanRegNum,
+        apiSource: 'surepass',
+        endpoint: `service-history-${makerLower}`,
+        request: {
+          url: requestUrl,
+          method: 'POST',
+          headers: this.headers,
+          body: requestBody
+        },
+        response: {
+          status: response.status,
+          data: response.data,
+          duration
+        }
+      });
 
       // Store the result in database
       const serviceHistoryRecord = await ServiceHistory.create({
@@ -69,6 +90,25 @@ class ServiceHistoryService {
       }
     } catch (error) {
       logger.error('[ServiceHistory] API error:', error.message);
+
+      // Log failed API call to file
+      await apiLogger.log({
+        registrationNumber: cleanRegNum,
+        apiSource: 'surepass',
+        endpoint: `service-history-${makerLower}`,
+        request: {
+          url: requestUrl,
+          method: 'POST',
+          headers: this.headers,
+          body: requestBody
+        },
+        response: error.response ? {
+          status: error.response.status,
+          data: error.response.data,
+          duration: 0
+        } : null,
+        error: error.message
+      });
 
       // Store failed attempt
       await ServiceHistory.create({
