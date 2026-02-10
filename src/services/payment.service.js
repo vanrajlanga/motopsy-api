@@ -10,6 +10,8 @@ const couponService = require('./coupon.service');
 const emailService = require('./email.service');
 const pricingService = require('./pricing.service');
 const invoiceService = require('./invoice.service');
+const servicePlanService = require('./service-plan.service');
+const serviceOrderService = require('./service-order.service');
 const { sequelize } = require('../config/database');
 require('dotenv').config();
 
@@ -36,7 +38,7 @@ class PaymentService {
    */
   async createOrder(request, userEmail) {
     try {
-      const { amount, paymentFor, currency = 'INR', couponCode, registrationNumber, kmsDriven } = request;
+      const { amount, paymentFor, currency = 'INR', couponCode, registrationNumber, kmsDriven, servicePlanOptionId, servicePlanId, serviceData } = request;
 
       // Validate required fields
       if (!amount && amount !== 0) {
@@ -47,9 +49,30 @@ class PaymentService {
         return Result.failure('PaymentFor is required');
       }
 
-      // Get configured amount from pricing service (dynamic pricing)
-      const pricingResult = await pricingService.getVehicleHistoryPriceAsync();
-      const configuredAmount = pricingResult.isSuccess ? pricingResult.value.amount : (parseInt(process.env.RAZORPAY_AMOUNT) || 799);
+      let configuredAmount;
+
+      // Check if this is a service order (payment_for >= 3)
+      if (paymentFor >= 3) {
+        // This is a service order (PDI or Service History Report)
+        if (servicePlanOptionId) {
+          // Brand-specific pricing
+          const pricingOption = await servicePlanService.getPricingOptionByIdAsync(servicePlanOptionId);
+          configuredAmount = parseFloat(pricingOption.amount);
+        } else if (servicePlanId) {
+          // Using default pricing (for brands without specific pricing)
+          const servicePlan = await servicePlanService.getServicePlanByIdAsync(servicePlanId);
+          if (!servicePlan || !servicePlan.default_amount) {
+            return Result.failure('Default pricing not configured for this service');
+          }
+          configuredAmount = parseFloat(servicePlan.default_amount);
+        } else {
+          return Result.failure('Either service plan option ID or service plan ID is required');
+        }
+      } else {
+        // Get configured amount from pricing service (dynamic pricing) for vehicle history reports
+        const pricingResult = await pricingService.getVehicleHistoryPriceAsync();
+        configuredAmount = pricingResult.isSuccess ? pricingResult.value.amount : (parseInt(process.env.RAZORPAY_AMOUNT) || 799);
+      }
 
       // Variables to store coupon info for tracking
       let couponId = null;
@@ -130,7 +153,11 @@ class PaymentService {
         discount_amount: discountAmount,
         // Store vehicle details for tracking (in case report generation fails)
         registration_number: registrationNumber ? registrationNumber.toUpperCase().replace(/\s/g, '') : null,
-        kms_driven: kmsDriven ? parseInt(kmsDriven) : null
+        kms_driven: kmsDriven ? parseInt(kmsDriven) : null,
+        // Store service data temporarily for service orders
+        service_plan_option_id: servicePlanOptionId || null,
+        service_plan_id: servicePlanId || null,
+        service_data: serviceData ? JSON.stringify(serviceData) : null
       });
 
       logger.info(`Razorpay order created for ${userEmail}: ${order.id}, paymentFor: ${paymentFor}, paymentHistoryId: ${paymentHistory.id}, couponId: ${couponId}`);
@@ -168,7 +195,9 @@ class PaymentService {
       if (!razorpayPaymentId) missingFields.push('razorpayPaymentId');
       if (!razorpaySignature) missingFields.push('razorpaySignature');
       if (!paymentHistoryId) missingFields.push('paymentHistoryId');
-      if (!registrationNumber) missingFields.push('registrationNumber');
+
+      // Registration number only required for vehicle history reports, not service orders
+      // Note: We'll check payment_for after fetching payment history
 
       if (missingFields.length > 0) {
         const errorMsg = `Missing required fields: ${missingFields.join(', ')}`;
@@ -215,30 +244,140 @@ class PaymentService {
         return Result.failure('Signature verification failed.');
       }
 
-      // Create VehicleDetailRequest record
-      const maxVehicleRequest = await VehicleDetailRequest.findOne({
-        attributes: [[sequelize.fn('MAX', sequelize.col('id')), 'maxId']],
-        raw: true
-      });
-      const nextVehicleRequestId = (maxVehicleRequest && maxVehicleRequest.maxId) ? maxVehicleRequest.maxId + 1 : 1;
+      // Check if this is a service order (payment_for >= 3)
+      const isServiceOrder = existingPaymentHistory && existingPaymentHistory.payment_for >= 3;
+      let vehicleDetailRequest = null;
+      let serviceOrder = null;
 
-      const vehicleDetailRequest = await VehicleDetailRequest.create({
-        id: nextVehicleRequestId,
-        user_id: userId,
-        payment_history_id: paymentHistoryId,
-        registration_number: registrationNumber,
-        make: request.Make || request.make,
-        model: request.Model || request.model,
-        year: request.Year || request.year,
-        trim: request.Trim || request.trim,
-        kms_driven: request.KmsDriven || request.kmsDriven,
-        city: request.City || request.city,
-        no_of_owners: request.NoOfOwners || request.noOfOwners,
-        version: request.Version || request.version,
-        transaction_type: request.TransactionType || request.transactionType,
-        customer_type: request.CustomerType || request.customerType,
-        created_at: new Date()
-      });
+      // For vehicle history reports, registration number is required
+      if (!isServiceOrder && !registrationNumber) {
+        logger.error('Payment verification error: registrationNumber is required for vehicle history reports');
+        return Result.failure('Missing required field: registrationNumber');
+      }
+
+      if (isServiceOrder) {
+        // Handle service order creation
+        try {
+          const serviceData = existingPaymentHistory.service_data ? JSON.parse(existingPaymentHistory.service_data) : {};
+          const servicePlanOptionId = existingPaymentHistory.service_plan_option_id;
+          const servicePlanId = existingPaymentHistory.service_plan_id;
+
+          let finalServicePlanId = servicePlanId;
+          let pricingOption = null;
+
+          // If servicePlanOptionId exists, get the service plan from the option
+          if (servicePlanOptionId) {
+            pricingOption = await servicePlanService.getPricingOptionByIdAsync(servicePlanOptionId);
+            if (pricingOption) {
+              finalServicePlanId = pricingOption.service_plan_id;
+            }
+          }
+
+          // If no service plan ID found, throw error
+          if (!finalServicePlanId) {
+            throw new Error('Service plan ID not found');
+          }
+
+          // Map camelCase to snake_case for service order creation
+          serviceOrder = await serviceOrderService.createServiceOrderAsync({
+            user_id: userId,
+            service_plan_id: finalServicePlanId,
+            service_plan_option_id: servicePlanOptionId, // Can be null for default pricing
+            amount: existingPaymentHistory.amount, // Store the amount paid at time of order
+            name: serviceData.name,
+            mobile_number: serviceData.mobileNumber,
+            email: serviceData.email,
+            car_company: serviceData.carCompany || null,
+            car_model: serviceData.carModel || null,
+            chassis_number: serviceData.chassisNumber || null,
+            registration_number: serviceData.registrationNumber || null,
+            car_model_year: serviceData.carModelYear || null,
+            state: serviceData.state,
+            city: serviceData.city || null,
+            address: serviceData.address,
+            postcode: serviceData.postcode,
+            order_notes: serviceData.orderNotes || null
+          }, paymentHistoryId);
+
+          logger.info(`Service order created: ${serviceOrder.id} for payment ${paymentHistoryId}`);
+
+          // Send email notifications for service order
+          try {
+            const user = await User.findByPk(userId);
+            const servicePlan = await servicePlanService.getServicePlanByIdAsync(finalServicePlanId);
+
+            if (user && servicePlan) {
+              // Determine tier name (use brand name for default pricing)
+              let tierName = 'Standard';
+              if (pricingOption) {
+                tierName = pricingOption.option_name;
+              } else if (serviceData.carCompany) {
+                tierName = serviceData.carCompany + ' (Default Pricing)';
+              }
+
+              const emailOrderDetails = {
+                email: serviceData.email || user.email,
+                name: serviceData.name || [user.first_name, user.last_name].filter(Boolean).join(' ') || user.user_name,
+                serviceName: servicePlan.service_name,
+                tierName: tierName,
+                amount: existingPaymentHistory.amount,
+                orderId: serviceOrder.id,
+                mobileNumber: serviceData.mobileNumber || serviceData.mobile_number || user.phone_number,
+                address: serviceData.address,
+                city: serviceData.city,
+                state: serviceData.state,
+                postcode: serviceData.postcode,
+                carCompany: serviceData.carCompany || serviceData.car_company,
+                carModel: serviceData.carModel || serviceData.car_model,
+                carModelYear: serviceData.carModelYear || serviceData.car_model_year,
+                chassisNumber: serviceData.chassisNumber || serviceData.chassis_number,
+                registrationNumber: serviceData.registrationNumber || serviceData.registration_number || serviceData.carNumber,
+                orderNotes: serviceData.orderNotes || serviceData.order_notes,
+                userId: userId
+              };
+
+              // Send confirmation email to user
+              await emailService.sendServiceOrderConfirmationToUserAsync(emailOrderDetails);
+
+              // Send notification email to admin
+              await emailService.sendServiceOrderNotificationToAdminAsync(emailOrderDetails);
+
+              logger.info(`Service order emails sent for order ${serviceOrder.id}`);
+            }
+          } catch (emailError) {
+            logger.error('Failed to send service order emails:', emailError);
+            // Don't fail the payment if emails fail
+          }
+        } catch (error) {
+          logger.error('Failed to create service order:', error);
+          // Continue with payment verification even if service order creation fails
+        }
+      } else {
+        // Create VehicleDetailRequest record for vehicle history reports
+        const maxVehicleRequest = await VehicleDetailRequest.findOne({
+          attributes: [[sequelize.fn('MAX', sequelize.col('id')), 'maxId']],
+          raw: true
+        });
+        const nextVehicleRequestId = (maxVehicleRequest && maxVehicleRequest.maxId) ? maxVehicleRequest.maxId + 1 : 1;
+
+        vehicleDetailRequest = await VehicleDetailRequest.create({
+          id: nextVehicleRequestId,
+          user_id: userId,
+          payment_history_id: paymentHistoryId,
+          registration_number: registrationNumber,
+          make: request.Make || request.make,
+          model: request.Model || request.model,
+          year: request.Year || request.year,
+          trim: request.Trim || request.trim,
+          kms_driven: request.KmsDriven || request.kmsDriven,
+          city: request.City || request.city,
+          no_of_owners: request.NoOfOwners || request.noOfOwners,
+          version: request.Version || request.version,
+          transaction_type: request.TransactionType || request.transactionType,
+          customer_type: request.CustomerType || request.customerType,
+          created_at: new Date()
+        });
+      }
 
       // Update PaymentHistory record
       // Note: In .NET API, PaymentHistory does NOT have VehicleDetailRequestId column
@@ -257,7 +396,12 @@ class PaymentService {
       paymentHistory.kms_driven = request.KmsDriven || request.kmsDriven || null;
       await paymentHistory.save();
 
-      logger.info(`Payment verified successfully: ${razorpayPaymentId}, VehicleDetailRequestId: ${vehicleDetailRequest.id}`);
+      // Log based on payment type
+      if (isServiceOrder) {
+        logger.info(`Payment verified successfully: ${razorpayPaymentId}, ServiceOrderId: ${serviceOrder?.id || 'N/A'}`);
+      } else {
+        logger.info(`Payment verified successfully: ${razorpayPaymentId}, VehicleDetailRequestId: ${vehicleDetailRequest?.id || 'N/A'}`);
+      }
 
       // Record coupon usage if a coupon was applied
       if (paymentHistory.coupon_id) {
@@ -275,71 +419,83 @@ class PaymentService {
       // Log successful payment activity (matches .NET)
       await userActivityLogService.logActivityAsync(paymentHistory.user_id, 'PaymentSuccess', 'Home', { ip: '0.0.0.0' });
 
-      // Send email notifications about the payment
-      try {
-        const user = await User.findByPk(paymentHistory.user_id);
-        if (user) {
-          // Construct user name from first_name and last_name
-          const userName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.user_name || null;
+      // Send email notifications for vehicle history reports only
+      // Service order emails were already sent during service order creation
+      if (!isServiceOrder) {
+        try {
+          const user = await User.findByPk(paymentHistory.user_id);
+          if (user) {
+            // Construct user name from first_name and last_name
+            const userName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.user_name || null;
 
-          // Generate invoice for the payment
-          let invoiceAttachment = null;
-          try {
-            const invoiceResult = await invoiceService.createInvoice({
-              paymentHistoryId: paymentHistory.id,
-              userId: user.id,
-              customerName: userName || user.email,
-              customerEmail: user.email,
-              customerPhone: user.phone_number || null,
-              registrationNumber: registrationNumber,
-              description: 'Vehicle History Report',
-              quantity: 1,
-              totalAmount: parseFloat(paymentHistory.amount)
-            });
+            // Generate invoice for the payment
+            let invoiceAttachment = null;
+            try {
+              const invoiceResult = await invoiceService.createInvoice({
+                paymentHistoryId: paymentHistory.id,
+                userId: user.id,
+                customerName: userName || user.email,
+                customerEmail: user.email,
+                customerPhone: user.phone_number || null,
+                registrationNumber: registrationNumber,
+                description: 'Vehicle History Report',
+                quantity: 1,
+                totalAmount: parseFloat(paymentHistory.amount)
+              });
 
-            invoiceAttachment = {
-              buffer: invoiceResult.pdfBuffer,
-              fileName: invoiceResult.fileName
-            };
-            logger.info(`Invoice generated: ${invoiceResult.invoice.invoice_number} for payment ${paymentHistory.id}`);
-          } catch (invoiceError) {
-            logger.error('Failed to generate invoice:', invoiceError);
-            // Continue with email without invoice attachment
+              invoiceAttachment = {
+                buffer: invoiceResult.pdfBuffer,
+                fileName: invoiceResult.fileName
+              };
+              logger.info(`Invoice generated: ${invoiceResult.invoice.invoice_number} for payment ${paymentHistory.id}`);
+            } catch (invoiceError) {
+              logger.error('Failed to generate invoice:', invoiceError);
+              // Continue with email without invoice attachment
+            }
+
+            // Send notification to admin (no button)
+            await emailService.sendPaymentNotificationToAdminAsync(
+              user.email,
+              userName,
+              registrationNumber,
+              paymentHistory.amount,
+              paymentMethod,
+              vehicleDetailRequest.id,
+              user.id
+            );
+
+            // Send notification to user with View Report button and invoice attachment
+            await emailService.sendPaymentSuccessToUserAsync(
+              user.email,
+              userName,
+              registrationNumber,
+              paymentHistory.amount,
+              vehicleDetailRequest.id,
+              user.id,
+              invoiceAttachment
+            );
           }
-
-          // Send notification to admin (no button)
-          await emailService.sendPaymentNotificationToAdminAsync(
-            user.email,
-            userName,
-            registrationNumber,
-            paymentHistory.amount,
-            paymentMethod,
-            vehicleDetailRequest.id,
-            user.id
-          );
-
-          // Send notification to user with View Report button and invoice attachment
-          await emailService.sendPaymentSuccessToUserAsync(
-            user.email,
-            userName,
-            registrationNumber,
-            paymentHistory.amount,
-            vehicleDetailRequest.id,
-            user.id,
-            invoiceAttachment
-          );
+        } catch (emailError) {
+          // Log email error but don't fail the payment verification
+          logger.error('Failed to send payment notification emails:', emailError);
         }
-      } catch (emailError) {
-        // Log email error but don't fail the payment verification
-        logger.error('Failed to send payment notification emails:', emailError);
       }
 
       // Return response matching .NET API format
-      return Result.success({
+      const response = {
         success: true,
-        paymentHistoryId: paymentHistory.id,
-        vehicleDetailRequestId: vehicleDetailRequest.id
-      });
+        paymentHistoryId: paymentHistory.id
+      };
+
+      if (vehicleDetailRequest) {
+        response.vehicleDetailRequestId = vehicleDetailRequest.id;
+      }
+
+      if (serviceOrder) {
+        response.serviceOrderId = serviceOrder.id;
+      }
+
+      return Result.success(response);
     } catch (error) {
       logger.error('Verify payment error:', error);
       return Result.failure(error.message || 'Payment verification failed');

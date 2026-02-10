@@ -18,7 +18,7 @@ const PaymentHistory = sequelize.define('payment_histories', {
   payment_for: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    comment: '0=VehicleHistoryReport, 1=PhysicalVerification'
+    comment: '0=VehicleHistoryReport, 1=PhysicalVerification, 3=UsedVehiclePDI, 4=NewVehiclePDI'
   },
   method: {
     type: DataTypes.INTEGER,
@@ -82,6 +82,17 @@ const PaymentHistory = sequelize.define('payment_histories', {
     type: DataTypes.INTEGER,
     allowNull: true,
     comment: 'KMs driven entered by user at time of payment'
+  },
+  // Service order tracking
+  service_plan_option_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'Service plan option ID for service orders'
+  },
+  service_data: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    comment: 'Temporary storage of service form data as JSON'
   }
 }, {
   tableName: 'payment_histories',

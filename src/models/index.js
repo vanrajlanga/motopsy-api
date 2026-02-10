@@ -17,6 +17,9 @@ const Invoice = require('./invoice.model');
 const NcrbReport = require('./ncrb-report.model');
 const VehicleSpecDiscrepancy = require('./discrepancy.model');
 const ServiceHistory = require('./service-history.model');
+const ServicePlan = require('./service-plan.model');
+const ServicePlanOption = require('./service-plan-option.model');
+const ServiceOrder = require('./service-order.model');
 
 // Setup associations (only if not already defined)
 
@@ -176,6 +179,54 @@ if (!UserRole.associations.Role) {
   UserRole.belongsTo(Role, { foreignKey: 'role_id', as: 'Role' });
 }
 
+// ServicePlan has many ServicePlanOptions
+if (!ServicePlan.associations.options) {
+  ServicePlan.hasMany(ServicePlanOption, {
+    foreignKey: 'service_plan_id',
+    as: 'options'
+  });
+}
+
+// ServicePlanOption belongs to ServicePlan
+if (!ServicePlanOption.associations.ServicePlan) {
+  ServicePlanOption.belongsTo(ServicePlan, {
+    foreignKey: 'service_plan_id',
+    as: 'ServicePlan'
+  });
+}
+
+// ServiceOrder belongs to User
+if (!ServiceOrder.associations.User) {
+  ServiceOrder.belongsTo(User, {
+    foreignKey: 'user_id',
+    as: 'User'
+  });
+}
+
+// ServiceOrder belongs to PaymentHistory
+if (!ServiceOrder.associations.PaymentHistory) {
+  ServiceOrder.belongsTo(PaymentHistory, {
+    foreignKey: 'payment_history_id',
+    as: 'PaymentHistory'
+  });
+}
+
+// ServiceOrder belongs to ServicePlan
+if (!ServiceOrder.associations.ServicePlan) {
+  ServiceOrder.belongsTo(ServicePlan, {
+    foreignKey: 'service_plan_id',
+    as: 'ServicePlan'
+  });
+}
+
+// ServiceOrder belongs to ServicePlanOption
+if (!ServiceOrder.associations.ServicePlanOption) {
+  ServiceOrder.belongsTo(ServicePlanOption, {
+    foreignKey: 'service_plan_option_id',
+    as: 'ServicePlanOption'
+  });
+}
+
 module.exports = {
   sequelize,
   User,
@@ -193,5 +244,8 @@ module.exports = {
   Invoice,
   NcrbReport,
   VehicleSpecDiscrepancy,
-  ServiceHistory
+  ServiceHistory,
+  ServicePlan,
+  ServicePlanOption,
+  ServiceOrder
 };

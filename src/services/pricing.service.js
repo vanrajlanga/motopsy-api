@@ -189,10 +189,10 @@ class PricingService {
       const defaultSettings = [
         {
           setting_key: 'vehicle_history_report',
-          setting_name: 'Vehicle History Report',
+          setting_name: 'RTO and Finance Report',
           amount: parseInt(process.env.RAZORPAY_AMOUNT) || 799,
           currency: 'INR',
-          description: 'Price for generating a vehicle history report',
+          description: 'Price for generating a RTO and Finance report',
           is_active: true
         },
         {

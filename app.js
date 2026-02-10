@@ -30,6 +30,8 @@ const customVehicleEntryRoutes = require('./src/routes/custom-vehicle-entry.rout
 const discrepancyRoutes = require('./src/routes/discrepancy.routes');
 const roleRoutes = require('./src/routes/role.routes');
 const serviceHistoryRoutes = require('./src/routes/service-history.routes');
+const servicePlanRoutes = require('./src/routes/service-plan.routes');
+const serviceOrderRoutes = require('./src/routes/service-order.routes');
 
 const app = express();
 
@@ -120,6 +122,8 @@ app.use('/api/custom-vehicles', customVehicleEntryRoutes);
 app.use('/api/discrepancy', discrepancyRoutes);
 app.use('/api/admin/roles', roleRoutes);
 app.use('/api/service-history', serviceHistoryRoutes);
+app.use('/api', servicePlanRoutes);
+app.use('/api', serviceOrderRoutes);
 
 // 404 handler
 app.use((req, res) => {
