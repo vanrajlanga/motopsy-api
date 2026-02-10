@@ -42,6 +42,19 @@ class AccountController extends ApiController {
   }
 
   /**
+   * POST /api/account/google-login
+   * Google OAuth login
+   */
+  async googleLogin(req, res, next) {
+    try {
+      const result = await accountService.googleLoginAsync(req.body);
+      return this.fromResult(result, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * POST /api/account/forgot-password
    * Forgot password
    */

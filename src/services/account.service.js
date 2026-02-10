@@ -9,6 +9,7 @@ const logger = require('../config/logger');
 const emailService = require('./email.service');
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
+const { OAuth2Client } = require('google-auth-library');
 
 class AccountService {
   /**
@@ -204,6 +205,114 @@ class AccountService {
     } catch (error) {
       logger.error('Login error:', error);
       return Result.failure(error.message || 'Login failed');
+    }
+  }
+
+  /**
+   * Google OAuth login
+   * Verifies Google credential and logs in or creates user
+   */
+  async googleLoginAsync(request) {
+    try {
+      const { credential } = request;
+
+      if (!credential) {
+        return Result.failure('Google credential is required');
+      }
+
+      if (!process.env.GOOGLE_CLIENT_ID) {
+        logger.error('GOOGLE_CLIENT_ID environment variable is not set');
+        return Result.failure('Google login is not configured');
+      }
+
+      // Initialize Google OAuth2 client
+      const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+      // Verify the Google token
+      let ticket;
+      try {
+        ticket = await client.verifyIdToken({
+          idToken: credential,
+          audience: process.env.GOOGLE_CLIENT_ID,
+        });
+      } catch (error) {
+        logger.error('Google token verification error:', error);
+        return Result.failure('Invalid Google credential');
+      }
+
+      const payload = ticket.getPayload();
+      const { email, given_name, family_name, picture, sub: googleId } = payload;
+
+      if (!email) {
+        return Result.failure('Email not provided by Google');
+      }
+
+      // Find or create user
+      let user = await User.findOne({
+        where: { normalized_email: email.toUpperCase() }
+      });
+
+      if (!user) {
+        // Create new user from Google account
+        const securityStamp = crypto.randomBytes(16).toString('hex').toUpperCase();
+        const concurrencyStamp = uuidv4();
+
+        // Get next available ID
+        const maxUser = await User.findOne({
+          attributes: [[sequelize.fn('MAX', sequelize.col('id')), 'maxId']],
+          raw: true
+        });
+        const nextId = (maxUser && maxUser.maxId) ? maxUser.maxId + 1 : 1;
+
+        user = await User.create({
+          id: nextId,
+          email: email,
+          normalized_email: email.toUpperCase(),
+          user_name: email,
+          normalized_user_name: email.toUpperCase(),
+          password_hash: '', // No password for Google OAuth users
+          email_confirmed: true, // Google-verified email
+          phone_number: null,
+          phone_number_confirmed: false,
+          two_factor_enabled: false,
+          lockout_enabled: false, // Don't lock Google OAuth accounts
+          access_failed_count: 0,
+          is_admin: false,
+          first_name: given_name || '',
+          last_name: family_name || '',
+          security_stamp: securityStamp,
+          concurrency_stamp: concurrencyStamp,
+          created_at: new Date()
+        });
+
+        logger.info(`New user created via Google OAuth: ${email}, userId: ${user.id}`);
+      } else {
+        // Check if account is locked
+        if (user.lockout_enabled && user.lockout_end && new Date(user.lockout_end) > new Date()) {
+          return Result.failure('Account is locked. Please try again later.');
+        }
+
+        // Update last modified time
+        user.modified_at = new Date();
+        await user.save();
+      }
+
+      // Fetch user roles
+      const userRoles = await UserRole.findAll({
+        where: { user_id: user.id },
+        include: [{ model: Role, as: 'Role' }]
+      });
+      const roleNames = userRoles.map(ur => ur.Role?.name).filter(Boolean);
+
+      // Generate JWT token with roles
+      const tokenData = generateToken(user, roleNames);
+
+      logger.info(`User logged in via Google: ${email}, roles: ${roleNames.join(', ') || 'none'}`);
+
+      return Result.success(tokenData);
+    } catch (error) {
+      logger.error('Google login error:', error);
+      return Result.failure(error.message || 'Google login failed');
     }
   }
 
