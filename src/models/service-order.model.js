@@ -24,6 +24,11 @@ const ServiceOrder = sequelize.define('service_orders', {
     allowNull: true,
     comment: 'NULL when using default pricing'
   },
+  service_package_name: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    comment: 'Name of the service package selected (e.g., Safety Pack, Inspection Only)'
+  },
   amount: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
@@ -77,6 +82,17 @@ const ServiceOrder = sequelize.define('service_orders', {
   },
   order_notes: {
     type: DataTypes.TEXT
+  },
+  // Appointment details
+  appointment_date: {
+    type: DataTypes.DATEONLY,
+    allowNull: true,
+    field: 'appointment_date'
+  },
+  appointment_time_slot: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    field: 'appointment_time_slot'
   },
   // Status
   status: {

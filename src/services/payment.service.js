@@ -56,15 +56,30 @@ class PaymentService {
         // This is a service order (PDI or Service History Report)
         if (servicePlanOptionId) {
           // Brand-specific pricing
-          const pricingOption = await servicePlanService.getPricingOptionByIdAsync(servicePlanOptionId);
-          configuredAmount = parseFloat(pricingOption.amount);
+          try {
+            const pricingOption = await servicePlanService.getPricingOptionByIdAsync(servicePlanOptionId);
+            if (!pricingOption) {
+              logger.error(`Pricing option not found for ID: ${servicePlanOptionId}`);
+              return Result.failure(`Pricing option with ID ${servicePlanOptionId} not found`);
+            }
+            configuredAmount = parseFloat(pricingOption.amount);
+          } catch (error) {
+            logger.error(`Error fetching pricing option ${servicePlanOptionId}:`, error.message);
+            return Result.failure(`Invalid pricing option: ${error.message}`);
+          }
         } else if (servicePlanId) {
           // Using default pricing (for brands without specific pricing)
           const servicePlan = await servicePlanService.getServicePlanByIdAsync(servicePlanId);
-          if (!servicePlan || !servicePlan.default_amount) {
-            return Result.failure('Default pricing not configured for this service');
+          if (!servicePlan) {
+            return Result.failure('Service plan not found');
           }
-          configuredAmount = parseFloat(servicePlan.default_amount);
+          // If default_amount is 0, it means dynamic pricing (e.g., combo plans)
+          // In this case, we accept the amount from frontend
+          if (servicePlan.default_amount === 0 || servicePlan.default_amount === '0' || servicePlan.default_amount === null) {
+            configuredAmount = amount; // Use the amount sent from frontend (dynamically calculated)
+          } else {
+            configuredAmount = parseFloat(servicePlan.default_amount);
+          }
         } else {
           return Result.failure('Either service plan option ID or service plan ID is required');
         }
@@ -103,7 +118,8 @@ class PaymentService {
       } else {
         // No coupon - amount must match configured amount
         if (amount !== configuredAmount) {
-          return Result.failure('Amount does not match');
+          logger.error(`Amount mismatch: Frontend sent ${amount}, Backend expects ${configuredAmount}, servicePlanOptionId: ${servicePlanOptionId}, servicePlanId: ${servicePlanId}`);
+          return Result.failure(`Amount does not match. Expected: ₹${configuredAmount}, Received: ₹${amount}`);
         }
       }
 
@@ -273,8 +289,52 @@ class PaymentService {
             }
           }
 
-          // If no service plan ID found, throw error
+          // FALLBACK: If no service plan ID found, try to determine from servicePackageName
+          if (!finalServicePlanId && serviceData.servicePackageName) {
+            logger.info(`Attempting to find service plan from package name: ${serviceData.servicePackageName}`);
+
+            // Check if it's the combo plan
+            if (serviceData.servicePackageName.includes('Vehicle Intelligence') &&
+                serviceData.servicePackageName.includes('Service History')) {
+              try {
+                const comboPlan = await servicePlanService.getServicePlanByKeyAsync('vehicle_intelligence_service_history');
+                if (comboPlan) {
+                  finalServicePlanId = comboPlan.id;
+                  logger.info(`Found combo service plan with ID: ${finalServicePlanId}`);
+                }
+              } catch (error) {
+                logger.error('Failed to find combo service plan:', error);
+              }
+            }
+            // Check if it's Safety Pack
+            else if (serviceData.servicePackageName.includes('Safety Pack')) {
+              try {
+                const safetyPackPlan = await servicePlanService.getServicePlanByKeyAsync('safety_pack');
+                if (safetyPackPlan) {
+                  finalServicePlanId = safetyPackPlan.id;
+                  logger.info(`Found Safety Pack service plan with ID: ${finalServicePlanId}`);
+                }
+              } catch (error) {
+                logger.error('Failed to find Safety Pack service plan:', error);
+              }
+            }
+            // Check if it's Inspection Only
+            else if (serviceData.servicePackageName.includes('Inspection Only')) {
+              try {
+                const inspectionOnlyPlan = await servicePlanService.getServicePlanByKeyAsync('inspection_only');
+                if (inspectionOnlyPlan) {
+                  finalServicePlanId = inspectionOnlyPlan.id;
+                  logger.info(`Found Inspection Only service plan with ID: ${finalServicePlanId}`);
+                }
+              } catch (error) {
+                logger.error('Failed to find Inspection Only service plan:', error);
+              }
+            }
+          }
+
+          // If still no service plan ID found, throw error
           if (!finalServicePlanId) {
+            logger.error('Service plan ID not found. servicePlanId:', servicePlanId, 'servicePlanOptionId:', servicePlanOptionId, 'servicePackageName:', serviceData.servicePackageName);
             throw new Error('Service plan ID not found');
           }
 
@@ -283,6 +343,7 @@ class PaymentService {
             user_id: userId,
             service_plan_id: finalServicePlanId,
             service_plan_option_id: servicePlanOptionId, // Can be null for default pricing
+            service_package_name: serviceData.servicePackageName || null,
             amount: existingPaymentHistory.amount, // Store the amount paid at time of order
             name: serviceData.name,
             mobile_number: serviceData.mobileNumber,
@@ -296,7 +357,9 @@ class PaymentService {
             city: serviceData.city || null,
             address: serviceData.address,
             postcode: serviceData.postcode,
-            order_notes: serviceData.orderNotes || null
+            order_notes: serviceData.orderNotes || null,
+            appointment_date: serviceData.selectedDate ? serviceData.selectedDate.substring(0, 10) : null,
+            appointment_time_slot: serviceData.selectedTimeSlot || null
           }, paymentHistoryId);
 
           logger.info(`Service order created: ${serviceOrder.id} for payment ${paymentHistoryId}`);
@@ -320,6 +383,7 @@ class PaymentService {
                 name: serviceData.name || [user.first_name, user.last_name].filter(Boolean).join(' ') || user.user_name,
                 serviceName: servicePlan.service_name,
                 tierName: tierName,
+                servicePackageName: serviceData.servicePackageName || null,
                 amount: existingPaymentHistory.amount,
                 orderId: serviceOrder.id,
                 mobileNumber: serviceData.mobileNumber || serviceData.mobile_number || user.phone_number,
@@ -333,7 +397,9 @@ class PaymentService {
                 chassisNumber: serviceData.chassisNumber || serviceData.chassis_number,
                 registrationNumber: serviceData.registrationNumber || serviceData.registration_number || serviceData.carNumber,
                 orderNotes: serviceData.orderNotes || serviceData.order_notes,
-                userId: userId
+                userId: userId,
+                appointmentDate: serviceData.selectedDate || null,
+                appointmentTimeSlot: serviceData.selectedTimeSlot || null
               };
 
               // Send confirmation email to user

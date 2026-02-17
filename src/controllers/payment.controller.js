@@ -1,5 +1,6 @@
 const ApiController = require('./base.controller');
 const paymentService = require('../services/payment.service');
+const logger = require('../config/logger');
 
 class PaymentController extends ApiController {
   /**
@@ -8,6 +9,7 @@ class PaymentController extends ApiController {
    */
   async createOrder(req, res, next) {
     try {
+      logger.info('Create order request body:', JSON.stringify(req.body));
       const result = await paymentService.createOrder(req.body, req.user.identity.name);
       return this.fromResult(result, res);
     } catch (error) {

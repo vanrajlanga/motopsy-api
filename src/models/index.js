@@ -20,6 +20,7 @@ const ServiceHistory = require('./service-history.model');
 const ServicePlan = require('./service-plan.model');
 const ServicePlanOption = require('./service-plan-option.model');
 const ServiceOrder = require('./service-order.model');
+const AppointmentSlotBlock = require('./appointment-slot-block.model');
 
 // Setup associations (only if not already defined)
 
@@ -247,5 +248,6 @@ module.exports = {
   ServiceHistory,
   ServicePlan,
   ServicePlanOption,
-  ServiceOrder
+  ServiceOrder,
+  AppointmentSlotBlock
 };

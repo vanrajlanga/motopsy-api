@@ -32,6 +32,7 @@ const roleRoutes = require('./src/routes/role.routes');
 const serviceHistoryRoutes = require('./src/routes/service-history.routes');
 const servicePlanRoutes = require('./src/routes/service-plan.routes');
 const serviceOrderRoutes = require('./src/routes/service-order.routes');
+const appointmentSlotRoutes = require('./src/routes/appointment-slot.routes');
 
 const app = express();
 
@@ -124,6 +125,7 @@ app.use('/api/admin/roles', roleRoutes);
 app.use('/api/service-history', serviceHistoryRoutes);
 app.use('/api', servicePlanRoutes);
 app.use('/api', serviceOrderRoutes);
+app.use('/api', appointmentSlotRoutes);
 
 // 404 handler
 app.use((req, res) => {

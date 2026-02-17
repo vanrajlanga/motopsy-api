@@ -654,13 +654,16 @@ class EmailService {
                 name,
                 serviceName,
                 tierName,
+                servicePackageName,
                 amount,
                 orderId,
                 mobileNumber,
                 address,
                 city,
                 state,
-                postcode
+                postcode,
+                appointmentDate,
+                appointmentTimeSlot
             } = orderDetails;
 
             const mailOptions = {
@@ -708,7 +711,8 @@ class EmailService {
                 <div class="service-highlight">
                   <h3>📋 Service Purchased</h3>
                   <p><strong>${serviceName}</strong></p>
-                  <p style="font-size: 14px; color: hsl(195, 100%, 42%); font-weight: 600;">${tierName}</p>
+                  ${servicePackageName ? `<p style="font-size: 16px; color: hsl(195, 100%, 42%); font-weight: 700; margin-top: 5px;">Package: ${servicePackageName}</p>` : ''}
+                  <p style="font-size: 14px; color: #666; font-weight: 600;">${tierName}</p>
                 </div>
 
                 <div class="order-id">Order ID: #${orderId}</div>
@@ -749,11 +753,37 @@ class EmailService {
                   </tr>
                 </table>
 
+                ${appointmentDate ? `
+                <div style="background: linear-gradient(135deg, #e8f5ff 0%, #f0f9ff 100%); padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <h3 style="margin: 0 0 15px 0; color: #1c3b54; font-size: 16px; font-weight: 600;">
+                    📅 Scheduled Appointment
+                  </h3>
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                      <td style="padding: 8px 0; color: #555; font-size: 14px;">
+                        <strong>Date:</strong> ${new Date(appointmentDate).toLocaleDateString('en-IN', {
+                          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                        })}
+                      </td>
+                    </tr>
+                    ${appointmentTimeSlot ? `
+                    <tr>
+                      <td style="padding: 8px 0; color: #555; font-size: 14px;">
+                        <strong>Time:</strong> ${appointmentTimeSlot}
+                      </td>
+                    </tr>
+                    ` : ''}
+                  </table>
+                </div>
+                ` : ''}
+
                 <div class="info-box">
                   <h3>🎯 What Happens Next?</h3>
                   <ul style="margin: 10px 0; padding-left: 20px;">
                     <li style="margin-bottom: 8px;">Our team will review your order and service details</li>
-                    <li style="margin-bottom: 8px;">We'll contact you within <strong>24 hours</strong> on <strong>${mobileNumber}</strong> to schedule the inspection</li>
+                    <li style="margin-bottom: 8px;">${appointmentDate
+                      ? `Our technician will visit your location on <strong>${new Date(appointmentDate).toLocaleDateString('en-IN', { month: 'long', day: 'numeric' })}</strong> during the <strong>${appointmentTimeSlot}</strong> time slot`
+                      : `We'll contact you within <strong>24 hours</strong> on <strong>${mobileNumber}</strong> to schedule the inspection`}</li>
                     <li style="margin-bottom: 8px;">The PDI inspection will be conducted at your provided address</li>
                     <li style="margin-bottom: 8px;">You'll receive a detailed <strong>${serviceName}</strong> via email after completion</li>
                   </ul>
@@ -803,6 +833,7 @@ class EmailService {
                 mobileNumber,
                 serviceName,
                 tierName,
+                servicePackageName,
                 amount,
                 orderId,
                 carCompany,
@@ -815,7 +846,9 @@ class EmailService {
                 state,
                 postcode,
                 orderNotes,
-                userId
+                userId,
+                appointmentDate,
+                appointmentTimeSlot
             } = orderDetails;
 
             const mailOptions = {
@@ -861,6 +894,10 @@ class EmailService {
                       <td>Service Type:</td>
                       <td><strong>${serviceName}</strong></td>
                     </tr>
+                    ${servicePackageName ? `<tr>
+                      <td>Service Package:</td>
+                      <td><strong style="color: hsl(195, 100%, 42%); font-size: 16px;">${servicePackageName}</strong></td>
+                    </tr>` : ''}
                     <tr>
                       <td>Selected Tier:</td>
                       <td><span class="badge badge-primary">${tierName}</span></td>
@@ -959,6 +996,30 @@ class EmailService {
                     </tr>
                   </table>
                 </div>
+
+                ${appointmentDate ? `
+                <div style="background: linear-gradient(135deg, #e8f5ff 0%, #f0f9ff 100%); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #00a8e8;">
+                  <h3 style="margin: 0 0 15px 0; color: #1c3b54; font-size: 16px; font-weight: 600;">
+                    📅 Scheduled Appointment
+                  </h3>
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                      <td style="padding: 8px 0; color: #333; font-size: 14px;">
+                        <strong>Date:</strong> ${new Date(appointmentDate).toLocaleDateString('en-IN', {
+                          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                        })}
+                      </td>
+                    </tr>
+                    ${appointmentTimeSlot ? `
+                    <tr>
+                      <td style="padding: 8px 0; color: #333; font-size: 14px;">
+                        <strong>Time Slot:</strong> ${appointmentTimeSlot}
+                      </td>
+                    </tr>
+                    ` : ''}
+                  </table>
+                </div>
+                ` : ''}
 
                 ${orderNotes ? `
                 <div class="notes-box">

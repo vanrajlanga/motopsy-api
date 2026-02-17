@@ -13,6 +13,7 @@ class ServiceOrderService {
         payment_history_id: paymentHistoryId,
         service_plan_id: orderData.service_plan_id,
         service_plan_option_id: orderData.service_plan_option_id,
+        service_package_name: orderData.service_package_name || null,
         amount: orderData.amount, // Store the amount paid at time of order
         // Customer details
         name: orderData.name,
@@ -30,6 +31,9 @@ class ServiceOrderService {
         address: orderData.address,
         postcode: orderData.postcode,
         order_notes: orderData.order_notes || null,
+        // Appointment details
+        appointment_date: orderData.appointment_date || null,
+        appointment_time_slot: orderData.appointment_time_slot || null,
         // Status
         status: 0 // Pending
       });
