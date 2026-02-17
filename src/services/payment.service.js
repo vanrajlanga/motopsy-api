@@ -38,7 +38,7 @@ class PaymentService {
    */
   async createOrder(request, userEmail) {
     try {
-      const { amount, paymentFor, currency = 'INR', couponCode, registrationNumber, kmsDriven, servicePlanOptionId, servicePlanId, serviceData } = request;
+      const { amount, paymentFor, currency = 'INR', couponCode, originalAmount: clientOriginalAmount, registrationNumber, kmsDriven, servicePlanOptionId, servicePlanId, serviceData } = request;
 
       // Validate required fields
       if (!amount && amount !== 0) {
@@ -74,9 +74,10 @@ class PaymentService {
             return Result.failure('Service plan not found');
           }
           // If default_amount is 0, it means dynamic pricing (e.g., combo plans)
-          // In this case, we accept the amount from frontend
+          // When a coupon is applied, use the originalAmount (pre-discount) sent by the frontend
+          // so coupon re-validation is done against the correct base price.
           if (servicePlan.default_amount === 0 || servicePlan.default_amount === '0' || servicePlan.default_amount === null) {
-            configuredAmount = amount; // Use the amount sent from frontend (dynamically calculated)
+            configuredAmount = (couponCode && clientOriginalAmount) ? parseFloat(clientOriginalAmount) : amount;
           } else {
             configuredAmount = parseFloat(servicePlan.default_amount);
           }
