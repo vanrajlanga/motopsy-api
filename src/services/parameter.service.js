@@ -158,6 +158,56 @@ class ParameterService {
   }
 
   /**
+   * Get a single parameter by ID with all fields.
+   */
+  async getParameterById(id) {
+    try {
+      const param = await InspectionParameter.findByPk(id);
+      if (!param) {
+        return Result.failure('Parameter not found');
+      }
+      return Result.success(param.toJSON());
+    } catch (error) {
+      logger.error('Get parameter by ID error:', error);
+      return Result.failure(error.message || 'Failed to get parameter');
+    }
+  }
+
+  /**
+   * Update a parameter's editable fields.
+   */
+  async updateParameter(id, data) {
+    try {
+      const param = await InspectionParameter.findByPk(id);
+      if (!param) {
+        return Result.failure('Parameter not found');
+      }
+
+      const allowedFields = [
+        'name', 'detail', 'input_type',
+        'option_1', 'option_2', 'option_3', 'option_4', 'option_5',
+        'score_1', 'score_2', 'score_3', 'score_4', 'score_5',
+        'fuel_filter', 'transmission_filter', 'is_red_flag', 'sort_order'
+      ];
+
+      const updateData = {};
+      for (const field of allowedFields) {
+        if (data[field] !== undefined) {
+          updateData[field] = data[field];
+        }
+      }
+
+      updateData.modified_at = new Date();
+
+      await param.update(updateData);
+      return Result.success(param.toJSON());
+    } catch (error) {
+      logger.error('Update parameter error:', error);
+      return Result.failure(error.message || 'Failed to update parameter');
+    }
+  }
+
+  /**
    * Bulk toggle all parameters in a module (across all its sub-groups).
    */
   async toggleModuleStatus(moduleId, isActive) {

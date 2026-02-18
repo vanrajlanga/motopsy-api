@@ -1,6 +1,7 @@
 const BaseController = require('./base.controller');
 const inspectionService = require('../services/inspection.service');
 const certificateService = require('../services/certificate.service');
+const Inspection = require('../models/inspection.model');
 const InspectionPhoto = require('../models/inspection-photo.model');
 const InspectionResponse = require('../models/inspection-response.model');
 
@@ -97,6 +98,33 @@ class InspectionController extends BaseController {
       const { id } = req.params;
       const result = await certificateService.generate(parseInt(id));
       return this.fromResult(result, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async uploadInspectorPhoto(req, res, next) {
+    try {
+      const { id } = req.params;
+
+      const inspection = await Inspection.findByPk(parseInt(id));
+      if (!inspection) {
+        return this.notFound('Inspection not found', res);
+      }
+
+      if (!req.file) {
+        return this.badRequest('No file uploaded', res);
+      }
+
+      await inspection.update({
+        inspector_photo_path: req.file.path,
+        modified_at: new Date()
+      });
+
+      return this.ok({
+        inspectionId: inspection.id,
+        inspectorPhotoPath: req.file.path
+      }, res);
     } catch (error) {
       next(error);
     }

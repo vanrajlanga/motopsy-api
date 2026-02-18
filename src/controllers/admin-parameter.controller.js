@@ -12,6 +12,32 @@ class AdminParameterController extends BaseController {
   }
 
   /**
+   * GET /api/admin/parameters/:id
+   * Get a single parameter with all fields
+   */
+  async getParameter(req, res) {
+    const { id } = req.params;
+    const result = await parameterService.getParameterById(parseInt(id));
+    return this.fromResult(result, res);
+  }
+
+  /**
+   * PUT /api/admin/parameters/:id
+   * Update a parameter's editable fields
+   */
+  async updateParameter(req, res) {
+    const { id } = req.params;
+    const data = req.body;
+
+    if (!data.name || !data.name.trim()) {
+      return this.badRequest('name is required', res);
+    }
+
+    const result = await parameterService.updateParameter(parseInt(id), data);
+    return this.fromResult(result, res);
+  }
+
+  /**
    * PATCH /api/admin/parameters/:id/status
    * Toggle a single parameter's is_active status
    */

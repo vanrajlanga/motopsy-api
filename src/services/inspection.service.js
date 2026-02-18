@@ -24,7 +24,7 @@ class InspectionService {
     try {
       const { vehicleRegNumber, vehicleMake, vehicleModel, vehicleYear,
               fuelType, transmissionType, odometerKm,
-              gpsLatitude, gpsLongitude, gpsAddress } = vehicleData;
+              gpsLatitude, gpsLongitude, gpsAddress, inspectorName } = vehicleData;
 
       // Get applicable parameters
       const paramResult = await parameterService.getApplicableParameters(fuelType, transmissionType);
@@ -55,6 +55,7 @@ class InspectionService {
         gps_latitude: gpsLatitude,
         gps_longitude: gpsLongitude,
         gps_address: gpsAddress,
+        inspector_name: inspectorName || null,
         status: 'in_progress',
         total_applicable_params: allParamIds.length,
         total_answered_params: 0,
@@ -455,13 +456,15 @@ class InspectionService {
       gpsLatitude: data.gps_latitude,
       gpsLongitude: data.gps_longitude,
       gpsAddress: data.gps_address,
+      inspectorName: data.inspector_name,
+      inspectorPhotoPath: data.inspector_photo_path,
       status: data.status,
       totalApplicableParams: data.total_applicable_params,
       totalAnsweredParams: data.total_answered_params,
       startedAt: data.started_at,
       completedAt: data.completed_at,
       modules,
-      score: data.Score || null,
+      score: data.Score ? this.transformScore(data.Score) : null,
       certificate: data.Certificate ? {
         id: data.Certificate.id,
         inspectionId: data.Certificate.inspection_id,
@@ -472,6 +475,50 @@ class InspectionService {
         issuedAt: data.Certificate.issued_at,
         expiresAt: data.Certificate.expires_at
       } : null
+    };
+  }
+
+  transformScore(score) {
+    const moduleRisks = {};
+    const riskColumns = {
+      engine_risk: 'engine_system',
+      transmission_risk: 'transmission_drivetrain',
+      structural_risk: 'structural_integrity',
+      paint_risk: 'paint_panel',
+      suspension_risk: 'suspension_brakes',
+      electrical_risk: 'electrical_electronics',
+      interior_risk: 'interior_safety',
+      documents_risk: 'documentation',
+      road_test_risk: 'road_test',
+    };
+
+    for (const [col, slug] of Object.entries(riskColumns)) {
+      const val = parseFloat(score[col] || 0);
+      if (val > 0) {
+        moduleRisks[slug] = val;
+      }
+    }
+
+    // Safe-parse JSON fields (MySQL may return strings)
+    let breakdown = score.repair_cost_breakdown || {};
+    if (typeof breakdown === 'string') {
+      try { breakdown = JSON.parse(breakdown); } catch (e) { breakdown = {}; }
+    }
+
+    let redFlagParams = score.red_flag_params || [];
+    if (typeof redFlagParams === 'string') {
+      try { redFlagParams = JSON.parse(redFlagParams); } catch (e) { redFlagParams = []; }
+    }
+
+    return {
+      vri: parseFloat(score.vri || 0),
+      rating: parseFloat(score.rating || 0),
+      certification: score.certification,
+      hasRedFlags: !!score.has_red_flags,
+      redFlagParams,
+      totalRepairCost: parseFloat(score.total_repair_cost || 0),
+      repairCostBreakdown: breakdown,
+      moduleRisks
     };
   }
 }

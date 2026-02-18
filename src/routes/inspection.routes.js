@@ -12,6 +12,7 @@ router.put('/:id/responses/:parameterId', inspectionController.saveResponse.bind
 router.post('/:id/complete', inspectionController.complete.bind(inspectionController));
 router.get('/:id/score', inspectionController.getScore.bind(inspectionController));
 router.post('/:id/certificate', inspectionController.generateCertificate.bind(inspectionController));
+router.post('/:id/inspector-photo', upload.single('photo'), inspectionController.uploadInspectorPhoto.bind(inspectionController));
 router.post('/:id/responses/:responseId/photos', upload.single('photo'), inspectionController.uploadPhoto.bind(inspectionController));
 
 module.exports = router;

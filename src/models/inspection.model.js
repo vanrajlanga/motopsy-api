@@ -56,6 +56,14 @@ const Inspection = sequelize.define('inspections', {
     type: DataTypes.STRING(255),
     allowNull: true
   },
+  inspector_name: {
+    type: DataTypes.STRING(150),
+    allowNull: true
+  },
+  inspector_photo_path: {
+    type: DataTypes.STRING(500),
+    allowNull: true
+  },
   status: {
     type: DataTypes.ENUM('draft', 'in_progress', 'completed', 'scored', 'certified'),
     allowNull: false,
