@@ -1,0 +1,496 @@
+MOTOPSY INSPECTION PARAMETERS,,,,,,,,,,,,,,,,
+Organized by Module > Sub-Group | Total Parameters: 378,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,
+ENGINE SYSTEM  (Weight: 22% | 78 parameters),,,,,,,,,,,,,,,,
+    CNG System (8 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+1,CNG Hydro Test Validity,Check cylinder hydro-test date stamp; must be within 3-year validity period,cng_cert,Valid,Expiring <3mo,Expired,Missing,,0,0.30,0.65,0.95,,CNG,All,No
+2,CNG Kit Certificate,Verify RTO-approved CNG fitment certificate with matching chassis number,cng_cert,Valid,Expiring <3mo,Expired,Missing,,0,0.30,0.65,0.95,,CNG,All,No
+3,CNG Leak Test,Apply soapy water on CNG joints and fittings; watch for bubbles indicating gas leak,pass_fail,Pass,Marginal,Fail,,,0,0.45,0.95,,,CNG,All,No
+4,CNG Regulator,"Inspect pressure regulator for cracks, corrosion and leaks; verify proper pressure output",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,CNG,All,No
+5,CNG Tank Condition,"Visually inspect CNG cylinder for dents, corrosion, scuff marks and expiry date stamp",cng_tank,Good,Minor Scuffs,Dented,Corroded,Expired/Damaged,0,0.15,0.40,0.70,0.95,CNG,All,No
+6,Cylinder Mounting,Check cylinder mounting brackets and straps for tightness and structural integrity,condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,CNG,All,No
+7,Emergency Shut-off Valve,Operate shut-off valve on/off; verify it completely stops gas flow when closed,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,CNG,All,No
+8,Gas Injector Condition,"Inspect gas injector rail for leaks, corrosion and proper seating on manifold",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,CNG,All,No
+,,,,,,,,,,,,,,,,
+    Combustion & Internal Health (20 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+9,Cold Start Smoothness,"Start engine from cold; observe cranking effort, idle stability and initial vibrations",smoothness,Smooth,Slight Roughness,Rough,Very Rough,Grinding,0,0.15,0.40,0.70,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+10,Engine Blowback Test,Remove oil filler cap on running engine; check for excessive pressure or vapor blowback,blowback,None,Trace Vapor,Mild Puff,Moderate,Heavy Blow,0,0.20,0.45,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+11,Engine Misfire Detection,Listen for irregular firing pattern at idle and under load; note any stumbling or hesitation,misfire,None,Occasional,Intermittent,Frequent,Constant,0,0.25,0.50,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+12,Excessive Engine Vibration,Feel engine area for abnormal vibration at idle and when revving; compare with typical levels,vibration,None,Slight,Moderate,Heavy,Severe,0,0.15,0.40,0.70,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+13,Exhaust Odor Abnormality,"Smell exhaust output for unusual odors such as raw fuel, burning oil or sweet coolant",odor,Normal,Mild,Noticeable,Strong,Pungent,0,0.15,0.40,0.70,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+14,Exhaust Smoke – Black,Observe exhaust under acceleration; black smoke indicates rich fuel mixture or injector issue,smoke,None,Trace,Light,Moderate,Heavy,0,0.20,0.45,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+15,Exhaust Smoke – Blue,Observe exhaust at startup and revving; blue smoke indicates engine is burning oil,smoke,None,Trace,Light,Moderate,Heavy,0,0.20,0.45,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+16,Exhaust Smoke – White,Observe exhaust at operating temperature; persistent white smoke may indicate coolant leak into combustion,smoke,None,Trace,Light,Moderate,Heavy,0,0.20,0.45,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+17,Head Gasket Failure Signs,"Check for milky oil on dipstick, bubbles in coolant reservoir, white exhaust and overheating pattern",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,"Petrol, Diesel, CNG, Hybrid",All,No
+18,Idle RPM Stability,Observe tachometer at idle for 2 minutes; RPM should hold steady without hunting or fluctuation,idle_rpm,Stable,Slightly Unsteady,Rough Idle,Very Rough,Stalling,0,0.20,0.45,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+19,Intercooler Condition,"Inspect intercooler pipes and core for damage, boost leaks and clogged or bent fins",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+20,Knocking Noise,Listen for deep metallic knocking sound from lower engine at idle and under load,noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+21,Overheating Evidence,"Check for coolant stains, warped components, blown hoses or erratic temperature gauge behavior",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+22,Radiator Condition,"Inspect radiator core for bent fins, cracks, leaks, corrosion and dried coolant stains",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+23,Radiator Fan Operation,Run engine to operating temperature; verify cooling fan engages automatically and spins freely,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+24,Tapping Noise,Listen for light rhythmic tapping from valve train area (top of engine) at idle,noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+25,Throttle Response Delay,Press accelerator progressively; engine RPM should rise immediately without lag or hesitation,delay,Responsive,Slight Delay,Noticeable,Significant,No Response,0,0.15,0.40,0.70,0.95,All,All,No
+26,Timing Chain Noise,Listen for metallic rattling or whining from front of engine especially during cold start,noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+27,Turbo Charger Performance,Listen for turbo spool-up sound under acceleration; check turbo shaft for play and oil leaks at seals,condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+28,Warm Start Smoothness,Restart engine when fully warm; should catch immediately and settle to smooth idle,smoothness,Smooth,Slight Roughness,Rough,Very Rough,Grinding,0,0.15,0.40,0.70,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+,,,,,,,,,,,,,,,,
+    Diagnostics & Electronics (7 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+29,ABS Module Codes,Connect OBD scanner; read ABS module for active and stored fault codes,obd_codes,None,Cleared History,Minor (1-2),Multiple (3+),Critical DTCs,0,0.25,0.40,0.70,0.95,All,All,No
+30,Airbag Module Codes,Connect OBD scanner; read SRS/airbag module for deployment history and stored fault codes,obd_codes,None,Cleared History,Minor (1-2),Multiple (3+),Critical DTCs,0,0.25,0.40,0.70,0.95,All,All,No
+31,Compression Consistency,Perform compression test across all cylinders; compare readings for consistency (max 10% variation),compression,Even,Slight Variation,Moderate Variation,Significant,Cylinder Fail,0,0.15,0.40,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+32,ECU Tampering Signs,"Check for aftermarket ECU tuning chips, piggyback modules or evidence of software remapping",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+33,Emission System Codes,Connect OBD scanner; read emission system for catalytic converter and O2 sensor fault codes,obd_codes,None,Cleared History,Minor (1-2),Multiple (3+),Critical DTCs,0,0.25,0.40,0.70,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+34,OBD Active Error Codes,Connect OBD scanner; read and document all currently active diagnostic trouble codes (DTCs),obd_codes,None,Cleared History,Minor (1-2),Multiple (3+),Critical DTCs,0,0.25,0.40,0.70,0.95,All,All,No
+35,OBD Historical Codes,Read stored and pending codes from OBD history; note if codes have been recently cleared,obd_codes,None,Cleared History,Minor (1-2),Multiple (3+),Critical DTCs,0,0.25,0.40,0.70,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+    Diesel Specific (6 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+36,AdBlue/DEF Level,Check AdBlue/DEF tank level on dashboard or visually; inspect filler cap and supply hoses,fluid_level,Full,Adequate,Low,Very Low,Empty,0,0.10,0.35,0.70,0.95,Diesel,All,No
+37,Diesel Injector Performance,Listen for even injector ticking pattern with engine running; check for fuel leaks around rail,condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,Diesel,All,No
+38,DPF Condition,Check DPF warning light history on dashboard; inspect exhaust for excessive soot buildup,dpf,Clean,Light Soot,Partially Blocked,Heavily Blocked,Failed,0,0.15,0.40,0.70,0.95,Diesel,All,No
+39,EGR Valve Condition,Inspect EGR valve and passages for heavy carbon buildup; check valve movement and sealing,condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,Diesel,All,No
+40,Fuel Water Separator,Inspect fuel water separator bowl for water accumulation; test drain valve operation,condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,Diesel,All,No
+41,Glow Plug Function,Turn ignition ON without starting; glow plug indicator should illuminate then extinguish within seconds,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,Diesel,All,No
+,,,,,,,,,,,,,,,,
+    EV Powertrain (11 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+42,12V Auxiliary Battery,Test 12V auxiliary battery voltage and health using multimeter or electronic battery tester,battery_hp,>80% Good,60-80% Fair,40-60% Weak,<40% Replace,,0,0.30,0.65,0.95,,"Electric, Hybrid",All,No
+43,Battery Cooling,Check battery cooling fan operation; verify coolant flow through HV battery thermal management circuit,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,"Electric, Hybrid",All,No
+44,Charging Port Condition,"Inspect EV charging port for bent pins, corrosion, cracks, water ingress or physical damage",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,"Electric, Hybrid",All,No
+45,DC Fast Charge Test,Connect DC fast charger; verify charging session initiates and power delivery matches expected rate,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,"Electric, Hybrid",All,No
+46,Electric Motor Noise,"Listen for unusual whining, grinding or clicking sounds from electric drive motor area",noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,"Electric, Hybrid",All,No
+47,Electric Motor Vibration,Feel for abnormal vibration from electric motor area during acceleration and deceleration,vibration,None,Slight,Moderate,Heavy,Severe,0,0.15,0.40,0.70,0.95,"Electric, Hybrid",All,No
+48,HV Battery SOH,Read HV battery State of Health percentage from vehicle diagnostics screen or OBD scanner,battery_soh,>90% Excellent,80-90% Good,70-80% Fair,60-70% Worn,<60% Degraded,0,0.10,0.35,0.65,0.95,"Electric, Hybrid",All,No
+49,HV Cable Inspection,"Visually trace orange HV cables for insulation damage, chafing, abrasion or exposed conductors",hv_cable,Intact,Minor Wear,Insulation Damage,Exposed Wire,Arcing Signs,0,0.25,0.55,0.80,0.95,"Electric, Hybrid",All,No
+50,L1/L2 Charging Test,Connect AC Level 1/2 charger; verify charging session starts and power draw is within specification,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,"Electric, Hybrid",All,No
+51,Regenerative Braking,Lift off accelerator while driving; regenerative braking should decelerate smoothly and consistently,regen,Smooth,Slight Judder,Weak Regen,Erratic,Non-Functional,0,0.15,0.40,0.70,0.95,"Electric, Hybrid",All,No
+52,Thermal Management System,Monitor battery thermal management during driving; heating and cooling should activate as needed,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,"Electric, Hybrid",All,No
+,,,,,,,,,,,,,,,,
+    Fluids & Lubrication (15 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+53,Brake Fluid Contamination,"Draw brake fluid sample from reservoir cap; check for dark discoloration, debris or moisture contamination",contamination,None,Trace,Mild,Heavy,Severe,0,0.15,0.35,0.70,0.95,All,All,No
+54,Brake Fluid Level,Visually check brake fluid reservoir level against MIN and MAX markings on reservoir,fluid_level,Full,Adequate,Low,Very Low,Empty,0,0.10,0.35,0.70,0.95,All,All,No
+55,Coolant Color,Open coolant reservoir cap when cold; inspect coolant color against expected type for the vehicle,coolant_color,Green/Blue Normal,Orange/Pink Normal,Brown/Rusty,Dark Muddy,Milky/Oily,0,0,0.50,0.70,0.95,All,All,No
+56,Coolant Level,Check coolant expansion tank level against MIN and MAX markings when engine is cold,fluid_level,Full,Adequate,Low,Very Low,Empty,0,0.10,0.35,0.70,0.95,All,All,No
+57,Coolant-Oil Mixing,Inspect oil filler cap underside and dipstick for milky white residue; check coolant for oil film,evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,"Petrol, Diesel, CNG, Hybrid",All,No
+58,Engine Oil Color,Pull dipstick and inspect oil color and consistency; rub between fingers to check for grit,oil_color,Clean Amber,Light Brown,Dark Brown,Black,Milky/Frothy,0,0.10,0.30,0.55,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+59,Engine Oil Contamination,"Examine dipstick oil for metal flakes, coolant traces (milky) or fuel dilution (thin/smells of petrol)",contamination,None,Trace,Mild,Heavy,Severe,0,0.15,0.35,0.70,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+60,Engine Oil Leakage (Bottom),"Inspect underside of engine block, oil pan and bottom gaskets for oil drips or wet spots",leakage,None,Seepage,Minor Drip,Active Leak,Heavy Leak,0,0.15,0.40,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+61,Engine Oil Leakage (Top),"Inspect valve cover gasket, cam cover and upper engine gaskets for oil seepage or wet stains",leakage,None,Seepage,Minor Drip,Active Leak,Heavy Leak,0,0.15,0.40,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+62,Engine Oil Level,Pull dipstick; verify engine oil level sits between MIN and MAX indicator marks,fluid_level,Full,Adequate,Low,Very Low,Empty,0,0.10,0.35,0.70,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+63,Metal Particles in Oil,Inspect dipstick tip and oil filler cap interior for metallic shimmer or visible metal particles,contamination,None,Trace,Mild,Heavy,Severe,0,0.15,0.35,0.70,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+64,Oil Sludge Presence,Remove oil filler cap; shine torch inside valve cover to check for sludge deposits on surfaces,contamination,None,Trace,Mild,Heavy,Severe,0,0.15,0.35,0.70,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+65,Power Steering Fluid Level,Check power steering fluid reservoir level against MIN and MAX markings; note fluid color,fluid_level,Full,Adequate,Low,Very Low,Empty,0,0.10,0.35,0.70,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+66,Transmission Fluid Burn Smell,Pull transmission dipstick (if accessible); smell fluid for burnt odor indicating overheated clutch packs,burn_smell,None,Faint,Noticeable,Strong,,0,0.30,0.65,0.95,,"Petrol, Diesel, CNG, Hybrid",All,No
+67,Transmission Fluid Level,Check transmission dipstick with engine warm and running in Park (auto) or cold (manual); note level and color,fluid_level,Full,Adequate,Low,Very Low,Empty,0,0.10,0.35,0.70,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+,,,,,,,,,,,,,,,,
+    Mounts Belts & Mechanical (11 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+68,Air Filter Condition,"Remove air filter element from housing; inspect for dirt loading, debris, tears or oil contamination",air_filter,Clean,Slightly Dirty,Dirty,Clogged,Missing,0,0.10,0.30,0.65,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+69,Battery Terminal Corrosion,Inspect both battery terminals and cable clamps for white or green corrosion buildup,contamination,None,Trace,Mild,Heavy,Severe,0,0.15,0.35,0.70,0.95,All,All,No
+70,Belt Condition,"Inspect serpentine and accessory drive belts for cracks, fraying, glazing, chunk missing or looseness",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+71,Engine Mount Condition,Have assistant rev engine in Drive with brake held; watch engine mounts for excessive rocking movement,condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+72,Exhaust System Condition,"Inspect entire exhaust system: pipes, joints, muffler, catalytic converter for rust, holes and loose hangers",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+73,Fuel Injector Noise,"With engine running, listen near fuel injector rail for even rhythmic clicking across all injectors",noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+74,Fuel Pump Sound,Turn ignition to ON position without starting; listen for fuel pump priming hum from fuel tank area,noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+75,Hose Condition,"Inspect all rubber coolant, vacuum and fuel hoses for cracks, bulging, hardening or leaks at clamps",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+76,PCV Valve Condition,"Remove PCV valve and shake; should rattle freely. If stuck or silent, valve is clogged",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+77,Vacuum Leak Detection,"With engine idling, listen around intake manifold and vacuum hoses for hissing indicating air leak",leakage,None,Seepage,Minor Drip,Active Leak,Heavy Leak,0,0.15,0.40,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+78,Wiring Harness (Rodent Damage),"Inspect all visible wiring looms in engine bay and cabin for rodent chew marks, exposed copper or nesting material",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,
+TRANSMISSION & DRIVETRAIN  (Weight: 12% | 30 parameters),,,,,,,,,,,,,,,,
+    Drivetrain (10 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+79,AWD System Operation,Test drive on loose gravel or wet surface; verify AWD/4WD engages and all wheels receive power,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+80,Axle Play,Lift wheel off ground; grab at 6 and 12 o'clock and rock to feel for play in axle shaft,play,None,Minimal,Noticeable,Excessive,Dangerous,0,0.15,0.40,0.75,0.95,All,All,No
+81,CV Joint Boot Condition,"Inspect inner and outer CV joint rubber boots on both sides for cracks, splits or grease leaks",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+82,CV Joint Noise,Turn steering to full lock both sides while driving slowly; listen for repetitive clicking sound,noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,All,All,No
+83,Differential Noise,"Drive at 40-60 km/h and coast; listen for whining, humming or clunking from differential area",noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,All,All,No
+84,Driveshaft Alignment,Visually inspect driveshaft for bends or dents; check universal joints for play by hand,alignment,Aligned,Slight Deviation,Misaligned,Severely Misaligned,,0,0.25,0.60,0.95,,All,All,No
+85,Drivetrain Vibration,Accelerate through 20-80 km/h range; feel for vibration transmitted through floor from drivetrain,vibration,None,Slight,Moderate,Heavy,Severe,0,0.15,0.40,0.70,0.95,All,All,No
+86,Mount Bush Wear,"Inspect transmission and drivetrain rubber mount bushes for visible cracking, perishing or sagging",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+87,Propeller Shaft Condition,"Inspect propeller shaft for dents, surface rust and worn universal joint bearings",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+88,Transfer Case Leakage,"Inspect transfer case housing and output seals for oil seepage, wet spots or active drips",leakage,None,Seepage,Minor Drip,Active Leak,Heavy Leak,0,0.15,0.40,0.75,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+    Gearbox & Clutch (20 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+89,Automatic Shift Delay,Drive in normal mode; automatic shifts between gears should be smooth and prompt without noticeable delay,delay,Responsive,Slight Delay,Noticeable,Significant,No Response,0,0.15,0.40,0.70,0.95,All,"Automatic, CVT, DCT, AMT",No
+90,Clutch Bite Height,Press and slowly release clutch pedal; note the engagement (bite) point in pedal travel range,clutch_bite,Normal Range,Slightly High,High,Very High,Abnormal,0,0.15,0.35,0.65,0.95,All,"Manual, AMT",No
+91,Clutch Pedal Feel,"Press clutch pedal to floor and release; check for smooth travel, consistent resistance and full spring return",clutch_pedal,Good Feel,Slightly Stiff,Hard,Spongy,No Response,0,0.20,0.45,0.70,0.95,All,Manual,No
+92,Clutch Slippage,"Accelerate hard in high gear (4th/5th) at low RPM; if RPM rises without matching speed gain, clutch is slipping",misfire,None,Occasional,Intermittent,Frequent,Constant,0,0.25,0.50,0.75,0.95,All,"Manual, AMT, DCT",No
+93,CVT Belt Noise,"Accelerate steadily in CVT vehicle; listen for unusual whining, droning or belt-slipping noise from transmission",noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,All,CVT,No
+94,Dual Clutch Jerk,Drive in stop-and-go traffic at low speed; check for jerking or shuddering during 1st-2nd gear transitions,vibration,None,Slight,Moderate,Heavy,Severe,0,0.15,0.40,0.70,0.95,All,DCT,No
+95,Gear Engagement Smoothness,Shift through all gears sequentially; each gear should slot in cleanly without resistance or notchiness,smoothness,Smooth,Slight Roughness,Rough,Very Rough,Grinding,0,0.15,0.40,0.70,0.95,All,All,No
+96,Gear Grinding,Shift between gears deliberately; any grinding or crunching sound indicates worn synchronizers,noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,All,"Manual, AMT",No
+97,Gear Selector Response,Move gear selector through all positions (P-R-N-D or 1-2-3-4-5-R); each should feel positive and click into place,delay,Responsive,Slight Delay,Noticeable,Significant,No Response,0,0.15,0.40,0.70,0.95,All,All,No
+98,Gear Slipping,Drive under varying load conditions; gear should hold engagement without popping out unexpectedly,misfire,None,Occasional,Intermittent,Frequent,Constant,0,0.25,0.50,0.75,0.95,All,All,No
+99,Gearbox Bearing Noise,"Drive in each gear and listen; whining, rumbling or growling from gearbox area indicates bearing wear",noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,All,All,No
+100,Hill Assist Function,Stop on moderate incline; release brake pedal fully and check if hill-hold engages before rolling back,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+101,Manual Linkage Wear,"With engine off, move gear lever in all directions from neutral; excessive slop indicates worn linkage bushes",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,Manual,No
+102,Neutral Gear Noise,"With engine running and gearbox in neutral, listen for whining or rattling that stops when clutch is pressed",noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,All,"Manual, AMT",No
+103,Parking Pawl Condition,"On slight incline, shift to Park and release brake; vehicle should hold firmly without clunking or rolling",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,"Automatic, CVT, DCT, AMT",No
+104,Reverse Gear Smoothness,"From neutral, engage reverse gear; should slot in cleanly without grinding noise or resistance",smoothness,Smooth,Slight Roughness,Rough,Very Rough,Grinding,0,0.15,0.40,0.70,0.95,All,All,No
+105,Torque Converter Delay,"With engine idling, shift from Neutral to Drive; engagement should be prompt and smooth without harsh thud",delay,Responsive,Slight Delay,Noticeable,Significant,No Response,0,0.15,0.40,0.70,0.95,All,Automatic,No
+106,Transmission Fluid Leak,Inspect underneath the transmission casing and around output seals for fluid drips or wet patches,leakage,None,Seepage,Minor Drip,Active Leak,Heavy Leak,0,0.15,0.40,0.75,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+107,Transmission Mount Condition,"Inspect transmission mount rubbers for cracks, sagging, oil contamination or separated bonding",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+108,Transmission Overheating Signs,Check transmission dipstick fluid for burnt smell and dark color; inspect casing for heat discoloration,evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,
+STRUCTURAL INTEGRITY  (Weight: 20% | 46 parameters),,,,,,,,,,,,,,,,
+    Chassis & Underbody (12 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+109,Boot Floor Integrity,"Lift boot carpet and spare wheel cover; inspect boot floor for rust perforation, repair patches or deformation",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+110,Chassis Rail Straightness,"Inspect both chassis rails from underneath on a lift; check for bends, kinks, repair welds or reinforcement plates",alignment,Aligned,Slight Deviation,Misaligned,Severely Misaligned,,0,0.25,0.60,0.95,,All,All,No
+111,Cross-Member Alignment,"Check front and rear cross-members for proper alignment; look for impact marks, bends or repair evidence",alignment,Aligned,Slight Deviation,Misaligned,Severely Misaligned,,0,0.25,0.60,0.95,,All,All,No
+112,Crumple Zone Damage,"Inspect front and rear crumple zone areas for accordion-type deformation, straightening marks or replacement",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,RED FLAG
+113,Engine Bay Structure Damage,"Inspect engine bay inner fender panels, shock towers and front rails for impact damage or body shop repairs",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+114,Firewall Distortion,"Check firewall panel from engine bay side for buckling, ripples, filler or non-factory sealant indicating impact",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,RED FLAG
+115,Floor Pan Weld Marks,"Inspect floor pan from underneath on a lift; look for non-factory welds, patches or new metal sections",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+116,Spare Wheel Well Deformation,"Remove spare wheel; inspect spare wheel well for dents, cracks, repaired metal or shape distortion",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+117,Structural Welding Evidence,Check all structural members from underneath for non-factory welds; compare weld patterns with OEM spots,evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,RED FLAG
+118,Subframe Condition,"Inspect front and rear subframe mounting points for cracks, corrosion, loose bolts or impact damage",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+119,Underbody Corrosion Coating,Check underbody anti-rust/undercoating for completeness; note areas where coating is missing or freshly applied,condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+120,Underbody Rust Severity,"Inspect entire underbody surface for rust progression: surface, scaling, deep pitting or perforating holes",rust,None,Surface Rust,Moderate Rust,Deep Corrosion,Perforating,0,0.20,0.45,0.75,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+    Frame & Stamps (12 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+121,Chassis Stamping Mismatch,"Locate chassis number stampings at multiple points (dashboard, door jamb, engine bay); compare for consistency",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,RED FLAG
+122,Frame Symmetry Measurement,"Using measuring tape, measure diagonal distances between key frame points; left vs right should match within spec",alignment,Aligned,Slight Deviation,Misaligned,Severely Misaligned,,0,0.25,0.60,0.95,,All,All,RED FLAG
+123,Front Apron Condition,"Inspect front apron panel behind bumper for dents, repair welds, filler or replacement evidence",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+124,Impact Bar Condition,"Check front and rear impact/crash bars for deformation, cracks, welds or non-OEM replacement",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+125,Quarter Panel Weld Marks,"Inspect quarter panel joint seams for aftermarket welding, grinding marks or spot-weld irregularity",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+126,Rear Apron Condition,"Inspect rear apron panel behind bumper for impact damage, straightening marks or repair evidence",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+127,Roof Weld Consistency,Run finger along roof-to-pillar weld seams; check for consistent factory spot welds vs irregular patterns,weld,Consistent,Slight Irregularity,Irregular,Repaired/Altered,,0,0.30,0.65,0.95,,All,All,No
+128,Shock Mount Structure,"Inspect front shock tower tops for cracks, distortion, wrinkles or weld repairs around mounting points",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+129,Side Sill Integrity,"Check rocker panels/side sills for dents, rust perforation, filler, repair patches or replacement",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+130,Structural Adhesive Signs,"Inspect structural panel joints for non-factory adhesive, silicone sealant or unusual bonding material",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+131,Strut Tower Alignment,Compare left and right strut tower positions visually and by measurement; should be symmetrical,alignment,Aligned,Slight Deviation,Misaligned,Severely Misaligned,,0,0.25,0.60,0.95,,All,All,No
+132,VIN Plate Tampering,"Inspect VIN plates for re-stamping, tampered rivets, mismatched fonts, sticker overlay or re-engraving",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,RED FLAG
+,,,,,,,,,,,,,,,,
+    Panels & Alignment (11 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+133,Bonnet Hinge Alignment,Open bonnet fully; check hinge bolt heads for paint crack marks indicating they've been loosened for alignment,alignment,Aligned,Slight Deviation,Misaligned,Severely Misaligned,,0,0.25,0.60,0.95,,All,All,No
+134,Bonnet Stay/Strut,Open bonnet to full extent; gas strut should hold bonnet firmly in open position without sagging,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+135,Boot Hinge Alignment,Open boot/tailgate; check hinge bolt heads for movement marks and paint disturbance around mounting points,alignment,Aligned,Slight Deviation,Misaligned,Severely Misaligned,,0,0.25,0.60,0.95,,All,All,No
+136,Boot Strut,Open boot or tailgate to full height; gas struts should hold it open without slowly dropping,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+137,Door Check Strap,Open each door to various positions; check strap holds door at detent points without excessive play or breakage,condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+138,Door Hinge Weld Marks,Inspect door hinge welds closely; compare with factory pattern for signs of re-welding or hinge replacement,evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+139,Paint Overspray Inside Seals,Carefully peel back rubber door and boot seals; check hidden areas for paint overspray on body metal,evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+140,Pillar Cut & Weld Evidence,"Run fingertips along all pillar seam lines; feel for cut marks, grinding, non-factory welds or filler",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,RED FLAG
+141,Replaced Structural Panel,"Check panel thickness consistency using magnet; look for non-factory sealant, mismatched bolt heads or fresh paint",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,RED FLAG
+142,Seal Tampering,"Inspect factory sealant lines at panel joints; check for removal marks, re-application or different sealant type",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+143,Uneven Panel Gaps,"Measure gaps between bonnet-fender, door-fender, door-door and door-quarter on both sides; compare for uniformity",gap,Uniform,Slight Variation,Uneven,Severely Uneven,,0,0.25,0.55,0.90,,All,All,No
+,,,,,,,,,,,,,,,,
+    Pillars & Roof (8 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+144,A-Pillar Condition,"Inspect both A-pillars for dents, filler, paint bubbling, repaint evidence or structural repair signs",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+145,B-Pillar Condition,"Inspect both B-pillars for dents, filler, weld repairs, paint inconsistency or structural damage",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+146,C-Pillar Condition,"Inspect both C-pillars for damage, filler application, repaint signs or structural repair evidence",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+147,Roof Line Straightness,Sight along roof line from front corner to rear; surface should be straight without waves or dips,alignment,Aligned,Slight Deviation,Misaligned,Severely Misaligned,,0,0.25,0.60,0.95,,All,All,No
+148,Roof Rail Alignment,"Check roof rails on both sides for even mounting height, consistent gaps and straight alignment",alignment,Aligned,Slight Deviation,Misaligned,Severely Misaligned,,0,0.25,0.60,0.95,,All,All,No
+149,Roof Repaint Sign,"Inspect roof panel for color shade difference, orange peel texture, masking tape lines or dust in paint",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+150,Sunroof Drainage Test,Pour water slowly around sunroof frame perimeter; check inside cabin for any water entry or dripping,pass_fail,Pass,Marginal,Fail,,,0,0.45,0.95,,,All,All,No
+151,Sunroof Seal Condition,"Inspect sunroof rubber seal all around for cracks, hardening, compression set or gaps",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+    Seals & Rubber (3 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+152,Boot/Tailgate Seal,"Inspect boot/tailgate rubber weather seal for tears, compression flat spots, gaps or water entry evidence",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+153,Door Rubber Seals,"Check all four door rubber seals for tears, flattening, hardening, peeling or gaps allowing water/wind entry",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+154,Windshield Seal,"Inspect windshield perimeter rubber seal for gaps, shrinkage, hardening or signs of water seepage",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,
+PAINT & PANEL MAPPING  (Weight: 10% | 85 parameters),,,,,,,,,,,,,,,,
+    Cosmetic & Consistency (24 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+155,Clear Coat Peel,"Inspect all painted panels in sunlight for areas where clear coat is peeling, flaking, bubbling or whitening",severity,Normal,Minor,Moderate,Major,Critical,0,0.20,0.45,0.75,0.95,All,All,No
+156,Color Mismatch,"Compare colors of adjacent panels in direct sunlight; look for shade, tone or metallic flake differences",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+157,Dent Density Front,"Systematically count and note size of dents on bonnet, front bumper, front fenders and front doors",dent,None,Light (1-2),Moderate (3-5),Heavy (6+),Severe,0,0.15,0.35,0.65,0.90,All,All,No
+158,Dent Density Rear,"Systematically count and note size of dents on rear bumper, tailgate, rear quarters and rear doors",dent,None,Light (1-2),Moderate (3-5),Heavy (6+),Severe,0,0.15,0.35,0.65,0.90,All,All,No
+159,Door Jamb Paint Consistency,"Open all doors; compare door jamb paint color, texture and finish with outer body panels",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+160,Edge Seal Paint Break,Examine paint along panel edges where rubber seals sit; interruptions in paint suggest post-factory repaint,evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+161,Glass Mfg Year,"Read date code etched on each glass piece (windshield, side, rear); all should match vehicle manufacture year",year_check,Matching/Recent,1-2 Yr Old,3-4 Yr Old,5+ Yr Old,Mismatched,0,0.10,0.30,0.55,0.95,All,All,No
+162,Headlight Lens Clarity,"Inspect both headlight lenses for haziness, yellowing, UV damage, internal cracks or moisture condensation",lens_clarity,Clear,Slight Haze,Yellowed,Cracked,Broken,0,0.15,0.40,0.70,0.95,All,All,No
+163,Headlight Mfg Year,Check date stamps on headlight housings; manufacturing date should be close to vehicle production date,year_check,Matching/Recent,1-2 Yr Old,3-4 Yr Old,5+ Yr Old,Mismatched,0,0.10,0.30,0.55,0.95,All,All,No
+164,Number Plate Condition,"Inspect front and rear number plates for legibility, fading, cracks, mounting security and reflector condition",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+165,OEM Sticker Presence,"Check for OEM factory stickers on door jambs, engine bay sticker, glass etchings and body panels",present,Present,Partial,Missing,,,0,0.50,0.90,,,All,All,No
+166,Paint Overspray Detection,"Examine rubber trims, glass edges, plastic trim and weather seals for traces of paint overspray",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+167,Panel Gap Uniformity,"Measure panel gaps with feeler gauge at top, middle and bottom of each joint; gaps should be consistent",gap,Uniform,Slight Variation,Uneven,Severely Uneven,,0,0.25,0.55,0.90,,All,All,No
+168,Rear Windshield Condition,"Inspect rear windshield for cracks, chips, scratches, delamination, seal damage or moisture between layers",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+169,Rust Spot Presence,"Inspect all body panels, wheel arches, door bottoms and lower edges for rust spots or bubbling paint",rust,None,Surface Rust,Moderate Rust,Deep Corrosion,Perforating,0,0.20,0.45,0.75,0.95,All,All,No
+170,Scratch Density Front,"Count and categorize scratches on front-facing panels: bonnet, front bumper, fenders and front doors",dent,None,Light (1-2),Moderate (3-5),Heavy (6+),Severe,0,0.15,0.35,0.65,0.90,All,All,No
+171,Scratch Density Rear,"Count and categorize scratches on rear panels: tailgate, rear bumper, quarters and rear doors",dent,None,Light (1-2),Moderate (3-5),Heavy (6+),Severe,0,0.15,0.35,0.65,0.90,All,All,No
+172,Stone Chip Severity,"Inspect front bumper leading edge, bonnet front and lower windshield for stone chip frequency and depth",severity,Normal,Minor,Moderate,Major,Critical,0,0.20,0.45,0.75,0.95,All,All,No
+173,Tail Light Lens Condition,"Inspect both tail light lenses for cracks, crazing, internal moisture, fading or UV deterioration",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+174,Tail Light Mfg Year,Check date stamps on tail light housings; manufacturing date should correspond to vehicle production period,year_check,Matching/Recent,1-2 Yr Old,3-4 Yr Old,5+ Yr Old,Mismatched,0,0.10,0.30,0.55,0.95,All,All,No
+175,Under Boot Paint Consistency,Lift boot carpet and trim; compare paint color and finish underneath with exterior body color,evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+176,Under Hood Paint Consistency,Inspect engine bay inner panels and strut tower paint; compare color and finish with exterior body,evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+177,Windshield Chips/Cracks,"Inspect full windshield surface for chips, star breaks, long cracks or stress fractures from edge to edge",severity,Normal,Minor,Moderate,Major,Critical,0,0.20,0.45,0.75,0.95,All,All,No
+178,Windshield Replaced,Check windshield glass stamp for OEM vs aftermarket brand; look for fresh sealant or uneven fitment gap,evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+,,,,,,,,,,,,,,,,
+    Multi-Point Readings (30 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+179,Bonnet – Center,Place coating thickness gauge at center of bonnet panel; take 3 readings and record average in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+180,Bonnet – Left,Place coating thickness gauge on left side of bonnet; take 3 readings and record average in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+181,Bonnet – Right,Place coating thickness gauge on right side of bonnet; take 3 readings and record average in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+182,L Quarter – Btm,Place coating thickness gauge at bottom of left rear quarter panel; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+183,L Quarter – Mid,Place coating thickness gauge at mid-section of left rear quarter panel; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+184,L Quarter – Top,Place coating thickness gauge at top of left rear quarter panel; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+185,L/F Door – Btm,Place coating thickness gauge at bottom of left front door; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+186,L/F Door – Mid,Place coating thickness gauge at mid-section of left front door; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+187,L/F Door – Top,Place coating thickness gauge at top of left front door; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+188,L/F Fender – Btm,Place coating thickness gauge at bottom of left front fender; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+189,L/F Fender – Mid,Place coating thickness gauge at mid-section of left front fender; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+190,L/F Fender – Top,Place coating thickness gauge at top of left front fender; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+191,L/R Door – Btm,Place coating thickness gauge at bottom of left rear door; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+192,L/R Door – Mid,Place coating thickness gauge at mid-section of left rear door; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+193,L/R Door – Top,Place coating thickness gauge at top of left rear door; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+194,R Quarter – Btm,Place coating thickness gauge at bottom of right rear quarter panel; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+195,R Quarter – Mid,Place coating thickness gauge at mid-section of right rear quarter panel; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+196,R Quarter – Top,Place coating thickness gauge at top of right rear quarter panel; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+197,R/F Door – Btm,Place coating thickness gauge at bottom of right front door; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+198,R/F Door – Mid,Place coating thickness gauge at mid-section of right front door; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+199,R/F Door – Top,Place coating thickness gauge at top of right front door; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+200,R/F Fender – Btm,Place coating thickness gauge at bottom of right front fender; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+201,R/F Fender – Mid,Place coating thickness gauge at mid-section of right front fender; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+202,R/F Fender – Top,Place coating thickness gauge at top of right front fender; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+203,R/R Door – Btm,Place coating thickness gauge at bottom of right rear door; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+204,R/R Door – Mid,Place coating thickness gauge at mid-section of right rear door; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+205,R/R Door – Top,Place coating thickness gauge at top of right rear door; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+206,Roof – Center,Place coating thickness gauge at center of roof panel; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+207,Roof – Front,Place coating thickness gauge at front area of roof panel; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+208,Roof – Rear,Place coating thickness gauge at rear area of roof panel; record reading in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+,,,,,,,,,,,,,,,,
+    Panel Micron Checks (31 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+209,Bonnet Micron,Take coating thickness reading on bonnet using paint gauge; record single representative value in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+210,Bonnet Repaint,"Inspect bonnet for repaint indicators: color mismatch, orange peel texture, masking lines or fresh sealant",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+211,Bonnet Replacement,"Check bonnet for replacement signs: non-factory bolts, missing OEM stickers, VIN label absence or alignment issues",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+212,Front Bumper Filler,Run magnet across front bumper surface; check for body filler. High micron readings indicate filler buildup,evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+213,Front Bumper Micron,Take coating thickness reading on front bumper using paint gauge; record value in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+214,Front Bumper Repaint,"Inspect front bumper for repaint signs: color variation, overspray on grille/lights, fresh clips or masking residue",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+215,L/F Door Alignment,"Measure left front door gaps at top, middle and bottom against adjacent panels; check flush alignment",alignment,Aligned,Slight Deviation,Misaligned,Severely Misaligned,,0,0.25,0.60,0.95,,All,All,No
+216,L/F Door Micron,Take coating thickness reading on left front door using paint gauge; record value in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+217,L/F Door Repaint,"Inspect left front door for repaint signs: color mismatch with jamb, orange peel, dust nibs or tape lines",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+218,L/R Door Alignment,"Measure left rear door gaps at top, middle and bottom against adjacent panels; check flush alignment",alignment,Aligned,Slight Deviation,Misaligned,Severely Misaligned,,0,0.25,0.60,0.95,,All,All,No
+219,L/R Door Micron,Take coating thickness reading on left rear door using paint gauge; record value in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+220,L/R Door Repaint,"Inspect left rear door for repaint signs: color shade difference, texture change or sealant disturbance",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+221,Left Fender Micron,Take coating thickness reading on left front fender using paint gauge; record value in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+222,Left Fender Repaint,"Inspect left front fender for repaint signs: color variation, overspray, fresh bolts or masking evidence",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+223,Left Fender Replacement,"Check left front fender for replacement: non-factory bolts, missing liner clips, gap inconsistency or fresh paint",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+224,Left Quarter Micron,Take coating thickness reading on left rear quarter panel using paint gauge; record value in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+225,R/F Door Alignment,"Measure right front door gaps at top, middle and bottom against adjacent panels; check flush alignment",alignment,Aligned,Slight Deviation,Misaligned,Severely Misaligned,,0,0.25,0.60,0.95,,All,All,No
+226,R/F Door Micron,Take coating thickness reading on right front door using paint gauge; record value in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+227,R/F Door Repaint,"Inspect right front door for repaint signs: color mismatch with jamb, texture change or tape line evidence",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+228,R/R Door Alignment,"Measure right rear door gaps at top, middle and bottom against adjacent panels; check flush alignment",alignment,Aligned,Slight Deviation,Misaligned,Severely Misaligned,,0,0.25,0.60,0.95,,All,All,No
+229,R/R Door Micron,Take coating thickness reading on right rear door using paint gauge; record value in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+230,R/R Door Repaint,"Inspect right rear door for repaint signs: color shade difference, orange peel change or sealant disturbance",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+231,Rear Bumper Repaint,"Inspect rear bumper for repaint signs: color mismatch, overspray on lights, fresh clips or masking residue",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+232,Right Fender Micron,Take coating thickness reading on right front fender using paint gauge; record value in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+233,Right Fender Repaint,"Inspect right front fender for repaint signs: color variation, overspray, fresh bolts or masking evidence",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+234,Right Fender Replacement,"Check right front fender for replacement: non-factory bolts, missing clips, gap inconsistency or fresh paint",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+235,Right Quarter Micron,Take coating thickness reading on right rear quarter panel using paint gauge; record value in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+236,Roof Micron,Take coating thickness reading on roof panel using paint gauge; record value in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+237,Roof Repaint,"Inspect roof for repaint signs: color shade difference from pillars, texture change or masking evidence at edges",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+238,Tailgate Micron,Take coating thickness reading on tailgate/boot lid using paint gauge; record value in µm,micron,90-140 µm OEM,150-250 µm Repaint,250-400 µm Filler,>400 µm Structural,,0,0.45,0.75,0.95,,All,All,No
+239,Tailgate Repaint,"Inspect tailgate for repaint signs: color mismatch, orange peel, overspray on badge or sealant disturbance",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,
+SUSPENSION & BRAKES  (Weight: 10% | 30 parameters),,,,,,,,,,,,,,,,
+    Brakes (9 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+240,ABS Function,Apply firm braking on safe dry surface at 40 km/h; ABS pedal should pulse and vehicle should track straight,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+241,Brake Disc Scoring,"Visually inspect brake disc surface through wheel spokes or with wheel removed; check for grooves, lips or cracks",disc_scoring,Smooth,Light Scoring,Moderate Grooves,Deep Grooves,Cracked,0,0.15,0.40,0.75,0.95,All,All,No
+242,Brake Fluid Leakage,"Inspect brake calipers, hose connections, lines and master cylinder for any fluid leaks or wet spots",leakage,None,Seepage,Minor Drip,Active Leak,Heavy Leak,0,0.15,0.40,0.75,0.95,All,All,No
+243,Brake Line Corrosion,"Inspect all metal brake lines running along underbody for surface rust, deep corrosion or flaking",rust,None,Surface Rust,Moderate Rust,Deep Corrosion,Perforating,0,0.20,0.45,0.75,0.95,All,All,No
+244,Brake Pad FL,Inspect front-left brake pad thickness through caliper window or by removing wheel; measure remaining material in mm,brake_pad,>8mm New,5-8mm Good,3-5mm Worn,1.5-3mm Replace,<1.5mm Unsafe,0,0.10,0.40,0.75,0.95,All,All,No
+245,Brake Pad FR,Inspect front-right brake pad thickness through caliper window or by removing wheel; measure remaining material in mm,brake_pad,>8mm New,5-8mm Good,3-5mm Worn,1.5-3mm Replace,<1.5mm Unsafe,0,0.10,0.40,0.75,0.95,All,All,No
+246,Brake Pad RL,Inspect rear-left brake pad thickness through caliper window or by removing wheel; measure remaining material in mm,brake_pad,>8mm New,5-8mm Good,3-5mm Worn,1.5-3mm Replace,<1.5mm Unsafe,0,0.10,0.40,0.75,0.95,All,All,No
+247,Brake Pad RR,Inspect rear-right brake pad thickness through caliper window or by removing wheel; measure remaining material in mm,brake_pad,>8mm New,5-8mm Good,3-5mm Worn,1.5-3mm Replace,<1.5mm Unsafe,0,0.10,0.40,0.75,0.95,All,All,No
+248,Handbrake Holding,Pull handbrake lever fully; vehicle should hold firm on moderate incline without any rolling or creeping,handbrake,Holds Firm,Adequate,Slips Slightly,Slips,Fails,0,0.10,0.40,0.70,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+    Suspension (12 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+249,Anti-Roll Bar Link,"Inspect anti-roll bar end links for worn bushes, play or clunking when rocked by hand",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+250,Ball Joint Play,"With wheel lifted off ground, pry under ball joint with lever; check for vertical play or clunking",play,None,Minimal,Noticeable,Excessive,Dangerous,0,0.15,0.40,0.75,0.95,All,All,No
+251,Control Arm Bush Wear,"Inspect lower and upper control arm rubber bushes for visible cracking, perishing, bulging or oil contamination",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+252,Front Shock Leakage,"Visually inspect front shock absorber bodies and shafts for oil wetness, film or active dripping",shock_leak,Dry,Damp Film,Wet Trail,Active Drip,Heavy Leak,0,0.10,0.40,0.75,0.95,All,All,No
+253,Rear Shock Leakage,"Visually inspect rear shock absorber bodies and shafts for oil wetness, film or active dripping",shock_leak,Dry,Damp Film,Wet Trail,Active Drip,Heavy Leak,0,0.10,0.40,0.75,0.95,All,All,No
+254,Steering Column Noise,"Turn steering wheel slowly lock to lock; listen for clicks, clunks, creaking or grinding from steering column",noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,All,All,No
+255,Steering Free Play,"With engine running, gently rock steering wheel left-right; measure free play before front wheels begin to move",play,None,Minimal,Noticeable,Excessive,Dangerous,0,0.15,0.40,0.75,0.95,All,All,No
+256,Steering Rack Leakage,Inspect steering rack rubber boots for tears and oil leaks; check rack housing and tie rod seals for fluid,leakage,None,Seepage,Minor Drip,Active Leak,Heavy Leak,0,0.15,0.40,0.75,0.95,All,All,No
+257,Suspension Noise,"Drive slowly over speed bumps and rough patches; listen for clunks, rattles, squeaks or thuds from suspension",noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,All,All,No
+258,Suspension Rebound Test,Push each corner of vehicle down firmly and release; body should bounce once and quickly settle (not continue bouncing),pass_fail,Pass,Marginal,Fail,,,0,0.45,0.95,,,All,All,No
+259,Wheel Alignment,Drive on straight flat road and briefly release steering; vehicle should track straight without pulling to either side,alignment,Aligned,Slight Deviation,Misaligned,Severely Misaligned,,0,0.25,0.60,0.95,,All,All,No
+260,Wheel Bearing Noise,Drive at 40-60 km/h; listen for humming or droning noise that changes pitch when steering is turned slightly,noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+    Tyres & Wheels (9 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+261,Alloy Rim Damage,"Inspect all alloy wheel rims closely for kerb rash, scuff marks, cracks, bends or signs of repair/welding",severity,Normal,Minor,Moderate,Major,Critical,0,0.20,0.45,0.75,0.95,All,All,No
+262,Spare Tyre Condition,"Remove spare wheel from vehicle; check tread depth, sidewall condition, age and inflate to correct pressure",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+263,Tyre Mfg Year,Read DOT code on each tyre sidewall; last 4 digits indicate manufacturing week and year,year_check,Matching/Recent,1-2 Yr Old,3-4 Yr Old,5+ Yr Old,Mismatched,0,0.10,0.30,0.55,0.95,All,All,No
+264,Tyre Pressure,Measure all four tyre pressures using calibrated gauge; compare readings with door jamb or manual specification,tyre_pressure,Optimal (30-35 PSI),Slightly Off,Low/High,Very Low/High,,0,0.20,0.55,0.90,,All,All,No
+265,Tyre Tread FL,Measure front-left tyre tread depth at 3 points across the tread width using depth gauge; record minimum value,tyre_tread,>6mm New,4-6mm Good,2.5-4mm Fair,1.6-2.5mm Low,<1.6mm Illegal,0,0.10,0.35,0.70,0.95,All,All,No
+266,Tyre Tread FR,Measure front-right tyre tread depth at 3 points across the tread width using depth gauge; record minimum value,tyre_tread,>6mm New,4-6mm Good,2.5-4mm Fair,1.6-2.5mm Low,<1.6mm Illegal,0,0.10,0.35,0.70,0.95,All,All,No
+267,Tyre Tread RL,Measure rear-left tyre tread depth at 3 points across the tread width using depth gauge; record minimum value,tyre_tread,>6mm New,4-6mm Good,2.5-4mm Fair,1.6-2.5mm Low,<1.6mm Illegal,0,0.10,0.35,0.70,0.95,All,All,No
+268,Tyre Tread RR,Measure rear-right tyre tread depth at 3 points across the tread width using depth gauge; record minimum value,tyre_tread,>6mm New,4-6mm Good,2.5-4mm Fair,1.6-2.5mm Low,<1.6mm Illegal,0,0.10,0.35,0.70,0.95,All,All,No
+269,Uneven Tyre Wear,"Inspect all tyre wear patterns; inner/outer edge wear, center wear, cupping or feathering indicates alignment or suspension issues",tyre_wear,Even Wear,Slight Uneven,Moderate Uneven,Severe Cupping,Bald Patches,0,0.15,0.40,0.70,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,
+ELECTRICAL & ELECTRONICS  (Weight: 8% | 41 parameters),,,,,,,,,,,,,,,,
+    Controls & Comfort (16 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+270,AC Compressor Noise,"Switch AC on and off; listen at compressor area under bonnet for rattling, squealing or knocking",noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,All,All,No
+271,AC Cooling Efficiency,Run AC on max cool with recirculation for 5 minutes; measure vent temperature drop using thermometer,ac_cooling,>12°C Drop,8-12°C Drop Normal,5-8°C Weak,<5°C Poor,,0,0.15,0.55,0.95,,All,All,No
+272,Blower Motor,Test blower/fan on all speed settings; should operate smoothly at each speed without squealing or rattling,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+273,Central Locking,"Test central lock from key fob, driver door switch and key; all four doors should lock and unlock simultaneously",operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+274,Fuel Flap Release,Pull fuel flap release lever or press button; fuel flap should pop open cleanly and close securely,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+275,Horn Function,"Press horn button; sound should be clear, loud and consistent without stuttering or weak output",operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+276,Infotainment System,"Power on infotainment system; test radio reception, Bluetooth pairing, navigation, USB media and speakers",operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+277,Parking Sensors,Engage reverse and approach obstacle slowly; parking sensors should beep with increasing frequency as distance closes,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+278,Power Window FL,Test front-left power window up and down through full travel; check auto-up/down function and anti-pinch,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+279,Power Window FR,Test front-right power window up and down through full travel; check auto-up/down function and operation from driver switch,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+280,Power Window RL,Test rear-left power window up and down through full travel; check child lock disable from driver controls,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+281,Power Window RR,Test rear-right power window up and down through full travel; check child lock disable from driver controls,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+282,Remote Key,"Test all key fob buttons from 10 meters: lock, unlock, boot release; verify indicator flash confirmation",operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+283,Reverse Camera,Engage reverse gear; rear camera should display clear image with parking guidelines on infotainment screen,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+284,Sunroof Operation,Open sunroof fully and close; test tilt function and ensure smooth operation without binding or noise,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+285,Touchscreen Response,Tap and swipe across different areas of touchscreen; all zones should register touch input accurately without lag,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+    Lighting (6 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+286,Brake Light Function,Press brake pedal; verify all brake lights illuminate including high-mount third brake light; check brightness,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+287,Fog Lamp Function,Switch on front and rear fog lamps separately; verify both illuminate correctly and turn off when switched,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+288,Hazard Light Function,Press hazard warning switch; all four indicators and dashboard light should flash simultaneously at even rate,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+289,Headlight Function,Test low beam and high beam headlights; verify both sides illuminate evenly with proper beam pattern and alignment,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+290,Indicator Function,"Test left and right turn indicators; check front, rear, side repeater and mirror indicators all flash in sync",operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+291,Reverse Light Function,Engage reverse gear; verify both white reverse lights illuminate at rear of vehicle,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+    Mirrors (4 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+292,ORVM Adjustment,Test electric adjustment for both ORVMs using joystick/buttons; mirror should move in all four directions smoothly,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+293,ORVM Condition Left,"Inspect left ORVM glass and housing for cracks, chips, scratches, fading, broken cover or loose mounting",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+294,ORVM Condition Right,"Inspect right ORVM glass and housing for cracks, chips, scratches, fading, broken cover or loose mounting",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+295,ORVM Fold Function,Activate electric mirror fold button; both ORVMs should fold inward and unfold smoothly without grinding,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+    Power & Charging (3 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+296,Alternator Voltage,"With engine running at idle, measure voltage across battery terminals; should read between 13.8V and 14.4V",voltage,13.8-14.4V Normal,13.2-13.8V Low,12.8-13.2V Under,<12.8V / >14.7V Fault,,0,0.35,0.70,0.95,,All,All,No
+297,Battery Health,Connect electronic battery tester to terminals; read cold cranking amps (CCA) and overall health percentage,battery_hp,>80% Good,60-80% Fair,40-60% Weak,<40% Replace,,0,0.30,0.65,0.95,,All,All,No
+298,Battery Mfg Date,Locate manufacture date label on battery; note manufacturing month and year to assess battery age,year_check,Matching/Recent,1-2 Yr Old,3-4 Yr Old,5+ Yr Old,Mismatched,0,0.10,0.30,0.55,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+    Warnings & Systems (7 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+299,12V Socket,Plug 12V tester or phone charger into accessory socket; verify power output in both ignition ON and ACC positions,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+300,ABS Warning Light,Turn ignition to ON; ABS warning light should illuminate for self-test then turn off within a few seconds,warning_lt,Off,Intermittent,Solid On,,,0,0.55,0.95,,,All,All,No
+301,Airbag Warning Light,Turn ignition to ON; airbag/SRS warning light should illuminate briefly for self-test then extinguish,warning_lt,Off,Intermittent,Solid On,,,0,0.55,0.95,,,All,All,No
+302,Immobilizer Function,Attempt to start engine without correct key/transponder; immobilizer should prevent engine from starting,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+303,Instrument Cluster Warning,Turn ignition to ON; observe all dashboard warning lights during self-test. All should illuminate then turn off,warning_lt,Off,Intermittent,Solid On,,,0,0.55,0.95,,,All,All,No
+304,Interior Lighting,"Test all interior lights: dome, map/reading, foot well, glove box vanity mirror and boot/trunk light",operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+305,USB Ports,Plug USB cable into each port; verify device charging and data transfer functionality where applicable,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+    Wipers & Visibility (5 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+306,Front Wiper Blade Condition,"Inspect front wiper blades by lifting arms; check rubber for cracks, splits, hardening or torn edges",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+307,Rear Defogger,Switch on rear demister/defogger; touch rear glass after 2-3 minutes to verify heating elements are warming,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+308,Rear Wiper Blade Condition,"Inspect rear wiper blade by lifting arm; check rubber edge for wear, cracking, curling or poor glass contact",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+309,Washer Jet Function,Activate windshield washer; jets should spray evenly and accurately onto windshield glass with adequate pressure,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+310,Wiper Motor Function,"Test front wipers on all speeds: low, high and intermittent; blades should sweep smoothly without juddering or streaking",operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,
+INTERIOR & SAFETY  (Weight: 5% | 23 parameters),,,,,,,,,,,,,,,,
+    Cabin (12 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+311,Airbag Deployment Signs,"Inspect steering wheel centre, dashboard panels and pillar trim for airbag deployment evidence or replacement signs",evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+312,Boot Carpet Condition,"Inspect boot lining, carpet and side trim for tears, stains, moisture damage, mismatch or aftermarket replacement",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+313,Cabin Odor (Flood Check),"Sit inside closed cabin; sniff for musty, mildew or damp odors that indicate previous flooding or water damage",odor,Normal,Mild,Noticeable,Strong,Pungent,0,0.15,0.40,0.70,0.95,All,All,No
+314,Carpet Moisture,Press firmly on floor carpets in all foot wells and under front seats; check for any dampness or water retention,moisture,Dry,Slightly Damp,Damp,Wet,Soaked,0,0.20,0.45,0.75,0.95,All,All,No
+315,Dashboard Cracks,"Inspect full dashboard surface for cracks, warping, discoloration or heat damage especially above airbag area",dash_cracks,None,Hairline,Small Cracks,Large Cracks,Broken,0,0.10,0.30,0.65,0.90,All,All,No
+316,Door Trim Condition,"Check all four door inner trim panels for scratches, scuffs, loose or broken clips, torn fabric or cracked plastic",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+317,Pedal Wear vs Odometer,Compare brake and clutch pedal rubber wear pattern with claimed odometer reading; heavy wear on low-km car is suspicious,wear_odo,Consistent,Slight Mismatch,Moderate Mismatch,Severe Mismatch,,0,0.30,0.65,0.95,,All,All,No
+318,Roof Lining Condition,"Inspect headliner fabric across entire roof; check for sagging, water stains, tears or signs of re-gluing",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+319,Seat Frame Integrity,"Firmly rock driver and passenger seats; check mounting bolts, seat rails and frame for looseness or damage",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+320,Seatbelt Lock Test,Pull each seatbelt fully out and release; buckle should click securely and belt should lock during sharp pull test,pass_fail,Pass,Marginal,Fail,,,0,0.45,0.95,,,All,All,No
+321,Seatbelt Retractor,Pull each seatbelt out fully then release; retractor should pull belt back smoothly without sticking or bunching,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+322,Steering Wear vs Odometer,"Check steering wheel leather or rubber for wear, shine and smoothness; compare wear level against claimed odometer reading",wear_odo,Consistent,Slight Mismatch,Moderate Mismatch,Severe Mismatch,,0,0.30,0.65,0.95,,All,All,No
+,,,,,,,,,,,,,,,,
+    Equipment & Safety (11 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+323,Cabin Structural Noise,"Drive over rough road surface; listen carefully for rattles, creaks or squeaks from dashboard, doors or trim panels",noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,All,All,No
+324,Child Lock Function,Engage child safety locks on both rear doors; attempt to open from inside—doors should not open from interior handle,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+325,Fire Extinguisher,"Check for fire extinguisher in cabin; verify it is present, properly mounted and within expiry date",present,Present,Partial,Missing,,,0,0.50,0.90,,,All,All,No
+326,ISOFIX Mounts,Locate ISOFIX anchor points between rear seat base and backrest; check metal anchors are accessible and undamaged,present,Present,Partial,Missing,,,0,0.50,0.90,,,All,All,No
+327,Jack Condition,"Remove vehicle jack from storage; inspect for rust, completeness of parts and test lifting mechanism operation",condition,Good,Fair,Worn,Damaged,Failed,0,0.15,0.40,0.75,0.95,All,All,No
+328,Number of Keys,Count all keys and key fobs provided by seller; full set typically means 2 or more keys,key_count,2+ Keys,1 Key,No Key,,,0,0.40,0.95,,,All,All,No
+329,Rear Seat Fold,Pull rear seat fold release lever; seat back should fold forward and return to upright position with secure latch,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+330,Safety Triangle,Check for reflective warning triangle in boot; verify it is present and in usable condition,present,Present,Partial,Missing,,,0,0.50,0.90,,,All,All,No
+331,Seat Adjustment,"Test all seat adjustment functions: forward/back slide, backrest recline, height adjustment and lumbar support",operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+332,Spare Wheel Kit,"Check boot for complete spare wheel kit: spare tyre, jack, wheel wrench, jack handle and tow hook",present,Present,Partial,Missing,,,0,0.50,0.90,,,All,All,No
+333,Tool Kit,"Inspect tool kit pouch for completeness: wheel wrench, screwdriver, jack handle and any vehicle-specific tools",present,Present,Partial,Missing,,,0,0.50,0.90,,,All,All,No
+,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,
+DOCUMENTATION VALIDATION  (Weight: 5% | 20 parameters),,,,,,,,,,,,,,,,
+    Registration & Legal (12 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+334,Chassis Number Match,Physically locate chassis number stamping on vehicle body; compare character-by-character with RC book entry,pass_fail,Pass,Marginal,Fail,,,0,0.45,0.95,,,All,All,No
+335,Engine Number Match,Locate engine number stamping on engine block; compare character-by-character with RC book entry,pass_fail,Pass,Marginal,Fail,,,0,0.45,0.95,,,All,All,No
+336,FASTag Linkage,Check FASTag on windshield; verify it is linked to the correct vehicle registration number via NHAI portal,pass_fail,Pass,Marginal,Fail,,,0,0.45,0.95,,,All,All,No
+337,Hypothecation Status,Check RC book for hypothecation endorsement; verify loan or lien status with bank/NBFC and RTO records,hypothecation,Clear,Active – Bank,Active – NBFC,Multiple Liens,Unknown,0,0.30,0.35,0.60,0.80,All,All,No
+338,Insurance Validity,"Check motor insurance policy for validity dates, vehicle details match, coverage type and claim history",doc_status,Valid,Expiring Soon,Expired,Missing,Tampered,0,0.20,0.55,0.80,0.95,All,All,No
+339,Loan NOC,"If hypothecation exists on RC, verify that No Objection Certificate from financier has been obtained",doc_status,Valid,Expiring Soon,Expired,Missing,Tampered,0,0.20,0.55,0.80,0.95,All,All,No
+340,NCB Status,"Check insurance papers for No Claim Bonus status, accumulated discount percentage and transfer eligibility",doc_status,Valid,Expiring Soon,Expired,Missing,Tampered,0,0.20,0.55,0.80,0.95,All,All,No
+341,Ownership Count,Count ownership transfers recorded on RC book; note each transfer date and verify sequence,ownership,1st Owner,2nd Owner,3rd Owner,4th+ Owner,,0,0.15,0.35,0.60,,All,All,No
+342,Pending Challans,Check for pending traffic challans via Parivahan portal or state transport website using registration number,challans,None,1-2 Minor,3-5 Minor,Multiple,Serious Offences,0,0.10,0.25,0.50,0.80,All,All,No
+343,Pollution Certificate,"Verify Pollution Under Control certificate: validity date, emission readings and matching registration details",doc_status,Valid,Expiring Soon,Expired,Missing,Tampered,0,0.20,0.55,0.80,0.95,All,All,No
+344,RC Original Verification,"Examine original RC book: check print quality, lamination integrity, hologram, watermarks for authenticity",doc_status,Valid,Expiring Soon,Expired,Missing,Tampered,0,0.20,0.55,0.80,0.95,All,All,No
+345,Registration State Match,Compare RC registration state with vehicle current usage state; interstate vehicles may have transfer implications,pass_fail,Pass,Marginal,Fail,,,0,0.45,0.95,,,All,All,No
+,,,,,,,,,,,,,,,,
+    Service & History (8 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+346,Accident Claim History,"Access insurance claim records for this vehicle; check for accident claims, amounts and repair descriptions",acc_history,None,1 Minor Claim,1 Major Claim,Multiple Claims,Total Loss,0,0.20,0.55,0.75,0.95,All,All,RED FLAG
+347,Duplicate Key,Verify if a duplicate/spare key is available and physically test it starts the engine and operates locks,present,Present,Partial,Missing,,,0,0.50,0.90,,,All,All,No
+348,Flood Record Check,Cross-check vehicle VIN against insurance flood damage databases and natural disaster claim records,evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,RED FLAG
+349,Recall Pending,Check manufacturer website or dealer database for any pending or incomplete safety recall campaigns,evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,No
+350,Service Book Stamps,"Review physical service book for authorized dealer stamps, service dates and consistent interval pattern",doc_status,Valid,Expiring Soon,Expired,Missing,Tampered,0,0.20,0.55,0.80,0.95,All,All,No
+351,Service Gap Check,Compare service dates in service book; identify gaps exceeding manufacturer recommended service intervals,service_gap,No Gaps,1 Gap,2-3 Gaps,4+ Gaps,No Records,0,0.15,0.35,0.60,0.80,All,All,No
+352,Total Loss Cross-Check,Cross-check vehicle VIN against insurance databases for any previous total-loss or constructive-loss declaration,evidence,None,Suspected,Likely,Confirmed,,0,0.40,0.75,0.95,,All,All,RED FLAG
+353,Warranty Remaining,Check warranty status through manufacturer dealer or online portal; note remaining coverage period and terms,doc_status,Valid,Expiring Soon,Expired,Missing,Tampered,0,0.20,0.55,0.80,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,
+ROAD TEST EVALUATION  (Weight: 8% | 25 parameters),,,,,,,,,,,,,,,,
+    Comfort & Handling (8 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+354,Body Roll,Take corners and roundabouts at moderate speed; assess how much the body leans and how quickly it recovers,body_roll,Minimal,Slight,Noticeable,Excessive,Unsafe,0,0.15,0.40,0.70,0.95,All,All,No
+355,Highway Noise,"Drive at 80-100 km/h with windows closed; assess overall cabin noise from wind, tyres and engine",noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,All,All,No
+356,Overtake Response,Accelerate from 60 to 100 km/h (overtaking simulation); assess engine power delivery and throttle response,delay,Responsive,Slight Delay,Noticeable,Significant,No Response,0,0.15,0.40,0.70,0.95,All,All,No
+357,Parking Brake on Incline,Stop on moderate incline; engage parking brake and release foot brake; vehicle must hold position firmly,handbrake,Holds Firm,Adequate,Slips Slightly,Slips,Fails,0,0.10,0.40,0.70,0.95,All,All,No
+358,Reverse Maneuver,"Reverse in a straight line and then a turn; assess rear visibility, smoothness and confidence in maneuver",smoothness,Smooth,Slight Roughness,Rough,Very Rough,Grinding,0,0.15,0.40,0.70,0.95,All,All,No
+359,Speedometer Accuracy,"At steady 60 km/h and 100 km/h, compare speedometer reading with GPS speed app to check accuracy",speedo,Accurate,Off ±5%,Off ±10%,Off >10%,,0,0.20,0.50,0.85,,All,All,No
+360,Steering Alignment Drift,"On straight flat road, briefly loosen grip on steering; vehicle should maintain straight line without pulling or drifting",stability,Stable,Slight Drift,Noticeable Pull,Strong Pull,Unsafe,0,0.15,0.40,0.70,0.95,All,All,No
+361,Transmission in Traffic,Drive through congested stop-and-go traffic for 10+ minutes; assess gear change smoothness and low-speed behavior,smoothness,Smooth,Slight Roughness,Rough,Very Rough,Grinding,0,0.15,0.40,0.70,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+    Driving Dynamics (10 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+362,AC Under Load,Drive uphill or accelerate hard with AC on full; AC should maintain cooling without significant performance drop,ac_cooling,>12°C Drop,8-12°C Drop Normal,5-8°C Weak,<5°C Poor,,0,0.15,0.55,0.95,,All,All,No
+363,Acceleration Lag,"From standstill, press accelerator firmly; note any delay or flat spot before power is delivered to wheels",delay,Responsive,Slight Delay,Noticeable,Significant,No Response,0,0.15,0.40,0.70,0.95,All,All,No
+364,Brake Pull,Apply firm braking from 60 km/h; vehicle should stop in a straight line without pulling to either side,stability,Stable,Slight Drift,Noticeable Pull,Strong Pull,Unsafe,0,0.15,0.40,0.70,0.95,All,All,No
+365,Cruise Control,"Set cruise control at highway speed; verify it maintains set speed, accelerates on resume and cancels on brake",operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+366,Engine Temperature Rise,Monitor engine temperature gauge during extended 15+ minute drive; needle should stay stable in normal zone,temp_rise,Normal,Slightly High,High,Overheating,Critical,0,0.20,0.50,0.80,0.95,"Petrol, Diesel, CNG, Hybrid",All,No
+367,Gear Hesitation,Accelerate steadily through gear changes; each upshift and downshift should happen promptly without hesitation or jerk,delay,Responsive,Slight Delay,Noticeable,Significant,No Response,0,0.15,0.40,0.70,0.95,All,All,No
+368,Hill Start Performance,Start from standstill on incline; assess hill-hold assist engagement and power delivery without excessive rollback,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No
+369,Steering Vibration,"Drive at 80-100 km/h on smooth road; feel steering wheel for vibration, shimmy or wobble through hands",vibration,None,Slight,Moderate,Heavy,Severe,0,0.15,0.40,0.70,0.95,All,All,No
+370,Straight Line Stability,Drive at 100 km/h on straight highway; vehicle should maintain lane without constant steering corrections needed,stability,Stable,Slight Drift,Noticeable Pull,Strong Pull,Unsafe,0,0.15,0.40,0.70,0.95,All,All,No
+371,Suspension Noise on Bumps,"Drive over speed bumps, potholes and rough patches at moderate speed; listen for thuds, clunks or rattles from suspension",noise,None,Faint,Noticeable,Loud,Severe,0,0.15,0.40,0.70,0.95,All,All,No
+,,,,,,,,,,,,,,,,
+    Safety & Response (7 checks),,,,,,,,,,,,,,,,
+#,Parameter Name,Parameter Detail,Input Type,Rating Options,,,,,Severity Scores,,,,,Fuel Filter,Transmission,Red Flag
+372,ABS Activation Feel,Brake hard on safe dry surface; ABS should activate with firm pulsating pedal feel and vehicle tracking straight,abs_feel,Normal,Slightly Firm,Aggressive,Erratic,Non-Functional,0,0.15,0.40,0.70,0.95,All,All,No
+373,Automatic Kickdown,"While cruising at 60 km/h, floor the accelerator; automatic transmission should kickdown promptly for overtaking power",operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,"Automatic, CVT, DCT, AMT",No
+374,Clutch Slip Under Load,"In 3rd or 4th gear at 30-40 km/h, accelerate hard; engine RPM should rise proportionally with vehicle speed gain",misfire,None,Occasional,Intermittent,Frequent,Constant,0,0.25,0.50,0.75,0.95,All,"Manual, AMT, DCT",No
+375,Emergency Braking,"Perform emergency stop from 60 km/h on safe road; assess stopping distance, pedal feel and vehicle stability",severity,Normal,Minor,Moderate,Major,Critical,0,0.20,0.45,0.75,0.95,All,All,No
+376,High Speed Stability,"Drive at 100+ km/h on highway; assess overall stability, vibration, wind sensitivity and driver confidence level",stability,Stable,Slight Drift,Noticeable Pull,Strong Pull,Unsafe,0,0.15,0.40,0.70,0.95,All,All,No
+377,Steering Return,Turn steering wheel to full lock then release; steering should self-center smoothly as vehicle moves forward,steer_return,Returns Fully,Slight Lag,Noticeable Lag,Doesn't Return,Binding,0,0.20,0.45,0.75,0.95,All,All,No
+378,Traction Control,Accelerate on loose or wet surface; traction control should intervene by cutting power or braking spinning wheel,operation,Working,Intermittent,Weak,Malfunction,Non-Functional,0,0.25,0.45,0.75,0.95,All,All,No

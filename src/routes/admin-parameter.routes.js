@@ -1,0 +1,22 @@
+const express = require('express');
+const router = express.Router();
+const adminParameterController = require('../controllers/admin-parameter.controller');
+const { authenticate, requireAdmin } = require('../middlewares/auth.middleware');
+
+// All routes require admin authentication
+router.use(authenticate);
+router.use(requireAdmin);
+
+// GET /api/admin/parameters/hierarchy
+router.get('/hierarchy', (req, res) => adminParameterController.getHierarchy(req, res));
+
+// PATCH /api/admin/parameters/:id/status
+router.patch('/:id/status', (req, res) => adminParameterController.toggleParameterStatus(req, res));
+
+// PATCH /api/admin/parameters/sub-group/:id/bulk-status
+router.patch('/sub-group/:id/bulk-status', (req, res) => adminParameterController.toggleSubGroupStatus(req, res));
+
+// PATCH /api/admin/parameters/module/:id/bulk-status
+router.patch('/module/:id/bulk-status', (req, res) => adminParameterController.toggleModuleStatus(req, res));
+
+module.exports = router;

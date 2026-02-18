@@ -33,6 +33,10 @@ const serviceHistoryRoutes = require('./src/routes/service-history.routes');
 const servicePlanRoutes = require('./src/routes/service-plan.routes');
 const serviceOrderRoutes = require('./src/routes/service-order.routes');
 const appointmentSlotRoutes = require('./src/routes/appointment-slot.routes');
+const inspectionRoutes = require('./src/routes/inspection.routes');
+const parameterRoutes = require('./src/routes/parameter.routes');
+const certificateRoutes = require('./src/routes/certificate.routes');
+const adminParameterRoutes = require('./src/routes/admin-parameter.routes');
 
 const app = express();
 
@@ -126,6 +130,10 @@ app.use('/api/service-history', serviceHistoryRoutes);
 app.use('/api', servicePlanRoutes);
 app.use('/api', serviceOrderRoutes);
 app.use('/api', appointmentSlotRoutes);
+app.use('/api/inspections', inspectionRoutes);
+app.use('/api/parameters', parameterRoutes);
+app.use('/api/certificates', certificateRoutes);
+app.use('/api/admin/parameters', adminParameterRoutes);
 
 // 404 handler
 app.use((req, res) => {

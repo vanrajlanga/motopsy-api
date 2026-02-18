@@ -21,6 +21,14 @@ const ServicePlan = require('./service-plan.model');
 const ServicePlanOption = require('./service-plan-option.model');
 const ServiceOrder = require('./service-order.model');
 const AppointmentSlotBlock = require('./appointment-slot-block.model');
+const InspectionModule = require('./inspection-module.model');
+const InspectionSubGroup = require('./inspection-sub-group.model');
+const InspectionParameter = require('./inspection-parameter.model');
+const Inspection = require('./inspection.model');
+const InspectionResponse = require('./inspection-response.model');
+const InspectionPhoto = require('./inspection-photo.model');
+const InspectionScore = require('./inspection-score.model');
+const InspectionCertificate = require('./inspection-certificate.model');
 
 // Setup associations (only if not already defined)
 
@@ -228,6 +236,120 @@ if (!ServiceOrder.associations.ServicePlanOption) {
   });
 }
 
+// --- Inspection System Associations ---
+
+// InspectionModule has many InspectionSubGroups
+if (!InspectionModule.associations.SubGroups) {
+  InspectionModule.hasMany(InspectionSubGroup, {
+    foreignKey: 'module_id',
+    as: 'SubGroups'
+  });
+}
+
+// InspectionSubGroup belongs to InspectionModule
+if (!InspectionSubGroup.associations.Module) {
+  InspectionSubGroup.belongsTo(InspectionModule, {
+    foreignKey: 'module_id',
+    as: 'Module'
+  });
+}
+
+// InspectionSubGroup has many InspectionParameters
+if (!InspectionSubGroup.associations.Parameters) {
+  InspectionSubGroup.hasMany(InspectionParameter, {
+    foreignKey: 'sub_group_id',
+    as: 'Parameters'
+  });
+}
+
+// InspectionParameter belongs to InspectionSubGroup
+if (!InspectionParameter.associations.SubGroup) {
+  InspectionParameter.belongsTo(InspectionSubGroup, {
+    foreignKey: 'sub_group_id',
+    as: 'SubGroup'
+  });
+}
+
+// Inspection belongs to User (technician)
+if (!Inspection.associations.Technician) {
+  Inspection.belongsTo(User, {
+    foreignKey: 'technician_id',
+    as: 'Technician'
+  });
+}
+
+// Inspection has many InspectionResponses
+if (!Inspection.associations.Responses) {
+  Inspection.hasMany(InspectionResponse, {
+    foreignKey: 'inspection_id',
+    as: 'Responses'
+  });
+}
+
+// Inspection has one InspectionScore
+if (!Inspection.associations.Score) {
+  Inspection.hasOne(InspectionScore, {
+    foreignKey: 'inspection_id',
+    as: 'Score'
+  });
+}
+
+// Inspection has one InspectionCertificate
+if (!Inspection.associations.Certificate) {
+  Inspection.hasOne(InspectionCertificate, {
+    foreignKey: 'inspection_id',
+    as: 'Certificate'
+  });
+}
+
+// InspectionResponse belongs to Inspection
+if (!InspectionResponse.associations.Inspection) {
+  InspectionResponse.belongsTo(Inspection, {
+    foreignKey: 'inspection_id',
+    as: 'Inspection'
+  });
+}
+
+// InspectionResponse belongs to InspectionParameter
+if (!InspectionResponse.associations.Parameter) {
+  InspectionResponse.belongsTo(InspectionParameter, {
+    foreignKey: 'parameter_id',
+    as: 'Parameter'
+  });
+}
+
+// InspectionResponse has many InspectionPhotos
+if (!InspectionResponse.associations.Photos) {
+  InspectionResponse.hasMany(InspectionPhoto, {
+    foreignKey: 'response_id',
+    as: 'Photos'
+  });
+}
+
+// InspectionPhoto belongs to InspectionResponse
+if (!InspectionPhoto.associations.Response) {
+  InspectionPhoto.belongsTo(InspectionResponse, {
+    foreignKey: 'response_id',
+    as: 'Response'
+  });
+}
+
+// InspectionScore belongs to Inspection
+if (!InspectionScore.associations.Inspection) {
+  InspectionScore.belongsTo(Inspection, {
+    foreignKey: 'inspection_id',
+    as: 'Inspection'
+  });
+}
+
+// InspectionCertificate belongs to Inspection
+if (!InspectionCertificate.associations.Inspection) {
+  InspectionCertificate.belongsTo(Inspection, {
+    foreignKey: 'inspection_id',
+    as: 'Inspection'
+  });
+}
+
 module.exports = {
   sequelize,
   User,
@@ -249,5 +371,13 @@ module.exports = {
   ServicePlan,
   ServicePlanOption,
   ServiceOrder,
-  AppointmentSlotBlock
+  AppointmentSlotBlock,
+  InspectionModule,
+  InspectionSubGroup,
+  InspectionParameter,
+  Inspection,
+  InspectionResponse,
+  InspectionPhoto,
+  InspectionScore,
+  InspectionCertificate
 };
