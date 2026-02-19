@@ -354,13 +354,15 @@ class PaymentService {
             chassis_number: serviceData.chassisNumber || null,
             registration_number: serviceData.registrationNumber || null,
             car_model_year: serviceData.carModelYear || null,
-            state: serviceData.state,
+            // Address (defaults to empty string when UI collection is disabled)
+            state: serviceData.state || '',
             city: serviceData.city || null,
-            address: serviceData.address,
-            postcode: serviceData.postcode,
+            address: serviceData.address || '',
+            postcode: serviceData.postcode || '',
             order_notes: serviceData.orderNotes || null,
-            appointment_date: serviceData.selectedDate ? serviceData.selectedDate.substring(0, 10) : null,
-            appointment_time_slot: serviceData.selectedTimeSlot || null
+            // SCHEDULE APPOINTMENT DISABLED
+            // appointment_date: serviceData.selectedDate ? serviceData.selectedDate.substring(0, 10) : null,
+            // appointment_time_slot: serviceData.selectedTimeSlot || null
           }, paymentHistoryId);
 
           logger.info(`Service order created: ${serviceOrder.id} for payment ${paymentHistoryId}`);
@@ -388,10 +390,11 @@ class PaymentService {
                 amount: existingPaymentHistory.amount,
                 orderId: serviceOrder.id,
                 mobileNumber: serviceData.mobileNumber || serviceData.mobile_number || user.phone_number,
-                address: serviceData.address,
-                city: serviceData.city,
-                state: serviceData.state,
-                postcode: serviceData.postcode,
+                // SERVICE ADDRESS DISABLED
+                // address: serviceData.address,
+                // city: serviceData.city,
+                // state: serviceData.state,
+                // postcode: serviceData.postcode,
                 carCompany: serviceData.carCompany || serviceData.car_company,
                 carModel: serviceData.carModel || serviceData.car_model,
                 carModelYear: serviceData.carModelYear || serviceData.car_model_year,
@@ -399,8 +402,9 @@ class PaymentService {
                 registrationNumber: serviceData.registrationNumber || serviceData.registration_number || serviceData.carNumber,
                 orderNotes: serviceData.orderNotes || serviceData.order_notes,
                 userId: userId,
-                appointmentDate: serviceData.selectedDate || null,
-                appointmentTimeSlot: serviceData.selectedTimeSlot || null
+                // SCHEDULE APPOINTMENT DISABLED
+                // appointmentDate: serviceData.selectedDate || null,
+                // appointmentTimeSlot: serviceData.selectedTimeSlot || null
               };
 
               // Send confirmation email to user

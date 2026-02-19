@@ -25,15 +25,15 @@ class ServiceOrderService {
         chassis_number: orderData.chassis_number || null,
         registration_number: orderData.registration_number || null,
         car_model_year: orderData.car_model_year || null,
-        // Address
-        state: orderData.state,
+        // Address (collected from UI when enabled, defaults to empty string when disabled)
+        state: orderData.state || '',
         city: orderData.city || null,
-        address: orderData.address,
-        postcode: orderData.postcode,
+        address: orderData.address || '',
+        postcode: orderData.postcode || '',
         order_notes: orderData.order_notes || null,
-        // Appointment details
-        appointment_date: orderData.appointment_date || null,
-        appointment_time_slot: orderData.appointment_time_slot || null,
+        // Appointment details - SCHEDULE APPOINTMENT DISABLED
+        // appointment_date: orderData.appointment_date || null,
+        // appointment_time_slot: orderData.appointment_time_slot || null,
         // Status
         status: 0 // Pending
       });

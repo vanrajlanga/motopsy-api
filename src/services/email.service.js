@@ -747,10 +747,11 @@ class EmailService {
                     <td>Contact Number:</td>
                     <td>${mobileNumber}</td>
                   </tr>
+                  ${address ? `
                   <tr>
                     <td>Service Location:</td>
                     <td>${address}, ${city || ''} ${state}, ${postcode}</td>
-                  </tr>
+                  </tr>` : ''}
                 </table>
 
                 ${appointmentDate ? `
@@ -970,6 +971,7 @@ class EmailService {
                   </table>
                 </div>
 
+                ${address ? `
                 <div class="section">
                   <div class="section-title">📍 Service Location</div>
                   <table>
@@ -995,7 +997,7 @@ class EmailService {
                       <td><strong>${address}, ${city ? city + ', ' : ''}${state} - ${postcode}</strong></td>
                     </tr>
                   </table>
-                </div>
+                </div>` : ''}
 
                 ${appointmentDate ? `
                 <div style="background: linear-gradient(135deg, #e8f5ff 0%, #f0f9ff 100%); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #00a8e8;">
