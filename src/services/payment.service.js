@@ -360,9 +360,10 @@ class PaymentService {
             address: serviceData.address || '',
             postcode: serviceData.postcode || '',
             order_notes: serviceData.orderNotes || null,
-            // SCHEDULE APPOINTMENT DISABLED
-            // appointment_date: serviceData.selectedDate ? serviceData.selectedDate.substring(0, 10) : null,
-            // appointment_time_slot: serviceData.selectedTimeSlot || null
+            // Appointment applies to physical inspection plans (Inspection Only, Safety Pack, PDI).
+            // Vehicle Intelligence + Service History has no appointment form, so selectedDate is null there.
+            appointment_date: serviceData.selectedDate ? serviceData.selectedDate.substring(0, 10) : null,
+            appointment_time_slot: serviceData.selectedTimeSlot || null
           }, paymentHistoryId);
 
           logger.info(`Service order created: ${serviceOrder.id} for payment ${paymentHistoryId}`);
@@ -402,9 +403,8 @@ class PaymentService {
                 registrationNumber: serviceData.registrationNumber || serviceData.registration_number || serviceData.carNumber,
                 orderNotes: serviceData.orderNotes || serviceData.order_notes,
                 userId: userId,
-                // SCHEDULE APPOINTMENT DISABLED
-                // appointmentDate: serviceData.selectedDate || null,
-                // appointmentTimeSlot: serviceData.selectedTimeSlot || null
+                appointmentDate: serviceData.selectedDate || null,
+                appointmentTimeSlot: serviceData.selectedTimeSlot || null
               };
 
               // Send confirmation email to user
