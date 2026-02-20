@@ -83,17 +83,22 @@ const ServiceOrder = sequelize.define('service_orders', {
   order_notes: {
     type: DataTypes.TEXT
   },
-  // Appointment details - SCHEDULE APPOINTMENT DISABLED
-  // appointment_date: {
-  //   type: DataTypes.DATEONLY,
-  //   allowNull: true,
-  //   field: 'appointment_date'
-  // },
-  // appointment_time_slot: {
-  //   type: DataTypes.STRING(20),
-  //   allowNull: true,
-  //   field: 'appointment_time_slot'
-  // },
+  // Appointment details
+  appointment_date: {
+    type: DataTypes.DATEONLY,
+    allowNull: true
+  },
+  appointment_time_slot: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    comment: 'Time slot e.g. 10:00-11:00'
+  },
+  // Assigned mechanic
+  mechanic_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'Auto-assigned mechanic user id'
+  },
   // Status
   status: {
     type: DataTypes.INTEGER,

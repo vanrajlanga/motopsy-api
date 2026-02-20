@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const inspectionController = require('../controllers/inspection.controller');
 const upload = require('../middlewares/upload.middleware');
+const { optionalAuth } = require('../middlewares/auth.middleware');
 
-router.post('/', inspectionController.create.bind(inspectionController));
+// Create inspection — optionalAuth so mechanics get technician_id auto-filled from token
+router.post('/', optionalAuth, inspectionController.create.bind(inspectionController));
 router.get('/', inspectionController.list.bind(inspectionController));
 router.get('/:id', inspectionController.getById.bind(inspectionController));
 // Batch route MUST come before :parameterId to avoid "batch" being parsed as parameterId

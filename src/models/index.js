@@ -236,6 +236,38 @@ if (!ServiceOrder.associations.ServicePlanOption) {
   });
 }
 
+// ServiceOrder belongs to User as Mechanic
+if (!ServiceOrder.associations.Mechanic) {
+  ServiceOrder.belongsTo(User, {
+    foreignKey: 'mechanic_id',
+    as: 'Mechanic'
+  });
+}
+
+// User has many ServiceOrders as assigned Mechanic
+if (!User.associations.MechanicOrders) {
+  User.hasMany(ServiceOrder, {
+    foreignKey: 'mechanic_id',
+    as: 'MechanicOrders'
+  });
+}
+
+// Inspection belongs to ServiceOrder
+if (!Inspection.associations.ServiceOrder) {
+  Inspection.belongsTo(ServiceOrder, {
+    foreignKey: 'service_order_id',
+    as: 'ServiceOrder'
+  });
+}
+
+// ServiceOrder has one Inspection
+if (!ServiceOrder.associations.Inspection) {
+  ServiceOrder.hasOne(Inspection, {
+    foreignKey: 'service_order_id',
+    as: 'Inspection'
+  });
+}
+
 // --- Inspection System Associations ---
 
 // InspectionModule has many InspectionSubGroups

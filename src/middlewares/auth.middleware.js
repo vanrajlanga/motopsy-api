@@ -137,9 +137,52 @@ const requireRole = (allowedRoles) => {
   };
 };
 
+/**
+ * Mechanic authorization middleware
+ * Allows users with the 'Mechanic' role
+ */
+const requireMechanic = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ isSuccess: false, error: 'Unauthorized' });
+  }
+
+  const userRoles = (req.user.roles || []).map(r => r.toUpperCase());
+  if (!userRoles.includes('MECHANIC') && !req.user.isAdmin) {
+    return res.status(403).json({
+      isSuccess: false,
+      error: 'Forbidden - Mechanic access required'
+    });
+  }
+
+  next();
+};
+
+/**
+ * Admin or Mechanic authorization middleware
+ */
+const requireAdminOrMechanic = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ isSuccess: false, error: 'Unauthorized' });
+  }
+
+  const userRoles = (req.user.roles || []).map(r => r.toUpperCase());
+  const hasAccess = req.user.isAdmin || userRoles.includes('MECHANIC') || userRoles.includes('ADMIN') || userRoles.includes('OPERATOR');
+
+  if (!hasAccess) {
+    return res.status(403).json({
+      isSuccess: false,
+      error: 'Forbidden - Admin or Mechanic access required'
+    });
+  }
+
+  next();
+};
+
 module.exports = {
   authenticate,
   requireAdmin,
   requireRole,
-  optionalAuth
+  optionalAuth,
+  requireMechanic,
+  requireAdminOrMechanic
 };

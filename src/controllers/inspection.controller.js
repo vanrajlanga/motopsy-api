@@ -8,7 +8,8 @@ const InspectionResponse = require('../models/inspection-response.model');
 class InspectionController extends BaseController {
   async create(req, res, next) {
     try {
-      const technicianId = req.body.technician_id || null;
+      // Use authenticated user as technician if logged in (mechanic flow), else use body field
+      const technicianId = req.user?.userId || req.body.technician_id || null;
       const result = await inspectionService.create(technicianId, req.body);
       return this.fromResult(result, res);
     } catch (error) {

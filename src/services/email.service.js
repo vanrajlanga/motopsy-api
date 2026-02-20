@@ -1061,6 +1061,134 @@ class EmailService {
     }
 
     /**
+     * Send assignment notification email to mechanic
+     * Called when a service order is assigned (auto or manually) to a mechanic
+     */
+    async sendMechanicAssignmentEmailAsync(mechanic, order) {
+        if (!this.isConfigured || !this.transporter) {
+            logger.warn('Email service not configured. Skipping mechanic assignment email.', { mechanicId: mechanic?.id });
+            return false;
+        }
+
+        try {
+            const mechanicEmail = mechanic.email;
+            const mechanicName = [mechanic.first_name, mechanic.last_name].filter(Boolean).join(' ') || mechanicEmail;
+
+            const appointmentDate = order.appointment_date
+                ? new Date(order.appointment_date).toLocaleDateString('en-IN', {
+                      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                  })
+                : null;
+
+            const mailOptions = {
+                from: `"Motopsy" <${this.fromEmail}>`,
+                to: mechanicEmail,
+                subject: `New Service Order Assigned to You - #${order.id}`,
+                html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background: linear-gradient(135deg, #0f766e 0%, #0891b2 100%); color: white; padding: 30px 20px; text-align: center; border-radius: 8px 8px 0 0; }
+              .content { padding: 30px 20px; background-color: #fff; border: 1px solid #e0e0e0; border-top: none; }
+              .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; background: #f8f9fa; border-radius: 0 0 8px 8px; }
+              table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+              table td { padding: 10px; border-bottom: 1px solid #e8e8e8; }
+              table td:first-child { font-weight: bold; width: 40%; color: #666; }
+              .order-id { background: #e0fdf4; padding: 10px 18px; border-radius: 6px; display: inline-block; font-weight: bold; color: #0f766e; margin: 10px 0; font-size: 20px; }
+              .appt-box { background: linear-gradient(135deg, #e8f5ff 0%, #f0f9ff 100%); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0891b2; }
+              .appt-box h3 { margin: 0 0 10px 0; color: #1c3b54; font-size: 15px; }
+              .info-box { background: #f0fdf4; padding: 18px; border-radius: 8px; border-left: 4px solid #0f766e; margin: 20px 0; }
+              .info-box h3 { margin: 0 0 10px 0; color: #0f766e; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>🔧 New Order Assigned!</h1>
+                <p style="margin: 8px 0 0 0; opacity: 0.9;">A service order has been assigned to you</p>
+              </div>
+              <div class="content">
+                <p>Dear <strong>${mechanicName}</strong>,</p>
+                <p>A new service order has been assigned to you. Please review the details below and be prepared for the appointment.</p>
+
+                <div style="text-align: center;">
+                  <div class="order-id">Order #${order.id}</div>
+                </div>
+
+                <h3 style="color: #0f766e;">📋 Customer & Vehicle Details</h3>
+                <table>
+                  <tr>
+                    <td>Customer Name:</td>
+                    <td><strong>${order.name || 'N/A'}</strong></td>
+                  </tr>
+                  <tr>
+                    <td>Contact Number:</td>
+                    <td><strong>${order.mobile_number || 'N/A'}</strong></td>
+                  </tr>
+                  ${order.registration_number ? `
+                  <tr>
+                    <td>Registration No:</td>
+                    <td><strong>${order.registration_number}</strong></td>
+                  </tr>` : ''}
+                  ${order.car_company || order.car_model ? `
+                  <tr>
+                    <td>Vehicle:</td>
+                    <td>${[order.car_company, order.car_model, order.car_model_year].filter(Boolean).join(' ')}</td>
+                  </tr>` : ''}
+                </table>
+
+                ${order.address ? `
+                <h3 style="color: #0f766e;">📍 Service Location</h3>
+                <table>
+                  <tr>
+                    <td>Address:</td>
+                    <td>${[order.address, order.city, order.state, order.postcode].filter(Boolean).join(', ')}</td>
+                  </tr>
+                </table>` : ''}
+
+                ${appointmentDate ? `
+                <div class="appt-box">
+                  <h3>📅 Appointment Details</h3>
+                  <p><strong>Date:</strong> ${appointmentDate}</p>
+                  ${order.appointment_time_slot ? `<p><strong>Time Slot:</strong> ${order.appointment_time_slot}</p>` : ''}
+                </div>` : ''}
+
+                <div class="info-box">
+                  <h3>✅ Next Steps</h3>
+                  <ul style="margin: 0; padding-left: 20px;">
+                    <li>Log in to your Motopsy mechanic portal</li>
+                    <li>Review the order details and service location</li>
+                    <li>Contact the customer if you need to confirm anything</li>
+                    <li>Complete the inspection and submit your report</li>
+                  </ul>
+                </div>
+
+                <p>If you have any questions, please contact the admin team.</p>
+                <p><strong>Thank you for your service!</strong></p>
+              </div>
+              <div class="footer">
+                <p>&copy; ${new Date().getFullYear()} Motopsy. All rights reserved.</p>
+                <p>For support, contact us at ${process.env.CONTACT_EMAIL || 'support@motopsy.com'}</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `,
+            };
+
+            await this.transporter.sendMail(mailOptions);
+            logger.info(`Mechanic assignment email sent to: ${mechanicEmail} for order #${order.id}`);
+            return true;
+        } catch (error) {
+            logger.error('Send mechanic assignment email error:', error);
+            return false;
+        }
+    }
+
+    /**
      * Send error notification email to admin/developer
      * Called when an API error occurs
      */

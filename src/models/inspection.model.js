@@ -16,6 +16,11 @@ const Inspection = sequelize.define('inspections', {
     type: DataTypes.INTEGER,
     allowNull: true
   },
+  service_order_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'Linked service order'
+  },
   vehicle_reg_number: {
     type: DataTypes.STRING(20),
     allowNull: true

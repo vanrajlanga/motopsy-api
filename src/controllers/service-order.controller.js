@@ -5,15 +5,11 @@ class ServiceOrderController extends ApiController {
   /**
    * POST /api/service-orders
    * Create service order (called after payment verification)
-   * Note: This is primarily called internally by payment service
    */
   async createServiceOrder(req, res, next) {
     try {
-      const userId = req.user?.id || req.user?.user_id;
-      const orderData = {
-        ...req.body,
-        user_id: userId
-      };
+      const userId = req.user?.userId || req.user?.id;
+      const orderData = { ...req.body, user_id: userId };
 
       const order = await serviceOrderService.createServiceOrderAsync(
         orderData,
@@ -36,8 +32,22 @@ class ServiceOrderController extends ApiController {
    */
   async getMyOrders(req, res, next) {
     try {
-      const userId = req.user?.id || req.user?.user_id;
+      const userId = req.user?.userId || req.user?.id;
       const orders = await serviceOrderService.getOrdersByUserIdAsync(userId);
+      return this.ok({ success: true, data: orders }, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/mechanic/my-orders
+   * Get all service orders assigned to the authenticated mechanic
+   */
+  async getMechanicOrders(req, res, next) {
+    try {
+      const mechanicId = req.user?.userId || req.user?.id;
+      const orders = await serviceOrderService.getMechanicOrdersAsync(mechanicId);
       return this.ok({ success: true, data: orders }, res);
     } catch (error) {
       next(error);
@@ -95,6 +105,43 @@ class ServiceOrderController extends ApiController {
         data: order,
         message: 'Order status updated successfully'
       }, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PUT /api/admin/service-orders/:id/assign-mechanic
+   * Admin: Manually assign a mechanic to a service order
+   */
+  async assignMechanic(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { mechanic_id } = req.body;
+
+      if (!mechanic_id) {
+        return this.badRequest('mechanic_id is required', res);
+      }
+
+      const order = await serviceOrderService.assignMechanicAsync(id, mechanic_id);
+      return this.ok({
+        success: true,
+        data: order,
+        message: 'Mechanic assigned successfully'
+      }, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/admin/mechanics
+   * Admin: Get all users with Mechanic role
+   */
+  async getAllMechanics(req, res, next) {
+    try {
+      const mechanics = await serviceOrderService.getAllMechanicsAsync();
+      return this.ok({ success: true, data: mechanics }, res);
     } catch (error) {
       next(error);
     }

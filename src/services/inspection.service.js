@@ -24,7 +24,8 @@ class InspectionService {
     try {
       const { vehicleRegNumber, vehicleMake, vehicleModel, vehicleYear,
               fuelType, transmissionType, odometerKm,
-              gpsLatitude, gpsLongitude, gpsAddress, inspectorName } = vehicleData;
+              gpsLatitude, gpsLongitude, gpsAddress, inspectorName,
+              serviceOrderId } = vehicleData;
 
       // Get applicable parameters
       const paramResult = await parameterService.getApplicableParameters(fuelType, transmissionType);
@@ -45,6 +46,7 @@ class InspectionService {
       const inspection = await Inspection.create({
         uuid: uuidv4(),
         technician_id: technicianId,
+        service_order_id: serviceOrderId || null,
         vehicle_reg_number: vehicleRegNumber,
         vehicle_make: vehicleMake,
         vehicle_model: vehicleModel,
