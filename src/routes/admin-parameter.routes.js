@@ -10,6 +10,12 @@ router.use(requireAdmin);
 // GET /api/admin/parameters/hierarchy
 router.get('/hierarchy', (req, res) => adminParameterController.getHierarchy(req, res));
 
+// GET /api/admin/parameters/modules  — module list only (for tabs)
+router.get('/modules', (req, res) => adminParameterController.getModules(req, res));
+
+// GET /api/admin/parameters/modules/:moduleId  — lazy load parameters for one module
+router.get('/modules/:moduleId', (req, res) => adminParameterController.getModuleParameters(req, res));
+
 // GET /api/admin/parameters/:id
 router.get('/:id', (req, res) => adminParameterController.getParameter(req, res));
 

@@ -68,6 +68,81 @@ class ParameterService {
   }
 
   /**
+   * Get just the module list with active/total counts (no parameters).
+   * Used for initial tab load in admin panel.
+   */
+  async getModules() {
+    try {
+      const modules = await InspectionModule.findAll({
+        order: [['sort_order', 'ASC']],
+        include: [{
+          model: InspectionSubGroup,
+          as: 'SubGroups',
+          attributes: ['id', 'name', 'sort_order'],
+          include: [{
+            model: InspectionParameter,
+            as: 'Parameters',
+            attributes: ['id', 'is_active']
+          }]
+        }]
+      });
+
+      const result = modules.map(mod => {
+        const moduleData = mod.toJSON();
+        let totalCount = 0;
+        let activeCount = 0;
+        moduleData.SubGroups = moduleData.SubGroups.map(sg => {
+          const sgActive = sg.Parameters.filter(p => p.is_active).length;
+          const sgTotal = sg.Parameters.length;
+          totalCount += sgTotal;
+          activeCount += sgActive;
+          return { id: sg.id, name: sg.name, activeCount: sgActive, totalCount: sgTotal };
+        });
+        return { id: moduleData.id, name: moduleData.name, icon: moduleData.icon, SubGroups: moduleData.SubGroups, activeCount, totalCount };
+      });
+
+      return Result.success(result);
+    } catch (error) {
+      logger.error('Get modules error:', error);
+      return Result.failure(error.message || 'Failed to get modules');
+    }
+  }
+
+  /**
+   * Get sub-groups + parameters for a single module.
+   * Used for lazy loading tab content in admin panel.
+   */
+  async getModuleParameters(moduleId) {
+    try {
+      const mod = await InspectionModule.findByPk(moduleId, {
+        include: [{
+          model: InspectionSubGroup,
+          as: 'SubGroups',
+          order: [['sort_order', 'ASC']],
+          include: [{
+            model: InspectionParameter,
+            as: 'Parameters',
+            order: [['sort_order', 'ASC']]
+          }]
+        }]
+      });
+
+      if (!mod) return Result.failure('Module not found');
+
+      const moduleData = mod.toJSON();
+      moduleData.SubGroups = moduleData.SubGroups.map(sg => {
+        const sgActive = sg.Parameters.filter(p => p.is_active).length;
+        return { ...sg, activeCount: sgActive, totalCount: sg.Parameters.length };
+      });
+
+      return Result.success(moduleData);
+    } catch (error) {
+      logger.error('Get module parameters error:', error);
+      return Result.failure(error.message || 'Failed to get module parameters');
+    }
+  }
+
+  /**
    * Get full hierarchy of modules → sub-groups → parameters with is_active status.
    * Used by admin panel for parameter management.
    */

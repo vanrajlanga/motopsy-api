@@ -12,6 +12,25 @@ class AdminParameterController extends BaseController {
   }
 
   /**
+   * GET /api/admin/parameters/modules
+   * Get module list with counts only (no parameters) for tab headers
+   */
+  async getModules(req, res) {
+    const result = await parameterService.getModules();
+    return this.fromResult(result, res);
+  }
+
+  /**
+   * GET /api/admin/parameters/modules/:moduleId
+   * Get sub-groups + parameters for a single module (lazy load)
+   */
+  async getModuleParameters(req, res) {
+    const { moduleId } = req.params;
+    const result = await parameterService.getModuleParameters(parseInt(moduleId));
+    return this.fromResult(result, res);
+  }
+
+  /**
    * GET /api/admin/parameters/:id
    * Get a single parameter with all fields
    */
