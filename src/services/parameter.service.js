@@ -114,28 +114,23 @@ class ParameterService {
    */
   async getModuleParameters(moduleId) {
     try {
-      const mod = await InspectionModule.findByPk(moduleId, {
+      const subGroups = await InspectionSubGroup.findAll({
+        where: { module_id: moduleId },
+        order: [['sort_order', 'ASC']],
         include: [{
-          model: InspectionSubGroup,
-          as: 'SubGroups',
-          order: [['sort_order', 'ASC']],
-          include: [{
-            model: InspectionParameter,
-            as: 'Parameters',
-            order: [['sort_order', 'ASC']]
-          }]
+          model: InspectionParameter,
+          as: 'Parameters',
+          order: [['sort_order', 'ASC']]
         }]
       });
 
-      if (!mod) return Result.failure('Module not found');
-
-      const moduleData = mod.toJSON();
-      moduleData.SubGroups = moduleData.SubGroups.map(sg => {
-        const sgActive = sg.Parameters.filter(p => p.is_active).length;
-        return { ...sg, activeCount: sgActive, totalCount: sg.Parameters.length };
+      const result = subGroups.map(sg => {
+        const sgData = sg.toJSON();
+        const active = sgData.Parameters.filter(p => p.is_active).length;
+        return { ...sgData, activeCount: active, totalCount: sgData.Parameters.length };
       });
 
-      return Result.success(moduleData);
+      return Result.success(result);
     } catch (error) {
       logger.error('Get module parameters error:', error);
       return Result.failure(error.message || 'Failed to get module parameters');
