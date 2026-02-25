@@ -68,7 +68,10 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Static files (matching .NET UseDefaultFiles and UseStaticFiles)
 app.use(express.static('public'));
-app.use('/uploads', express.static('uploads'));
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static('uploads'));
 
 // Request logging middleware - Enhanced for production debugging
 app.use((req, res, next) => {

@@ -40,7 +40,8 @@ class CertificateService {
       const certNumber = await this.generateCertificateNumber();
 
       // QR code data: verification URL
-      const qrCodeData = `https://motopsy.com/verify/${certNumber}`;
+      const siteUrl = process.env.FRONTEND_BASE_URL || 'https://motopsy.com';
+      const qrCodeData = `${siteUrl}/verify/${certNumber}`;
 
       const issuedAt = new Date();
       const expiresAt = new Date(issuedAt);

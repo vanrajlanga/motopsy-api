@@ -1,3 +1,4 @@
+const path = require('path');
 const BaseController = require('./base.controller');
 const inspectionService = require('../services/inspection.service');
 const certificateService = require('../services/certificate.service');
@@ -117,14 +118,45 @@ class InspectionController extends BaseController {
         return this.badRequest('No file uploaded', res);
       }
 
+      const relativePath = `uploads/${req.file.filename}`;
       await inspection.update({
-        inspector_photo_path: req.file.path,
+        inspector_photo_path: relativePath,
         modified_at: new Date()
       });
 
+      const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
       return this.ok({
         inspectionId: inspection.id,
-        inspectorPhotoPath: req.file.path
+        inspectorPhotoPath: fileUrl
+      }, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async uploadVehiclePhoto(req, res, next) {
+    try {
+      const { id } = req.params;
+
+      const inspection = await Inspection.findByPk(parseInt(id));
+      if (!inspection) {
+        return this.notFound('Inspection not found', res);
+      }
+
+      if (!req.file) {
+        return this.badRequest('No file uploaded', res);
+      }
+
+      const relativePath = `uploads/${req.file.filename}`;
+      await inspection.update({
+        vehicle_photo_path: relativePath,
+        modified_at: new Date()
+      });
+
+      const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+      return this.ok({
+        inspectionId: inspection.id,
+        vehiclePhotoPath: fileUrl
       }, res);
     } catch (error) {
       next(error);
@@ -148,18 +180,20 @@ class InspectionController extends BaseController {
         return this.badRequest('No file uploaded', res);
       }
 
+      const relativePath = `uploads/${req.file.filename}`;
       const photo = await InspectionPhoto.create({
         response_id: parseInt(responseId),
-        file_path: req.file.path,
+        file_path: relativePath,
         file_name: req.file.originalname,
         file_size: req.file.size,
         created_at: new Date()
       });
 
+      const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
       return this.ok({
         id: photo.id,
         fileName: photo.file_name,
-        filePath: photo.file_path,
+        filePath: fileUrl,
         fileSize: photo.file_size
       }, res);
     } catch (error) {

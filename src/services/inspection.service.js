@@ -1,3 +1,4 @@
+const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { sequelize } = require('../config/database');
 const { Op } = require('sequelize');
@@ -415,7 +416,12 @@ class InspectionService {
         selectedOption: resp.selected_option,
         severityScore: resp.severity_score,
         notes: resp.notes,
-        photos: resp.Photos || []
+        photos: (resp.Photos || []).map(p => ({
+          id: p.id,
+          filePath: this._resolvePhotoUrl(p.file_path),
+          fileName: p.file_name,
+          fileSize: p.file_size
+        }))
       });
     }
 
@@ -460,6 +466,7 @@ class InspectionService {
       gpsAddress: data.gps_address,
       inspectorName: data.inspector_name,
       inspectorPhotoPath: data.inspector_photo_path,
+      vehiclePhotoPath: data.vehicle_photo_path,
       status: data.status,
       totalApplicableParams: data.total_applicable_params,
       totalAnsweredParams: data.total_answered_params,
@@ -478,6 +485,15 @@ class InspectionService {
         expiresAt: data.Certificate.expires_at
       } : null
     };
+  }
+
+  _resolvePhotoUrl(filePath) {
+    if (!filePath) return '';
+    if (filePath.startsWith('http')) return filePath;
+    const serverUrl = process.env.SERVER_URL || 'http://localhost:5001';
+    // Handle old absolute paths (e.g. /Users/.../uploads/file.jpg) and new relative paths (uploads/file.jpg)
+    const filename = path.basename(filePath);
+    return `${serverUrl}/uploads/${filename}`;
   }
 
   transformScore(score) {
