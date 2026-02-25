@@ -18,7 +18,7 @@ const InspectionResponse = sequelize.define('inspection_responses', {
   selected_option: {
     type: DataTypes.TINYINT,
     allowNull: true,
-    comment: '1-5 matching option_1..option_5, or null if unanswered'
+    comment: '0 = N/A, 1-5 matching option_1..option_5, null = unanswered'
   },
   severity_score: {
     type: DataTypes.DECIMAL(3, 2),
