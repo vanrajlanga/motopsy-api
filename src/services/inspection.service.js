@@ -511,9 +511,9 @@ class InspectionService {
     };
 
     for (const [col, slug] of Object.entries(riskColumns)) {
-      const val = parseFloat(score[col] || 0);
-      if (val > 0) {
-        moduleRisks[slug] = val;
+      // Include 0-risk modules (perfect score) — only skip if column is truly NULL
+      if (score[col] != null) {
+        moduleRisks[slug] = parseFloat(score[col]);
       }
     }
 
