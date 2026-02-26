@@ -368,6 +368,36 @@ class PaymentService {
 
           logger.info(`Service order created: ${serviceOrder.id} for payment ${paymentHistoryId}`);
 
+          // For combo plan (Vehicle Intelligence + Service History), also create a VehicleDetailRequest
+          // so the Vehicle Intelligence report is generated and appears in Report History
+          const isCombo = serviceData.servicePackageName &&
+            serviceData.servicePackageName.includes('Vehicle Intelligence') &&
+            serviceData.servicePackageName.includes('Service History');
+
+          if (isCombo && serviceData.carNumber) {
+            try {
+              const maxVehicleRequest = await VehicleDetailRequest.findOne({
+                attributes: [[sequelize.fn('MAX', sequelize.col('id')), 'maxId']],
+                raw: true
+              });
+              const nextVehicleRequestId = (maxVehicleRequest && maxVehicleRequest.maxId) ? maxVehicleRequest.maxId + 1 : 1;
+
+              vehicleDetailRequest = await VehicleDetailRequest.create({
+                id: nextVehicleRequestId,
+                user_id: userId,
+                payment_history_id: paymentHistoryId,
+                registration_number: serviceData.carNumber.toUpperCase().replace(/\s/g, ''),
+                make: serviceData.carCompany || null,
+                model: serviceData.carModel || null,
+                created_at: new Date()
+              });
+              logger.info(`Combo plan: VehicleDetailRequest created: ${vehicleDetailRequest.id} for payment ${paymentHistoryId}`);
+            } catch (comboError) {
+              logger.error('Failed to create VehicleDetailRequest for combo plan:', comboError);
+              // Don't fail the payment if this fails
+            }
+          }
+
           // Send email notifications for service order
           try {
             const user = await User.findByPk(userId);
