@@ -66,16 +66,24 @@ class ScoringService {
         moduleGroups[mod.slug].responses.push(resp);
       }
 
-      // Calculate per-module risk (average severity of responded params)
+      // Calculate per-module risk using WEIGHTED average of responded params.
+      // Proportional redistribution: divide by the sum of weights of answered
+      // params only — disabled/N/A/filtered params are simply absent from both
+      // numerator and denominator, so their weight is automatically redistributed
+      // to the remaining answered params in proportion to their weights.
       const moduleRisks = {};
       const repairCostBreakdown = {};
       let totalRepairCost = 0;
 
       for (const [slug, group] of Object.entries(moduleGroups)) {
         const answered = group.responses.filter(r => r.severity_score != null);
-        const moduleRisk = answered.length > 0
-          ? answered.reduce((sum, r) => sum + parseFloat(r.severity_score || 0), 0) / answered.length
-          : 0;
+
+        let moduleRisk = 0;
+        if (answered.length > 0) {
+          const weightedSum   = answered.reduce((s, r) => s + parseFloat(r.Parameter?.weightage || 1) * parseFloat(r.severity_score || 0), 0);
+          const totalParamWt  = answered.reduce((s, r) => s + parseFloat(r.Parameter?.weightage || 1), 0);
+          moduleRisk = totalParamWt > 0 ? weightedSum / totalParamWt : 0;
+        }
 
         moduleRisks[slug] = moduleRisk;
 

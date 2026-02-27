@@ -31,4 +31,8 @@ router.patch('/sub-group/:id/bulk-status', (req, res) => adminParameterControlle
 // PATCH /api/admin/parameters/module/:id/bulk-status
 router.patch('/module/:id/bulk-status', (req, res) => adminParameterController.toggleModuleStatus(req, res));
 
+
+// GET /api/admin/parameters/module/:id/weight-summary
+router.get('/module/:id/weight-summary', (req, res) => adminParameterController.getModuleWeightSummary(req, res));
+
 module.exports = router;

@@ -103,6 +103,16 @@ class AdminParameterController extends BaseController {
     const result = await parameterService.toggleModuleStatus(parseInt(id), isActive);
     return this.fromResult(result, res);
   }
+
+  /**
+   * GET /api/admin/parameters/module/:id/weight-summary
+   * Returns total + active weight for a module
+   */
+  async getModuleWeightSummary(req, res) {
+    const { id } = req.params;
+    const result = await parameterService.getModuleWeightSummary(parseInt(id));
+    return this.fromResult(result, res);
+  }
 }
 
 module.exports = new AdminParameterController();

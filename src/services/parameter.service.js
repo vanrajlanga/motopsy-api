@@ -82,7 +82,7 @@ class ParameterService {
           include: [{
             model: InspectionParameter,
             as: 'Parameters',
-            attributes: ['id', 'is_active']
+            attributes: ['id', 'is_active', 'weightage']
           }]
         }]
       });
@@ -91,14 +91,26 @@ class ParameterService {
         const moduleData = mod.toJSON();
         let totalCount = 0;
         let activeCount = 0;
+        let weightTotal = 0;
+        let activeWeightTotal = 0;
         moduleData.SubGroups = moduleData.SubGroups.map(sg => {
           const sgActive = sg.Parameters.filter(p => p.is_active).length;
           const sgTotal = sg.Parameters.length;
           totalCount += sgTotal;
           activeCount += sgActive;
+          sg.Parameters.forEach(p => {
+            const wt = parseFloat(p.weightage || 0);
+            weightTotal += wt;
+            if (p.is_active) activeWeightTotal += wt;
+          });
           return { id: sg.id, name: sg.name, activeCount: sgActive, totalCount: sgTotal };
         });
-        return { id: moduleData.id, name: moduleData.name, icon: moduleData.icon, SubGroups: moduleData.SubGroups, activeCount, totalCount };
+        return {
+          id: moduleData.id, name: moduleData.name, icon: moduleData.icon,
+          SubGroups: moduleData.SubGroups, activeCount, totalCount,
+          weightTotal: parseFloat(weightTotal.toFixed(2)),
+          activeWeightTotal: parseFloat(activeWeightTotal.toFixed(2))
+        };
       });
 
       return Result.success(result);
@@ -263,7 +275,7 @@ class ParameterService {
         'name', 'detail', 'input_type',
         'option_1', 'option_2', 'option_3', 'option_4', 'option_5',
         'score_1', 'score_2', 'score_3', 'score_4', 'score_5',
-        'fuel_filter', 'transmission_filter', 'is_red_flag', 'sort_order'
+        'fuel_filter', 'transmission_filter', 'is_red_flag', 'sort_order', 'weightage'
       ];
 
       const updateData = {};
@@ -280,6 +292,39 @@ class ParameterService {
     } catch (error) {
       logger.error('Update parameter error:', error);
       return Result.failure(error.message || 'Failed to update parameter');
+    }
+  }
+
+  /**
+   * Get weight summary for a module: total weight, active weight, param count.
+   * Used by admin panel to show whether weights sum to ~100%.
+   */
+  async getModuleWeightSummary(moduleId) {
+    try {
+      const subGroups = await InspectionSubGroup.findAll({
+        where: { module_id: moduleId },
+        attributes: ['id']
+      });
+      const subGroupIds = subGroups.map(sg => sg.id);
+
+      const params = await InspectionParameter.findAll({
+        where: { sub_group_id: { [Op.in]: subGroupIds } },
+        attributes: ['id', 'weightage', 'is_active']
+      });
+
+      const totalWeight  = params.reduce((s, p) => s + parseFloat(p.weightage), 0);
+      const activeWeight = params.filter(p => p.is_active).reduce((s, p) => s + parseFloat(p.weightage), 0);
+
+      return Result.success({
+        moduleId,
+        totalWeight:  parseFloat(totalWeight.toFixed(2)),
+        activeWeight: parseFloat(activeWeight.toFixed(2)),
+        totalParams:  params.length,
+        activeParams: params.filter(p => p.is_active).length
+      });
+    } catch (error) {
+      logger.error('Get module weight summary error:', error);
+      return Result.failure(error.message || 'Failed to get weight summary');
     }
   }
 

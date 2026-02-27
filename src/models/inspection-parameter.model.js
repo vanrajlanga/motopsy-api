@@ -93,6 +93,11 @@ const InspectionParameter = sequelize.define('inspection_parameters', {
     allowNull: false,
     defaultValue: 1
   },
+  weightage: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: false,
+    defaultValue: 1.00
+  },
   created_at: {
     type: DataTypes.DATE,
     allowNull: false,
