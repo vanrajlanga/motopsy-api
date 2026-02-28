@@ -26,10 +26,10 @@ class InspectionService {
       const { vehicleRegNumber, vehicleMake, vehicleModel, vehicleYear,
               fuelType, transmissionType, odometerKm,
               gpsLatitude, gpsLongitude, gpsAddress, inspectorName,
-              serviceOrderId } = vehicleData;
+              serviceOrderId, hasLift = false, roadTestPossible = false } = vehicleData;
 
-      // Get applicable parameters
-      const paramResult = await parameterService.getApplicableParameters(fuelType, transmissionType);
+      // Get applicable parameters (fuel + transmission + context filtered)
+      const paramResult = await parameterService.getApplicableParameters(fuelType, transmissionType, { hasLift, roadTestPossible });
       if (!paramResult.isSuccess) {
         await transaction.rollback();
         return Result.failure('Failed to load parameters');
@@ -59,6 +59,8 @@ class InspectionService {
         gps_longitude: gpsLongitude,
         gps_address: gpsAddress,
         inspector_name: inspectorName || null,
+        has_lift: hasLift ? 1 : 0,
+        road_test_possible: roadTestPossible ? 1 : 0,
         status: 'in_progress',
         total_applicable_params: allParamIds.length,
         total_answered_params: 0,
@@ -369,6 +371,115 @@ class InspectionService {
   }
 
   /**
+   * Update inspection context (lift / road test) and reconcile response rows.
+   * Adding context back creates new response rows; removing deletes unanswered ones
+   * (answered ones are preserved so no data is lost).
+   */
+  async updateContext(inspectionId, hasLift, roadTestPossible) {
+    const transaction = await sequelize.transaction();
+    try {
+      const inspection = await Inspection.findByPk(inspectionId, { transaction });
+      if (!inspection) {
+        await transaction.rollback();
+        return Result.failure('Inspection not found');
+      }
+
+      const oldHasLift = !!inspection.has_lift;
+      const oldRoadTest = !!inspection.road_test_possible;
+
+      // Determine what changed
+      const liftTurnedOff  = oldHasLift && !hasLift;
+      const liftTurnedOn   = !oldHasLift && hasLift;
+      const roadTurnedOff  = oldRoadTest && !roadTestPossible;
+      const roadTurnedOn   = !oldRoadTest && roadTestPossible;
+
+      let applicableDelta = 0;
+
+      // Helper: get param IDs by context_filter that are fuel/trans applicable for this inspection
+      const getContextParamIds = async (contextValue) => {
+        const params = await InspectionParameter.findAll({
+          where: { context_filter: contextValue, is_active: 1 },
+          attributes: ['id', 'fuel_filter', 'transmission_filter'],
+          transaction
+        });
+        return params
+          .filter(p =>
+            parameterService.matchesFilter(p.fuel_filter, inspection.fuel_type) &&
+            parameterService.matchesFilter(p.transmission_filter, inspection.transmission_type)
+          )
+          .map(p => p.id);
+      };
+
+      // Remove unanswered responses when context turned OFF
+      if (liftTurnedOff || roadTurnedOff) {
+        const filterVal = liftTurnedOff ? 'lift_required' : 'road_test_required';
+        const paramIds = await getContextParamIds(filterVal);
+        if (paramIds.length) {
+          const deleted = await InspectionResponse.destroy({
+            where: {
+              inspection_id: inspectionId,
+              parameter_id: paramIds,
+              selected_option: null  // only delete unanswered — preserve inspector's work
+            },
+            transaction
+          });
+          applicableDelta -= deleted;
+        }
+      }
+
+      // Add new response rows when context turned ON
+      if (liftTurnedOn || roadTurnedOn) {
+        const filterVal = liftTurnedOn ? 'lift_required' : 'road_test_required';
+        const paramIds = await getContextParamIds(filterVal);
+        if (paramIds.length) {
+          // Only insert rows that don't already exist
+          const existing = await InspectionResponse.findAll({
+            where: { inspection_id: inspectionId, parameter_id: paramIds },
+            attributes: ['parameter_id'],
+            transaction
+          });
+          const existingIds = new Set(existing.map(r => r.parameter_id));
+          const toCreate = paramIds
+            .filter(id => !existingIds.has(id))
+            .map(id => ({
+              inspection_id: inspectionId,
+              parameter_id: id,
+              selected_option: null,
+              severity_score: null,
+              notes: null,
+              created_at: new Date()
+            }));
+          if (toCreate.length) {
+            await InspectionResponse.bulkCreate(toCreate, { transaction });
+            applicableDelta += toCreate.length;
+          }
+        }
+      }
+
+      // Update inspection record
+      await inspection.update({
+        has_lift: hasLift ? 1 : 0,
+        road_test_possible: roadTestPossible ? 1 : 0,
+        total_applicable_params: inspection.total_applicable_params + applicableDelta,
+        modified_at: new Date()
+      }, { transaction });
+
+      await transaction.commit();
+
+      return Result.success({
+        hasLift,
+        roadTestPossible,
+        totalApplicableParams: inspection.total_applicable_params + applicableDelta,
+        delta: applicableDelta
+      });
+    } catch (error) {
+      await transaction.rollback();
+      logger.error('Update context error:', error);
+      return Result.failure(error.message || 'Failed to update inspection context');
+    }
+  }
+
+  /**
    * Group responses by module and sub-group for the frontend.
    */
   groupResponsesByModule(inspection) {
@@ -413,6 +524,7 @@ class InspectionService {
         options: [param.option_1, param.option_2, param.option_3, param.option_4, param.option_5].filter(Boolean),
         scores: [param.score_1, param.score_2, param.score_3, param.score_4, param.score_5].filter(s => s != null),
         isRedFlag: param.is_red_flag,
+        contextFilter: param.context_filter || null,
         selectedOption: resp.selected_option,
         severityScore: resp.severity_score,
         notes: resp.notes,
@@ -468,6 +580,8 @@ class InspectionService {
       inspectorPhotoPath: data.inspector_photo_path,
       vehiclePhotoPath: data.vehicle_photo_path,
       status: data.status,
+      hasLift: !!data.has_lift,
+      roadTestPossible: !!data.road_test_possible,
       totalApplicableParams: data.total_applicable_params,
       totalAnsweredParams: data.total_answered_params,
       startedAt: data.started_at,

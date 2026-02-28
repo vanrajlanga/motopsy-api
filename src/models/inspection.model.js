@@ -45,6 +45,16 @@ const Inspection = sequelize.define('inspections', {
     type: DataTypes.ENUM('Manual', 'Automatic', 'CVT', 'DCT', 'AMT'),
     allowNull: false
   },
+  has_lift: {
+    type: DataTypes.TINYINT(1),
+    allowNull: false,
+    defaultValue: 0
+  },
+  road_test_possible: {
+    type: DataTypes.TINYINT(1),
+    allowNull: false,
+    defaultValue: 0
+  },
   odometer_km: {
     type: DataTypes.INTEGER,
     allowNull: true

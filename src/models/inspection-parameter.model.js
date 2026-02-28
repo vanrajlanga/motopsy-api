@@ -78,6 +78,11 @@ const InspectionParameter = sequelize.define('inspection_parameters', {
     allowNull: true,
     defaultValue: 'All'
   },
+  context_filter: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    defaultValue: null
+  },
   is_red_flag: {
     type: DataTypes.TINYINT(1),
     allowNull: false,

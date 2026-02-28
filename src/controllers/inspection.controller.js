@@ -67,6 +67,21 @@ class InspectionController extends BaseController {
     }
   }
 
+  async updateContext(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { hasLift, roadTestPossible } = req.body;
+      const result = await inspectionService.updateContext(
+        parseInt(id),
+        hasLift !== undefined ? !!hasLift : undefined,
+        roadTestPossible !== undefined ? !!roadTestPossible : undefined
+      );
+      return this.fromResult(result, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async complete(req, res, next) {
     try {
       const { id } = req.params;

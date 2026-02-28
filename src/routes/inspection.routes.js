@@ -12,6 +12,7 @@ router.get('/:id', inspectionController.getById.bind(inspectionController));
 // Batch route MUST come before :parameterId to avoid "batch" being parsed as parameterId
 router.put('/:id/responses/batch', inspectionController.saveBatchResponses.bind(inspectionController));
 router.put('/:id/responses/:parameterId', inspectionController.saveResponse.bind(inspectionController));
+router.patch('/:id/context', inspectionController.updateContext.bind(inspectionController));
 router.post('/:id/complete', inspectionController.complete.bind(inspectionController));
 router.get('/:id/score', inspectionController.getScore.bind(inspectionController));
 router.post('/:id/certificate', inspectionController.generateCertificate.bind(inspectionController));

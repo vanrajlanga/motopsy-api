@@ -10,7 +10,8 @@ class ParameterService {
    * Get all applicable parameters grouped by module > sub-group,
    * filtered by fuel type and transmission type.
    */
-  async getApplicableParameters(fuelType, transmissionType) {
+  async getApplicableParameters(fuelType, transmissionType, context = {}) {
+    const { hasLift = true, roadTestPossible = true } = context;
     try {
       const modules = await InspectionModule.findAll({
         order: [['sort_order', 'ASC']],
@@ -34,7 +35,8 @@ class ParameterService {
             sg.Parameters = sg.Parameters.filter(p =>
               p.is_active &&
               this.matchesFilter(p.fuel_filter, fuelType) &&
-              this.matchesFilter(p.transmission_filter, transmissionType)
+              this.matchesFilter(p.transmission_filter, transmissionType) &&
+              this.matchesContextFilter(p.context_filter, hasLift, roadTestPossible)
             );
             return sg;
           })
@@ -59,6 +61,14 @@ class ParameterService {
    * Check if a parameter's filter matches the vehicle's value.
    * "All" matches everything. Otherwise, check if filter contains the value.
    */
+  matchesContextFilter(contextFilter, hasLift, roadTestPossible) {
+    if (!contextFilter) return true;
+    const filters = contextFilter.split(',').map(f => f.trim());
+    if (filters.includes('lift_required') && !hasLift) return false;
+    if (filters.includes('road_test_required') && !roadTestPossible) return false;
+    return true;
+  }
+
   matchesFilter(filterValue, vehicleValue) {
     if (!filterValue || filterValue.trim().toLowerCase() === 'all') return true;
     if (!vehicleValue) return true;
@@ -275,7 +285,7 @@ class ParameterService {
         'name', 'detail', 'input_type',
         'option_1', 'option_2', 'option_3', 'option_4', 'option_5',
         'score_1', 'score_2', 'score_3', 'score_4', 'score_5',
-        'fuel_filter', 'transmission_filter', 'is_red_flag', 'sort_order', 'weightage'
+        'fuel_filter', 'transmission_filter', 'context_filter', 'is_red_flag', 'sort_order', 'weightage'
       ];
 
       const updateData = {};
