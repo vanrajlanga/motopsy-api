@@ -135,6 +135,20 @@ class ServiceOrderController extends ApiController {
   }
 
   /**
+   * POST /api/service-orders/:id/share-link
+   * Mechanic/Admin: Generate (or retrieve) a public share token for an order
+   */
+  async generateShareLink(req, res, next) {
+    try {
+      const { id } = req.params;
+      const token = await serviceOrderService.generateShareLink(id);
+      return this.ok({ success: true, shareToken: token }, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /api/admin/mechanics
    * Admin: Get all users with Mechanic role
    */

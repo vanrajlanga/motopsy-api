@@ -311,6 +311,12 @@ class ServiceOrderService {
             model: PaymentHistory,
             as: 'PaymentHistory',
             attributes: ['order_id', 'status', 'amount', 'created_at']
+          },
+          {
+            model: db.Inspection,
+            as: 'Inspection',
+            attributes: ['id', 'status'],
+            required: false
           }
         ],
         limit: take,
@@ -382,6 +388,40 @@ class ServiceOrderService {
       return order;
     } catch (error) {
       throw new Error(`Error updating order status: ${error.message}`);
+    }
+  }
+
+  /**
+   * Generate (or return existing) share token for a service order.
+   * The token is a UUID stored on the order and used to construct a public inspection link.
+   */
+  async generateShareLink(orderId) {
+    try {
+      const { v4: uuidv4 } = require('uuid');
+      const order = await ServiceOrder.findByPk(orderId);
+      if (!order) throw new Error('Order not found');
+
+      // Reuse existing token if already generated
+      if (!order.share_token) {
+        await order.update({ share_token: uuidv4(), modified_at: new Date() });
+      }
+
+      return order.share_token;
+    } catch (error) {
+      throw new Error(`Error generating share link: ${error.message}`);
+    }
+  }
+
+  /**
+   * Look up a service order by its public share token.
+   */
+  async getOrderByShareToken(token) {
+    try {
+      const order = await ServiceOrder.findOne({ where: { share_token: token } });
+      if (!order) throw new Error('Invalid share token');
+      return order;
+    } catch (error) {
+      throw new Error(`Error fetching order by token: ${error.message}`);
     }
   }
 

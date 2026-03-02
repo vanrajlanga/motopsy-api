@@ -9,6 +9,7 @@ router.get('/service-orders/my-orders', authenticate, (req, res, next) => servic
 
 // --- Mechanic routes ---
 router.get('/mechanic/my-orders', authenticate, requireMechanic, (req, res, next) => serviceOrderController.getMechanicOrders(req, res, next));
+router.post('/service-orders/:id/share-link', authenticate, requireAdminOrMechanic, (req, res, next) => serviceOrderController.generateShareLink(req, res, next));
 router.get('/service-orders/:id', authenticate, requireAdminOrMechanic, (req, res, next) => serviceOrderController.getOrderById(req, res, next));
 
 // --- Admin routes ---

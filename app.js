@@ -37,6 +37,7 @@ const inspectionRoutes = require('./src/routes/inspection.routes');
 const parameterRoutes = require('./src/routes/parameter.routes');
 const certificateRoutes = require('./src/routes/certificate.routes');
 const adminParameterRoutes = require('./src/routes/admin-parameter.routes');
+const publicRoutes = require('./src/routes/public.routes');
 
 const app = express();
 
@@ -138,6 +139,7 @@ app.use('/api/inspections', inspectionRoutes);
 app.use('/api/parameters', parameterRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/admin/parameters', adminParameterRoutes);
+app.use('/api/public', publicRoutes);
 
 // 404 handler
 app.use((req, res) => {

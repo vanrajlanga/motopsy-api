@@ -99,6 +99,13 @@ const ServiceOrder = sequelize.define('service_orders', {
     allowNull: true,
     comment: 'Auto-assigned mechanic user id'
   },
+  // Share link token
+  share_token: {
+    type: DataTypes.STRING(64),
+    allowNull: true,
+    defaultValue: null,
+    comment: 'UUID token for public inspection share link'
+  },
   // Status
   status: {
     type: DataTypes.INTEGER,
