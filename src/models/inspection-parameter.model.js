@@ -83,6 +83,12 @@ const InspectionParameter = sequelize.define('inspection_parameters', {
     allowNull: true,
     defaultValue: null
   },
+  template_filter: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Comma-sep template slugs; NULL = all templates'
+  },
   is_red_flag: {
     type: DataTypes.TINYINT(1),
     allowNull: false,
@@ -102,6 +108,12 @@ const InspectionParameter = sequelize.define('inspection_parameters', {
     type: DataTypes.DECIMAL(5, 2),
     allowNull: false,
     defaultValue: 1.00
+  },
+  weightage_pdi: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: true,
+    defaultValue: null,
+    comment: 'PDI-specific weight; NULL = use weightage for both templates'
   },
   created_at: {
     type: DataTypes.DATE,

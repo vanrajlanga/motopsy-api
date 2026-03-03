@@ -16,6 +16,16 @@ router.get('/modules', (req, res) => adminParameterController.getModules(req, re
 // GET /api/admin/parameters/modules/:moduleId  — lazy load parameters for one module
 router.get('/modules/:moduleId', (req, res) => adminParameterController.getModuleParameters(req, res));
 
+// GET /api/admin/parameters/module/:id/weight-summary
+router.get('/module/:id/weight-summary', (req, res) => adminParameterController.getModuleWeightSummary(req, res));
+
+// GET /api/admin/parameters/templates — all templates + module list for weight editor
+// ⚠️ Must be declared before /:id wildcard
+router.get('/templates', (req, res) => adminParameterController.getTemplates(req, res));
+
+// PUT /api/admin/parameters/templates/:id — update module_weights and/or certification_levels
+router.put('/templates/:id', (req, res) => adminParameterController.updateTemplate(req, res));
+
 // GET /api/admin/parameters/:id
 router.get('/:id', (req, res) => adminParameterController.getParameter(req, res));
 
@@ -30,9 +40,5 @@ router.patch('/sub-group/:id/bulk-status', (req, res) => adminParameterControlle
 
 // PATCH /api/admin/parameters/module/:id/bulk-status
 router.patch('/module/:id/bulk-status', (req, res) => adminParameterController.toggleModuleStatus(req, res));
-
-
-// GET /api/admin/parameters/module/:id/weight-summary
-router.get('/module/:id/weight-summary', (req, res) => adminParameterController.getModuleWeightSummary(req, res));
 
 module.exports = router;

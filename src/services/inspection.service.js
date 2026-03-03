@@ -11,10 +11,18 @@ const InspectionScore = require('../models/inspection-score.model');
 const InspectionCertificate = require('../models/inspection-certificate.model');
 const InspectionPhoto = require('../models/inspection-photo.model');
 const User = require('../models/user.model');
+const ServiceOrder = require('../models/service-order.model');
+const ServicePlan = require('../models/service-plan.model');
+const InspectionTemplate = require('../models/inspection-template.model');
 const parameterService = require('./parameter.service');
 const scoringService = require('./scoring.service');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
+
+// service_type → template_id mapping
+// service_type=4 is New Vehicle PDI → template 2 (new_car_pdi)
+// all others with inspections → template 1 (used_car)
+const NEW_CAR_PDI_SERVICE_TYPE = 4;
 
 class InspectionService {
   /**
@@ -26,7 +34,8 @@ class InspectionService {
       const { vehicleRegNumber, vehicleMake, vehicleModel, vehicleYear,
               fuelType, transmissionType, odometerKm,
               gpsLatitude, gpsLongitude, gpsAddress, inspectorName,
-              serviceOrderId, hasLift = false, roadTestPossible = false } = vehicleData;
+              serviceOrderId, hasLift = false, roadTestPossible = false,
+              templateId: explicitTemplateId = null } = vehicleData;
 
       // If linked to a service order, return existing inspection instead of creating a duplicate
       if (serviceOrderId) {
@@ -43,8 +52,38 @@ class InspectionService {
         }
       }
 
-      // Get applicable parameters (fuel + transmission + context filtered)
-      const paramResult = await parameterService.getApplicableParameters(fuelType, transmissionType, { hasLift, roadTestPossible });
+      // Determine inspection template:
+      // Priority 1: explicit templateId passed in request (manual override)
+      // Priority 2: inferred from service order's plan type
+      // Priority 3: default to used_car
+      let templateId = 1;
+      let templateSlug = 'used_car';
+
+      if (explicitTemplateId) {
+        // Caller explicitly chose a template — resolve its slug
+        try {
+          const tpl = await InspectionTemplate.findByPk(explicitTemplateId, { attributes: ['id', 'slug'] });
+          if (tpl) { templateId = tpl.id; templateSlug = tpl.slug; }
+        } catch (e) {
+          logger.warn(`Could not resolve explicit templateId ${explicitTemplateId}, defaulting to used_car`);
+        }
+      } else if (serviceOrderId) {
+        try {
+          const order = await ServiceOrder.findByPk(serviceOrderId, { attributes: ['service_plan_id'] });
+          if (order) {
+            const plan = await ServicePlan.findByPk(order.service_plan_id, { attributes: ['service_type'] });
+            if (plan?.service_type === NEW_CAR_PDI_SERVICE_TYPE) {
+              templateId = 2;
+              templateSlug = 'new_car_pdi';
+            }
+          }
+        } catch (e) {
+          logger.warn(`Could not resolve template from service order ${serviceOrderId}, defaulting to used_car`);
+        }
+      }
+
+      // Get applicable parameters (fuel + transmission + context + template filtered)
+      const paramResult = await parameterService.getApplicableParameters(fuelType, transmissionType, { hasLift, roadTestPossible, templateSlug });
       if (!paramResult.isSuccess) {
         await transaction.rollback();
         return Result.failure('Failed to load parameters');
@@ -63,6 +102,7 @@ class InspectionService {
         uuid: uuidv4(),
         technician_id: technicianId,
         service_order_id: serviceOrderId || null,
+        template_id: templateId,
         vehicle_reg_number: vehicleRegNumber,
         vehicle_make: vehicleMake,
         vehicle_model: vehicleModel,
@@ -118,6 +158,11 @@ class InspectionService {
     try {
       const inspection = await Inspection.findByPk(inspectionId, {
         include: [
+          {
+            model: InspectionTemplate,
+            as: 'Template',
+            attributes: ['id', 'name', 'slug']
+          },
           {
             model: User,
             as: 'Technician',
@@ -580,6 +625,10 @@ class InspectionService {
     return {
       id: data.id,
       uuid: data.uuid,
+      templateId: data.template_id || 1,
+      templateSlug: data.Template?.slug || 'used_car',
+      templateName: data.Template?.name || 'Used Vehicle Inspection',
+      isPDI: data.Template?.slug === 'new_car_pdi',
       technician: data.Technician,
       vehicleRegNumber: data.vehicle_reg_number,
       vehicleMake: data.vehicle_make,

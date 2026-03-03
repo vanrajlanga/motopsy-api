@@ -5,8 +5,17 @@ const InspectionSubGroup = require('../models/inspection-sub-group.model');
 const InspectionModule = require('../models/inspection-module.model');
 const InspectionScore = require('../models/inspection-score.model');
 const Inspection = require('../models/inspection.model');
+const InspectionTemplate = require('../models/inspection-template.model');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
+
+// Default certification thresholds (used_car)
+const DEFAULT_CERT_LEVELS = [
+  { label: 'Gold',          minRating: 4.5 },
+  { label: 'Silver',        minRating: 3.5 },
+  { label: 'Verified',      minRating: 2.5 },
+  { label: 'Not Certified', minRating: 0   }
+];
 
 // Module slug → risk column mapping
 const SLUG_TO_RISK_COLUMN = {
@@ -29,6 +38,21 @@ class ScoringService {
    */
   async calculateScores(inspectionId) {
     try {
+      // Load the inspection to get template_id
+      const inspection = await Inspection.findByPk(inspectionId, {
+        attributes: ['id', 'template_id']
+      });
+
+      // Load the template if set (for module weight overrides + custom cert labels)
+      let template = null;
+      if (inspection?.template_id) {
+        template = await InspectionTemplate.findByPk(inspection.template_id);
+      }
+
+      const templateModuleWeights = template?.module_weights || null;
+      const certLevels = template?.certification_levels || DEFAULT_CERT_LEVELS;
+      const isPDI = template?.slug === 'new_car_pdi';
+
       // Get all responses with parameter and module info
       const responses = await InspectionResponse.findAll({
         where: { inspection_id: inspectionId },
@@ -80,36 +104,45 @@ class ScoringService {
 
         let moduleRisk = 0;
         if (answered.length > 0) {
-          const weightedSum   = answered.reduce((s, r) => s + parseFloat(r.Parameter?.weightage || 1) * parseFloat(r.severity_score || 0), 0);
-          const totalParamWt  = answered.reduce((s, r) => s + parseFloat(r.Parameter?.weightage || 1), 0);
+          // For PDI, use weightage_pdi if set; otherwise fall back to weightage
+          const getWt = (r) => isPDI && r.Parameter?.weightage_pdi != null
+            ? parseFloat(r.Parameter.weightage_pdi)
+            : parseFloat(r.Parameter?.weightage || 1);
+          const weightedSum  = answered.reduce((s, r) => s + getWt(r) * parseFloat(r.severity_score || 0), 0);
+          const totalParamWt = answered.reduce((s, r) => s + getWt(r), 0);
           moduleRisk = totalParamWt > 0 ? weightedSum / totalParamWt : 0;
         }
 
         moduleRisks[slug] = moduleRisk;
 
-        // Repair cost: baseRepairCost × (moduleRisk ^ gamma) per module
+        // Repair cost: skipped for PDI (new car under warranty)
         const mod = group.module;
-        const baseCost = parseFloat(mod.base_repair_cost || 0);
-        const gamma = parseFloat(mod.gamma || 1.0);
-        const moduleCost = baseCost * Math.pow(moduleRisk, gamma);
+        if (!isPDI) {
+          const baseCost = parseFloat(mod.base_repair_cost || 0);
+          const gamma = parseFloat(mod.gamma || 1.0);
+          const moduleCost = baseCost * Math.pow(moduleRisk, gamma);
 
-        repairCostBreakdown[slug] = {
-          moduleName: mod.name,
-          risk: Math.round(moduleRisk * 10000) / 10000,
-          baseCost,
-          gamma,
-          repairCost: Math.round(moduleCost * 100) / 100
-        };
+          repairCostBreakdown[slug] = {
+            moduleName: mod.name,
+            risk: Math.round(moduleRisk * 10000) / 10000,
+            baseCost,
+            gamma,
+            repairCost: Math.round(moduleCost * 100) / 100
+          };
 
-        totalRepairCost += moduleCost;
+          totalRepairCost += moduleCost;
+        }
       }
 
       // Calculate VRI (weighted sum of module risks)
+      // Use template module_weights if provided, otherwise use inspection_modules.weight
       let vri = 0;
       let totalWeight = 0;
 
       for (const [slug, group] of Object.entries(moduleGroups)) {
-        const weight = parseFloat(group.module.weight || 0);
+        const weight = templateModuleWeights
+          ? parseFloat(templateModuleWeights[slug] ?? group.module.weight ?? 0)
+          : parseFloat(group.module.weight || 0);
         vri += (moduleRisks[slug] || 0) * weight;
         totalWeight += weight;
       }
@@ -137,18 +170,20 @@ class ScoringService {
         severityScore: parseFloat(r.severity_score)
       }));
 
-      // Determine certification
+      // Determine certification using template-specific levels
       let certification;
       if (hasRedFlags) {
-        certification = 'Not Certified';
-      } else if (rating >= 4.5) {
-        certification = 'Gold';
-      } else if (rating >= 3.5) {
-        certification = 'Silver';
-      } else if (rating >= 2.5) {
-        certification = 'Verified';
+        // For PDI: red flag = Reject Delivery; for used car: Not Certified
+        certification = isPDI ? 'Reject Delivery' : 'Not Certified';
       } else {
-        certification = 'Not Certified';
+        const levels = Array.isArray(certLevels) ? certLevels : DEFAULT_CERT_LEVELS;
+        certification = levels[levels.length - 1].label; // fallback to lowest
+        for (const level of levels) {
+          if (rating >= level.minRating) {
+            certification = level.label;
+            break;
+          }
+        }
       }
 
       // Build score data

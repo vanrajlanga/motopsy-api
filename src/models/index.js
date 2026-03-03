@@ -24,6 +24,7 @@ const AppointmentSlotBlock = require('./appointment-slot-block.model');
 const InspectionModule = require('./inspection-module.model');
 const InspectionSubGroup = require('./inspection-sub-group.model');
 const InspectionParameter = require('./inspection-parameter.model');
+const InspectionTemplate = require('./inspection-template.model');
 const Inspection = require('./inspection.model');
 const InspectionResponse = require('./inspection-response.model');
 const InspectionPhoto = require('./inspection-photo.model');
@@ -260,6 +261,22 @@ if (!Inspection.associations.ServiceOrder) {
   });
 }
 
+// Inspection belongs to InspectionTemplate
+if (!Inspection.associations.Template) {
+  Inspection.belongsTo(InspectionTemplate, {
+    foreignKey: 'template_id',
+    as: 'Template'
+  });
+}
+
+// InspectionTemplate has many Inspections
+if (!InspectionTemplate.associations.Inspections) {
+  InspectionTemplate.hasMany(Inspection, {
+    foreignKey: 'template_id',
+    as: 'Inspections'
+  });
+}
+
 // ServiceOrder has one Inspection
 if (!ServiceOrder.associations.Inspection) {
   ServiceOrder.hasOne(Inspection, {
@@ -407,6 +424,7 @@ module.exports = {
   InspectionModule,
   InspectionSubGroup,
   InspectionParameter,
+  InspectionTemplate,
   Inspection,
   InspectionResponse,
   InspectionPhoto,

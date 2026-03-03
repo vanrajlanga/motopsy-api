@@ -21,6 +21,11 @@ const Inspection = sequelize.define('inspections', {
     allowNull: true,
     comment: 'Linked service order'
   },
+  template_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'FK inspection_templates.id — NULL defaults to used_car behaviour'
+  },
   vehicle_reg_number: {
     type: DataTypes.STRING(20),
     allowNull: true

@@ -11,7 +11,7 @@ class ParameterService {
    * filtered by fuel type and transmission type.
    */
   async getApplicableParameters(fuelType, transmissionType, context = {}) {
-    const { hasLift = true, roadTestPossible = true } = context;
+    const { hasLift = true, roadTestPossible = true, templateSlug = null } = context;
     try {
       const modules = await InspectionModule.findAll({
         order: [['sort_order', 'ASC']],
@@ -36,7 +36,8 @@ class ParameterService {
               p.is_active &&
               this.matchesFilter(p.fuel_filter, fuelType) &&
               this.matchesFilter(p.transmission_filter, transmissionType) &&
-              this.matchesContextFilter(p.context_filter, hasLift, roadTestPossible)
+              this.matchesContextFilter(p.context_filter, hasLift, roadTestPossible) &&
+              this.matchesTemplateFilter(p.template_filter, templateSlug)
             );
             return sg;
           })
@@ -67,6 +68,15 @@ class ParameterService {
     if (filters.includes('lift_required') && !hasLift) return false;
     if (filters.includes('road_test_required') && !roadTestPossible) return false;
     return true;
+  }
+
+  matchesTemplateFilter(templateFilter, templateSlug) {
+    // NULL / empty / 'all' → applies to every template
+    if (!templateFilter || templateFilter.trim().toLowerCase() === 'all') return true;
+    // If no specific template context, include everything
+    if (!templateSlug) return true;
+    const slugs = templateFilter.split(',').map(s => s.trim().toLowerCase());
+    return slugs.includes(templateSlug.toLowerCase());
   }
 
   matchesFilter(filterValue, vehicleValue) {
@@ -275,17 +285,30 @@ class ParameterService {
    * Update a parameter's editable fields.
    */
   async updateParameter(id, data) {
+    const VALID_TEMPLATE_SLUGS = new Set(['used_car', 'new_car_pdi']);
+
     try {
       const param = await InspectionParameter.findByPk(id);
       if (!param) {
         return Result.failure('Parameter not found');
       }
 
+      // Validate template_filter if provided
+      if (data.template_filter != null) {
+        const slugs = data.template_filter.split(',').map(s => s.trim()).filter(Boolean);
+        for (const slug of slugs) {
+          if (!VALID_TEMPLATE_SLUGS.has(slug)) {
+            return Result.failure(`Invalid template_filter value: "${slug}". Allowed: ${[...VALID_TEMPLATE_SLUGS].join(', ')}`);
+          }
+        }
+      }
+
       const allowedFields = [
         'name', 'detail', 'input_type',
         'option_1', 'option_2', 'option_3', 'option_4', 'option_5',
         'score_1', 'score_2', 'score_3', 'score_4', 'score_5',
-        'fuel_filter', 'transmission_filter', 'context_filter', 'is_red_flag', 'sort_order', 'weightage'
+        'fuel_filter', 'transmission_filter', 'context_filter', 'template_filter',
+        'is_red_flag', 'sort_order', 'weightage', 'weightage_pdi'
       ];
 
       const updateData = {};
@@ -319,18 +342,29 @@ class ParameterService {
 
       const params = await InspectionParameter.findAll({
         where: { sub_group_id: { [Op.in]: subGroupIds } },
-        attributes: ['id', 'weightage', 'is_active']
+        attributes: ['id', 'weightage', 'weightage_pdi', 'is_active', 'template_filter']
       });
 
       const totalWeight  = params.reduce((s, p) => s + parseFloat(p.weightage), 0);
       const activeWeight = params.filter(p => p.is_active).reduce((s, p) => s + parseFloat(p.weightage), 0);
 
+      // Per-template effective weight: only params visible to that template
+      // PDI uses weightage_pdi if set, otherwise falls back to weightage
+      const usedCarParams = params.filter(p => !p.template_filter || p.template_filter === 'used_car');
+      const pdiParams     = params.filter(p => !p.template_filter || p.template_filter === 'new_car_pdi');
+      const usedCarWeight = usedCarParams.reduce((s, p) => s + parseFloat(p.weightage), 0);
+      const pdiWeight     = pdiParams.reduce((s, p) => s + parseFloat(p.weightage_pdi ?? p.weightage), 0);
+
       return Result.success({
         moduleId,
-        totalWeight:  parseFloat(totalWeight.toFixed(2)),
-        activeWeight: parseFloat(activeWeight.toFixed(2)),
-        totalParams:  params.length,
-        activeParams: params.filter(p => p.is_active).length
+        totalWeight:     parseFloat(totalWeight.toFixed(2)),
+        activeWeight:    parseFloat(activeWeight.toFixed(2)),
+        totalParams:     params.length,
+        activeParams:    params.filter(p => p.is_active).length,
+        usedCarWeight:   parseFloat(usedCarWeight.toFixed(2)),
+        usedCarParams:   usedCarParams.length,
+        pdiWeight:       parseFloat(pdiWeight.toFixed(2)),
+        pdiParams:       pdiParams.length,
       });
     } catch (error) {
       logger.error('Get module weight summary error:', error);
