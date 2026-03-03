@@ -1,6 +1,7 @@
 const ApiController = require('./base.controller');
 const serviceOrderService = require('../services/service-order.service');
 const inspectionService = require('../services/inspection.service');
+const Inspection = require('../models/inspection.model');
 
 class PublicController extends ApiController {
   /**
@@ -11,6 +12,12 @@ class PublicController extends ApiController {
     try {
       const { token } = req.params;
       const order = await serviceOrderService.getOrderByShareToken(token);
+      // Check if an inspection already exists for this order
+      const existingInspection = await Inspection.findOne({
+        where: { service_order_id: order.id },
+        attributes: ['id', 'status']
+      });
+
       return this.ok({
         success: true,
         data: {
@@ -20,7 +27,9 @@ class PublicController extends ApiController {
           model: order.car_model,
           year: order.car_model_year,
           customerName: order.name,
-          shareToken: token
+          shareToken: token,
+          existingInspectionId: existingInspection?.id || null,
+          existingInspectionStatus: existingInspection?.status || null
         }
       }, res);
     } catch (error) {

@@ -183,7 +183,22 @@ class ServiceOrderService {
           ['created_at', 'DESC']
         ]
       });
-      return orders;
+
+      // Deduplicate: if multiple inspection rows exist for the same order (hasOne JOIN issue),
+      // keep the most advanced inspection status per order.
+      const statusPriority = { certified: 5, scored: 4, completed: 3, in_progress: 2, pending: 1 };
+      const seen = new Map();
+      for (const order of orders) {
+        if (!seen.has(order.id)) {
+          seen.set(order.id, order);
+        } else {
+          const existing = seen.get(order.id);
+          const existingP = statusPriority[existing.Inspection?.status] || 0;
+          const newP = statusPriority[order.Inspection?.status] || 0;
+          if (newP > existingP) seen.set(order.id, order);
+        }
+      }
+      return Array.from(seen.values());
     } catch (error) {
       throw new Error(`Error fetching mechanic orders: ${error.message}`);
     }

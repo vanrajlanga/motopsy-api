@@ -28,6 +28,21 @@ class InspectionService {
               gpsLatitude, gpsLongitude, gpsAddress, inspectorName,
               serviceOrderId, hasLift = false, roadTestPossible = false } = vehicleData;
 
+      // If linked to a service order, return existing inspection instead of creating a duplicate
+      if (serviceOrderId) {
+        const existing = await Inspection.findOne({ where: { service_order_id: serviceOrderId } });
+        if (existing) {
+          await transaction.rollback();
+          logger.info(`Inspection already exists for order ${serviceOrderId}, returning existing #${existing.id}`);
+          return Result.success({
+            id: existing.id,
+            uuid: existing.uuid,
+            status: existing.status,
+            resumed: true
+          });
+        }
+      }
+
       // Get applicable parameters (fuel + transmission + context filtered)
       const paramResult = await parameterService.getApplicableParameters(fuelType, transmissionType, { hasLift, roadTestPossible });
       if (!paramResult.isSuccess) {

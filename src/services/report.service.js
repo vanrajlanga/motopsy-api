@@ -6,6 +6,10 @@ const inspectionService = require('./inspection.service');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
 
+// ─── Logo (cached at load time) ───────────────────────────────────────────────
+const _logoPath = path.join(__dirname, '../assets/logo.png');
+const _logoDataUrl = `data:image/png;base64,${fs.readFileSync(_logoPath).toString('base64')}`;
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function formatDate(d) {
@@ -388,10 +392,7 @@ const CSS = `
 function pageHeader(certLabel, certCls) {
   return `
     <div class="page-header">
-      <div class="logo-wrap">
-        <div class="logo-mark">M</div>
-        <div class="logo-text">moto<span>psy</span></div>
-      </div>
+      <img src="${_logoDataUrl}" alt="Motopsy" style="height:80px;width:auto;" />
       <div class="header-tag">
         Vehicle Inspection Report
         ${certLabel ? `<span class="header-cert-badge ${certCls}">${certLabel.toUpperCase()}</span>` : ''}
@@ -425,8 +426,7 @@ function buildCoverPage(d) {
 <div class="page cover-page">
   <div class="cover-top">
     <div class="logo-wrap">
-      <div class="logo-mark cover-logo-mark">M</div>
-      <div class="logo-text cover-logo-text">moto<span>psy</span></div>
+      <img src="${_logoDataUrl}" alt="Motopsy" style="height:140px;width:auto;filter:brightness(0) invert(1);" />
     </div>
     <div class="cover-top-right">
       <div class="cover-doc-type">Vehicle Inspection Report</div>
