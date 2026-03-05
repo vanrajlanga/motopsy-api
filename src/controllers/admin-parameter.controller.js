@@ -130,22 +130,31 @@ class AdminParameterController extends BaseController {
         InspectionTemplate.findAll({ where: { is_active: 1 }, order: [['id', 'ASC']] }),
         InspectionModule.findAll({ order: [['sort_order', 'ASC']], attributes: ['id', 'name', 'slug', 'weight'] }),
         InspectionSubGroup.findAll({ attributes: ['id', 'module_id'] }),
-        InspectionParameter.findAll({ attributes: ['id', 'sub_group_id', 'template_filter'] })
+        InspectionParameter.findAll({ attributes: ['id', 'sub_group_id', 'template_filter', 'is_active'] })
       ]);
 
       // Build sub_group → module_id lookup
       const sgModuleMap = new Map();
       for (const sg of subGroups) sgModuleMap.set(sg.id, sg.module_id);
 
-      // Per-module param counts visible to each template slug
-      const moduleTemplateCounts = {}; // moduleId → { used_car: N, new_car_pdi: N }
+      // Per-module param counts (total + active) visible to each template slug
+      const moduleTemplateCounts = {}; // moduleId → { used_car: N, new_car_pdi: N, used_car_active: N, new_car_pdi_active: N }
       for (const p of params) {
         const moduleId = sgModuleMap.get(p.sub_group_id);
         if (!moduleId) continue;
-        if (!moduleTemplateCounts[moduleId]) moduleTemplateCounts[moduleId] = { used_car: 0, new_car_pdi: 0 };
+        if (!moduleTemplateCounts[moduleId]) moduleTemplateCounts[moduleId] = {
+          used_car: 0, new_car_pdi: 0, used_car_active: 0, new_car_pdi_active: 0
+        };
         const tf = p.template_filter;
-        if (!tf || tf === 'used_car')    moduleTemplateCounts[moduleId].used_car++;
-        if (!tf || tf === 'new_car_pdi') moduleTemplateCounts[moduleId].new_car_pdi++;
+        const active = !!p.is_active;
+        if (!tf || tf === 'used_car') {
+          moduleTemplateCounts[moduleId].used_car++;
+          if (active) moduleTemplateCounts[moduleId].used_car_active++;
+        }
+        if (!tf || tf === 'new_car_pdi') {
+          moduleTemplateCounts[moduleId].new_car_pdi++;
+          if (active) moduleTemplateCounts[moduleId].new_car_pdi_active++;
+        }
       }
 
       const parseJson = (v) => {
