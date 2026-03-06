@@ -3,6 +3,9 @@ const router = express.Router();
 const vehicleDetailController = require('../controllers/vehicle-detail.controller');
 const { authenticate, requireAdmin } = require('../middlewares/auth.middleware');
 
+// Preview vehicle RC data without saving to DB (pre-payment check)
+router.post('/preview', authenticate, (req, res, next) => vehicleDetailController.previewVehicleDetails(req, res, next));
+
 // Get vehicle details by RC number (requires authentication)
 router.post('/', authenticate, (req, res, next) => vehicleDetailController.getVehicleDetails(req, res, next));
 

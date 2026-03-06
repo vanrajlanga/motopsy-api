@@ -185,6 +185,17 @@ class VehicleDetailService {
 
       const resolvedUserId = user.id;
 
+      // Dedup: if a VehicleDetailRequest ID is provided and a record already exists for it, return it
+      if (vehicleDetailRequestId) {
+        const existing = await VehicleDetail.findOne({
+          where: { vehicle_detail_request_id: vehicleDetailRequestId }
+        });
+        if (existing) {
+          logger.info(`Returning existing vehicle detail ${existing.id} for request ${vehicleDetailRequestId} (dedup)`);
+          return Result.success(await this.buildVehicleDetailResponse(existing, resolvedUserId, kmsDriven, make, model, version));
+        }
+      }
+
       // Always call Surepass API to fetch fresh RC details (no caching)
       const rcResult = await surepassService.getRegistrationDetailsAsync(registrationNumber);
 
@@ -351,6 +362,65 @@ class VehicleDetailService {
     } catch (error) {
       logger.error('Get vehicle details error:', error.message || error);
       return Result.failure(error.message || 'Failed to get vehicle details');
+    }
+  }
+
+  /**
+   * Preview vehicle RC data WITHOUT saving to database.
+   * Used for the pre-payment RC check so we don't create orphan vehicle_details records.
+   */
+  async previewVehicleByRCAsync(registrationNumber) {
+    try {
+      if (!registrationNumber) {
+        return Result.failure('Registration number is required');
+      }
+
+      const rcResult = await surepassService.getRegistrationDetailsAsync(registrationNumber);
+      if (!rcResult.isSuccess) {
+        return Result.failure(rcResult.error);
+      }
+
+      const rcData = rcResult.value;
+
+      // Build an in-memory vehicle detail shape for spec matching (no DB write)
+      const tempDetail = {
+        registration_number: rcData.rcNumber,
+        maker_description: rcData.makerDescription,
+        maker_model: rcData.makerModel,
+        manufacturer: rcData.makerDescription,
+        model: rcData.makerModel,
+        fuel_type: rcData.fuelType,
+        color: rcData.color,
+        norms_type: rcData.normsType,
+        cubic_capacity: rcData.cubicCapacity,
+        manufacturing_date_formatted: rcData.manufacturingDateFormatted,
+        variant: rcData.variant,
+        chassis_number: rcData.vehicleChassisNumber,
+      };
+
+      // Run spec matching in-memory (no save)
+      const matchResult = await this.findVehicleSpecification(tempDetail);
+      const spec = matchResult?.spec || null;
+
+      return Result.success({
+        vehicleDetail: {
+          makerDescription: rcData.makerDescription,
+          makerModel: rcData.makerModel,
+          manufacturingDateFormatted: rcData.manufacturingDateFormatted,
+          vehicleChassisNumber: rcData.vehicleChassisNumber,
+          variant: rcData.variant,
+          fuelType: rcData.fuelType,
+          color: rcData.color,
+        },
+        vehicleSpecification: spec ? {
+          make: spec.make,
+          model: spec.model,
+          version: spec.version,
+        } : null,
+      });
+    } catch (error) {
+      logger.error('Preview vehicle RC error:', error.message || error);
+      return Result.failure(error.message || 'Failed to preview vehicle details');
     }
   }
 

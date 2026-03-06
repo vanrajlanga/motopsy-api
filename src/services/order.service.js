@@ -14,6 +14,8 @@ const { sequelize } = require('../config/database');
 // Import models index to ensure associations are loaded
 const models = require('../models/index');
 
+const PAYMENT_FOR = require('../constants/payment-for');
+
 // Import vehicle detail service for spec matching
 const vehicleDetailService = require('./vehicle-detail.service');
 
@@ -50,11 +52,7 @@ class OrderService {
    * Get payment for name from payment_for code
    */
   getPaymentForName(paymentFor) {
-    const paymentForMap = {
-      0: 'Vehicle History Report',
-      1: 'Physical Verification'
-    };
-    return paymentForMap[paymentFor] || 'Unknown';
+    return PAYMENT_FOR.getName(paymentFor);
   }
 
   /**
@@ -123,6 +121,11 @@ class OrderService {
       let whereClause = {};
       if (filter && filter.status !== undefined && filter.status !== null) {
         whereClause.status = filter.status;
+      }
+
+      // Filter by payment_for types (e.g. report orders vs inspection orders)
+      if (filter && Array.isArray(filter.paymentForTypes) && filter.paymentForTypes.length > 0) {
+        whereClause.payment_for = { [Op.in]: filter.paymentForTypes };
       }
 
       // Add date range filter on payment_date (order date)
@@ -210,8 +213,8 @@ class OrderService {
         });
       }
 
-      // For orders with registration numbers, also look up vehicle_details by user_id + registration_number
-      // This handles cases where vehicle_detail_request_id is NULL (legacy data)
+      // Fallback 1: for payments WITH a VehicleDetailRequest but vehicle_detail has NULL vehicle_detail_request_id
+      // Look up vehicle_details by user_id + registration_number
       const userRegPairs = payments
         .filter(p => p.VehicleDetailRequests && p.VehicleDetailRequests.length > 0 && p.VehicleDetailRequests[0].registration_number)
         .map(p => ({
@@ -220,25 +223,39 @@ class OrderService {
           requestId: p.VehicleDetailRequests[0].id
         }));
 
-      // Look up vehicle_details by user_id + registration_number for fallback
       if (userRegPairs.length > 0) {
         for (const pair of userRegPairs) {
-          // Skip if we already have a vehicleDetailId for this request
           if (vehicleDetailMap[pair.requestId]) continue;
-
           const vehicleDetail = await VehicleDetail.findOne({
-            where: {
-              user_id: pair.userId,
-              registration_number: pair.registrationNumber
-            },
+            where: { user_id: pair.userId, registration_number: pair.registrationNumber },
             attributes: ['id', 'api_source'],
             order: [['created_at', 'DESC']]
           });
-
           if (vehicleDetail) {
             vehicleDetailMap[pair.requestId] = vehicleDetail.id;
             apiSourceMap[vehicleDetail.id] = vehicleDetail.api_source || null;
           }
+        }
+      }
+
+      // Fallback 2: for payments with NO VehicleDetailRequest at all but have registration_number
+      // Look up vehicle_details directly by user_id + registration_number
+      // Uses a separate directVehicleDetailMap keyed by paymentId
+      let directVehicleDetailMap = {}; // paymentId -> vehicleDetailId
+      const orphanPayments = payments.filter(
+        p => (!p.VehicleDetailRequests || p.VehicleDetailRequests.length === 0) && p.registration_number
+      );
+      for (const p of orphanPayments) {
+        const vehicleDetail = await VehicleDetail.findOne({
+          where: { user_id: p.user_id, registration_number: p.registration_number },
+          attributes: ['id', 'api_source'],
+          order: [['created_at', 'DESC']]
+        });
+        if (vehicleDetail) {
+          directVehicleDetailMap[p.id] = vehicleDetail.id;
+          apiSourceMap[vehicleDetail.id] = vehicleDetail.api_source || null;
+          // Include in allVehicleDetailsMap under a synthetic key so NCRB/spec lookup picks it up
+          allVehicleDetailsMap[`direct_${p.id}`] = [vehicleDetail.id];
         }
       }
 
@@ -425,7 +442,10 @@ class OrderService {
           }
         } else {
           // Normal case: single row
-          const vehicleDetailId = vehicleRequestId ? vehicleDetailMap[vehicleRequestId] || null : null;
+          // If no VehicleDetailRequest, fall back to directVehicleDetailMap (matched by payment reg number)
+          const vehicleDetailId = vehicleRequestId
+            ? vehicleDetailMap[vehicleRequestId] || null
+            : directVehicleDetailMap[payment.id] || null;
           const order = this.transformToOrderDto(
             payment,
             vehicleDetailId,

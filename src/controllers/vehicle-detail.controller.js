@@ -3,6 +3,20 @@ const vehicleDetailService = require('../services/vehicle-detail.service');
 
 class VehicleDetailController extends BaseController {
   /**
+   * POST /api/vehicle-detail/preview - Fetch RC data WITHOUT saving to DB.
+   * Used pre-payment so the frontend can show vehicle info without creating orphan records.
+   */
+  async previewVehicleDetails(req, res, next) {
+    try {
+      const { registrationNumber } = req.body;
+      const result = await vehicleDetailService.previewVehicleByRCAsync(registrationNumber);
+      return this.fromResult(result, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * POST /api/vehicle-detail - Get vehicle details by RC number
    * Matches .NET: GetVehicleDetailsByRcNumber(request, User.Identity.Name)
    */

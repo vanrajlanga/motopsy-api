@@ -4,7 +4,9 @@ const Result = require('../utils/result');
 const logger = require('../config/logger');
 const PaymentHistory = require('../models/payment-history.model');
 const VehicleDetailRequest = require('../models/vehicle-detail-request.model');
+const VehicleDetail = require('../models/vehicle-detail.model');
 const User = require('../models/user.model');
+const PAYMENT_FOR = require('../constants/payment-for');
 const userActivityLogService = require('./user-activity-log.service');
 const couponService = require('./coupon.service');
 const emailService = require('./email.service');
@@ -51,8 +53,8 @@ class PaymentService {
 
       let configuredAmount;
 
-      // Check if this is a service order (payment_for >= 3)
-      if (paymentFor >= 3) {
+      // Check if this is a service order (PDI / inspection)
+      if (PAYMENT_FOR.isServiceOrder(paymentFor)) {
         // This is a service order (PDI or Service History Report)
         if (servicePlanOptionId) {
           // Brand-specific pricing
@@ -261,8 +263,8 @@ class PaymentService {
         return Result.failure('Signature verification failed.');
       }
 
-      // Check if this is a service order (payment_for >= 3)
-      const isServiceOrder = existingPaymentHistory && existingPaymentHistory.payment_for >= 3;
+      // Check if this is a service order (PDI / inspection)
+      const isServiceOrder = existingPaymentHistory && PAYMENT_FOR.isServiceOrder(existingPaymentHistory.payment_for);
       let vehicleDetailRequest = null;
       let serviceOrder = null;
 
@@ -478,6 +480,29 @@ class PaymentService {
           customer_type: request.CustomerType || request.customerType,
           created_at: new Date()
         });
+
+        // Backfill: link any orphan vehicle_details created during the pre-payment RC preview
+        if (vehicleDetailRequest && registrationNumber) {
+          try {
+            const [backfilled] = await VehicleDetail.update(
+              { vehicle_detail_request_id: vehicleDetailRequest.id },
+              {
+                where: {
+                  user_id: userId,
+                  registration_number: registrationNumber.toUpperCase().replace(/\s/g, ''),
+                  vehicle_detail_request_id: null,
+                },
+                limit: 1,
+              }
+            );
+            if (backfilled > 0) {
+              logger.info(`Backfilled vehicle_detail request_id=${vehicleDetailRequest.id} for user=${userId}, reg=${registrationNumber}`);
+            }
+          } catch (backfillErr) {
+            logger.error('Backfill vehicle_detail_request_id failed:', backfillErr);
+            // Non-critical — don't fail payment
+          }
+        }
       }
 
       // Update PaymentHistory record
