@@ -251,6 +251,18 @@ class ServiceOrderService {
             model: PaymentHistory,
             as: 'PaymentHistory',
             attributes: ['order_id', 'status', 'created_at']
+          },
+          {
+            model: db.Inspection,
+            as: 'Inspection',
+            attributes: ['id', 'uuid', 'status'],
+            required: false,
+            include: [{
+              model: db.InspectionCertificate,
+              as: 'Certificate',
+              attributes: ['rating', 'certification'],
+              required: false
+            }]
           }
         ],
         order: [['created_at', 'DESC']]
