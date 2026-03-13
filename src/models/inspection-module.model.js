@@ -34,6 +34,12 @@ const InspectionModule = sequelize.define('inspection_modules', {
     allowNull: false,
     defaultValue: 1.3
   },
+  repair_percent: {
+    type: DataTypes.DECIMAL(4, 2),
+    allowNull: false,
+    defaultValue: 0,
+    comment: 'Max repair cost as percentage of vehicle value (0.15 = 15%)'
+  },
   sort_order: {
     type: DataTypes.INTEGER,
     allowNull: false,

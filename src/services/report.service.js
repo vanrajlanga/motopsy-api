@@ -31,7 +31,7 @@ function formatNum(n) {
 
 function formatRupees(n) {
   if (n == null || n === 0) return '₹0';
-  return '₹' + Number(n).toLocaleString('en-IN');
+  return '₹' + Math.round(Number(n)).toLocaleString('en-IN');
 }
 
 function conditionInfo(severityScore, isRedFlag, selectedOption) {
@@ -140,6 +140,139 @@ const MODULE_ICON_SVGS = {
 };
 const DEFAULT_MODULE_ICON_SVG = '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>';
 
+/**
+ * Generate a plain-language health narrative for the PDF report.
+ * Written so a non-technical customer can understand the car's condition.
+ */
+function generateHealthNarrative(d) {
+  const score = d.score;
+  if (!score) return '<p>Inspection data not available.</p>';
+
+  const rating = Number(score.rating);
+  const baseRating = Number(score.baseRating || score.rating);
+  const cert = score.certification || '';
+  const hasRedFlags = score.hasRedFlags;
+  const redFlagPenalty = score.redFlagPenalty || 0;
+  const redFlagParams = score.redFlagParams || [];
+  const repairCost = score.totalRepairCost || 0;
+  const isPDI = !!d.isPDI;
+  const modules = d.modules || [];
+
+  // Categorise modules by condition
+  const excellent = [], good = [], attention = [], concern = [];
+  for (const m of modules) {
+    const modRating = getModuleRating(m.slug, score);
+    if (modRating == null) continue;
+    if (modRating >= 4.5)      excellent.push(m.name);
+    else if (modRating >= 3.5) good.push(m.name);
+    else if (modRating >= 2.5) attention.push(m.name);
+    else                       concern.push(m.name);
+  }
+
+  // Find top issues (params with highest severity)
+  const topIssues = [];
+  for (const m of modules) {
+    for (const sg of m.subGroups || []) {
+      for (const r of sg.responses || []) {
+        if (r.severityScore != null && r.severityScore >= 0.40) {
+          topIssues.push({ name: r.paramName, severity: r.severityScore, module: m.name, isRedFlag: r.isRedFlag });
+        }
+      }
+    }
+  }
+  topIssues.sort((a, b) => b.severity - a.severity);
+
+  const parts = [];
+
+  // Opening paragraph — overall verdict
+  const vehicleName = `${d.vehicleYear} ${d.vehicleMake} ${d.vehicleModel}`.replace(/\s+/g, ' ').trim();
+  if (rating >= 4.5) {
+    parts.push(isPDI
+      ? `This brand new ${vehicleName} is in <strong style="color:var(--success);">excellent condition</strong>. The vehicle meets new-car standards with only minor cosmetic observations, if any.`
+      : `This ${vehicleName} is in <strong style="color:var(--success);">excellent overall condition</strong>. The vehicle has been well-maintained and shows minimal signs of wear across all major systems.`);
+  } else if (rating >= 3.5) {
+    parts.push(isPDI
+      ? `This brand new ${vehicleName} is in <strong style="color:var(--success);">good condition</strong> but has a few areas that should be rectified by the dealership before delivery.`
+      : `This ${vehicleName} is in <strong style="color:var(--success);">good overall condition</strong>. While there are a few areas that show normal wear, no major concerns were identified during the inspection.`);
+  } else if (rating >= 2.5) {
+    parts.push(isPDI
+      ? `This brand new ${vehicleName} has <strong style="color:var(--warning);">multiple issues</strong> that need to be addressed by the dealership before you accept delivery.`
+      : `This ${vehicleName} is in <strong style="color:var(--warning);">fair condition</strong>. Some areas require attention, and we recommend addressing the issues noted below before regular use.`);
+  } else if (rating >= 1.5) {
+    parts.push(isPDI
+      ? `This ${vehicleName} has <strong style="color:var(--danger);">significant quality issues</strong> for a new vehicle. We recommend requesting a replacement unit from the dealership.`
+      : `This ${vehicleName} shows <strong style="color:var(--danger);">signs of significant wear</strong>. Multiple systems need repair or replacement. We recommend a thorough evaluation by a qualified mechanic before purchase.`);
+  } else {
+    parts.push(isPDI
+      ? `This ${vehicleName} has <strong style="color:var(--danger);">critical issues</strong> that are unacceptable for a new vehicle. We strongly recommend rejecting delivery.`
+      : `This ${vehicleName} is in <strong style="color:var(--danger);">poor condition</strong>. Critical issues were found that may affect safety and drivability. We strongly recommend against purchase without major repairs.`);
+  }
+
+  // Red flag explanation
+  if (hasRedFlags && redFlagParams.length > 0) {
+    const flagNames = redFlagParams.map(rf => `<strong>${rf.paramName}</strong>`).join(', ');
+    const flagCount = redFlagParams.length;
+    parts.push(`<span style="color:var(--danger);">⚠ ${flagCount === 1 ? 'A critical safety concern was' : flagCount + ' critical safety concerns were'} identified:</span> ${flagNames}. ${flagCount === 1 ? 'This issue' : 'These issues'} can affect vehicle safety and ${flagCount === 1 ? 'has' : 'have'} resulted in a ${redFlagPenalty}% rating penalty. We recommend ${flagCount === 1 ? 'this be' : 'these be'} addressed immediately.`);
+  }
+
+  // What's strong
+  if (excellent.length > 0) {
+    parts.push(`<strong>What's in great shape:</strong> ${excellent.join(', ')} — ${excellent.length === 1 ? 'this area scored' : 'these areas scored'} above 4.5/5, indicating minimal to no issues.`);
+  }
+  if (good.length > 0 && excellent.length < 6) {
+    parts.push(`<strong>Good condition:</strong> ${good.join(', ')} — showing normal wear for a vehicle of this age, nothing to worry about.`);
+  }
+
+  // What needs attention
+  if (attention.length > 0) {
+    parts.push(`<strong>Needs attention:</strong> ${attention.join(', ')} — ${attention.length === 1 ? 'this area has' : 'these areas have'} moderate issues that should be inspected or serviced soon.`);
+  }
+  if (concern.length > 0) {
+    parts.push(`<strong>Areas of concern:</strong> ${concern.join(', ')} — ${concern.length === 1 ? 'this area requires' : 'these areas require'} immediate professional attention.`);
+  }
+
+  // Top specific issues (max 4)
+  const notableIssues = topIssues.slice(0, 4);
+  if (notableIssues.length > 0) {
+    const issueLines = notableIssues.map(i => {
+      const sevLabel = i.severity >= 0.75 ? 'Critical' : i.severity >= 0.40 ? 'Moderate' : 'Minor';
+      const sevColor = i.severity >= 0.75 ? 'var(--danger)' : i.severity >= 0.40 ? 'var(--warning)' : 'var(--muted-fg)';
+      return `<li>${i.name} <span style="color:${sevColor};">(${sevLabel})</span>${i.isRedFlag ? ' <span style="color:var(--danger);">⚑ Safety Flag</span>' : ''}</li>`;
+    }).join('');
+    parts.push(`<strong>Key findings:</strong><ul style="padding-left:18px;margin:4px 0;">${issueLines}</ul>`);
+  }
+
+  // Repair cost context
+  if (repairCost > 0) {
+    const costFormatted = '₹' + Math.round(repairCost).toLocaleString('en-IN');
+    parts.push(`<strong>Estimated repair cost:</strong> ${costFormatted} — this is the estimated cost to address all identified issues at current market rates for this vehicle type.`);
+  }
+
+  // Final recommendation — handle both Used Car and PDI cert labels
+  if (cert === 'Gold' || cert === 'Accept Delivery') {
+    const msg = isPDI
+      ? 'This vehicle passed the Pre-Delivery Inspection. It is ready for delivery with no concerns — all systems are functioning as expected for a new vehicle.'
+      : 'This vehicle passed with a Gold certification. It is an excellent choice and ready for regular use with standard maintenance.';
+    parts.push(`<strong style="color:var(--success);">Recommendation:</strong> ${msg}`);
+  } else if (cert === 'Silver' || cert === 'Accept with Rectification') {
+    const msg = isPDI
+      ? 'This vehicle has minor issues that should be rectified by the dealership before delivery. None are safety-critical, but they should be addressed to ensure the car is in perfect new-car condition.'
+      : 'This vehicle earned a Silver certification. It is in good shape overall — consider addressing the minor issues noted above at your next service.';
+    parts.push(`<strong style="color:var(--silver);">Recommendation:</strong> ${msg}`);
+  } else if (cert === 'Verified' || cert === 'Rectify Before Delivery') {
+    const msg = isPDI
+      ? 'This vehicle has multiple issues that must be rectified by the dealership before you accept delivery. Request written confirmation of all corrections before taking possession.'
+      : 'This vehicle is Verified but has some areas that need attention. Factor the repair costs into your budget and get the flagged issues checked by a mechanic.';
+    parts.push(`<strong style="color:var(--cyan);">Recommendation:</strong> ${msg}`);
+  } else if (cert === 'Reject Delivery') {
+    parts.push(`<strong style="color:var(--danger);">Recommendation:</strong> This vehicle has critical issues that make it unacceptable for delivery. We strongly recommend rejecting this unit and requesting a replacement or full resolution from the dealership.`);
+  } else {
+    parts.push(`<strong style="color:var(--danger);">Recommendation:</strong> This vehicle did not meet certification standards. We advise caution — the identified issues are significant and could be costly to repair.`);
+  }
+
+  return parts.map(p => `<p style="margin:0 0 8px 0;">${p}</p>`).join('');
+}
+
 function getModuleIconSvg(icon, size = 26, stroke = 'rgba(255,255,255,0.85)') {
   const paths = MODULE_ICON_SVGS[icon] || DEFAULT_MODULE_ICON_SVG;
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
@@ -175,7 +308,7 @@ const CSS = `
   .logo-text { font-size: 1.6rem; font-weight: 900; color: var(--navy); letter-spacing: -0.5px; }
   .logo-text span { color: var(--cyan); }
   .header-tag { font-size: 1rem; color: var(--muted-fg); font-weight: 500; display: flex; align-items: center; gap: 6px; }
-  .header-cert-badge { font-size: 0.95rem; font-weight: 700; padding: 2px 10px; border-radius: 20px; }
+  .header-cert-badge { font-size: 1.02rem; font-weight: 700; padding: 2px 10px; border-radius: 20px; }
   .cert-gold { background: hsl(45,100%,92%); color: hsl(45,100%,32%); }
   .cert-silver { background: hsl(210,15%,92%); color: hsl(210,15%,32%); }
   .cert-verified { background: var(--cyan-light); color: hsl(195,100%,25%); }
@@ -221,14 +354,14 @@ const CSS = `
   .cover-cert-card { border-radius: 14px; border: 2px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.07); padding: 16px 20px; display: flex; align-items: center; gap: 16px; }
   .cover-cert-icon { flex-shrink: 0; }
   .cover-cert-info { flex: 1; }
-  .cover-cert-label { font-size: 0.85rem; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; opacity: 0.55; margin-bottom: 3px; }
+  .cover-cert-label { font-size: 0.92rem; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; opacity: 0.55; margin-bottom: 3px; }
   .cover-cert-level { font-size: 1.8rem; font-weight: 900; line-height: 1; }
   .cover-cert-rating { font-size: 1.1rem; opacity: 0.7; margin-top: 2px; }
 
   .cover-bottom { background: rgba(0,0,0,0.25); border-top: 1px solid rgba(255,255,255,0.08); padding: 10mm 16mm; }
   .cover-meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
   .cover-meta-box { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 10px 14px; }
-  .cover-meta-box .cmb-label { font-size: 0.85rem; opacity: 0.5; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .cover-meta-box .cmb-label { font-size: 0.92rem; opacity: 0.5; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
   .cover-meta-box .cmb-value { font-size: 1.15rem; font-weight: 700; }
 
   .cover-footer-bar { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); }
@@ -278,7 +411,7 @@ const CSS = `
   .mhi-bar { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
   .mhi-bar-fill { height: 100%; border-radius: 3px; }
   .mhi-score { font-size: 1rem; font-weight: 700; color: var(--navy); min-width: 28px; text-align: right; }
-  .mhi-na { font-size: 0.95rem; color: var(--muted-fg); }
+  .mhi-na { font-size: 1.02rem; color: var(--muted-fg); }
 
   /* summary table */
   .summary-table { width: 100%; border-collapse: collapse; font-size: 1.15rem; margin-bottom: 20px; }
@@ -308,7 +441,7 @@ const CSS = `
   .vri-card { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
   .vri-box { border: 1.5px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; position: relative; overflow: hidden; }
   .vri-box::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,0) 60%, rgba(0,180,220,0.04) 100%); }
-  .vri-box .vb-label { font-size: 0.95rem; color: var(--muted-fg); margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+  .vri-box .vb-label { font-size: 1.02rem; color: var(--muted-fg); margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
   .vri-box .vb-val { font-size: 2.2rem; font-weight: 900; color: var(--navy); }
   .vri-box .vb-sub { font-size: 1.05rem; font-weight: 600; margin-top: 2px; }
 
@@ -323,14 +456,14 @@ const CSS = `
   /* param table */
   .param-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 1.1rem; }
   .param-table thead tr { background: var(--muted); border-bottom: 2px solid var(--border); }
-  .param-table thead th { padding: 8px 12px; text-align: left; font-weight: 700; color: var(--muted-fg); font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px; }
+  .param-table thead th { padding: 8px 12px; text-align: left; font-weight: 700; color: var(--muted-fg); font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.5px; }
   .param-table thead th.center { text-align: center; }
   .param-table tbody tr { border-bottom: 1px solid var(--border); }
   .param-table tbody tr:last-child { border-bottom: none; }
   .param-table tbody td { padding: 9px 12px; vertical-align: middle; }
-  .param-num { font-size: 1rem; color: var(--muted-fg); font-weight: 600; white-space: nowrap; }
+  .param-num { font-size: 1.1rem; color: var(--muted-fg); font-weight: 600; white-space: nowrap; }
   .param-name-cell { font-weight: 500; }
-  .rf-badge { display: inline-block; font-size: 0.8rem; font-weight: 800; background: hsl(0,84%,94%); color: var(--danger); padding: 1px 5px; border-radius: 3px; margin-left: 5px; }
+  .rf-badge { display: inline-block; font-size: 0.9rem; font-weight: 800; background: hsl(0,84%,94%); color: var(--danger); padding: 1px 5px; border-radius: 3px; margin-left: 5px; }
   .cond-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 1rem; font-weight: 600; white-space: nowrap; }
   .cond-normal { background: hsl(142,71%,92%); color: var(--success); }
   .cond-minor { background: hsl(217,91%,92%); color: hsl(217,91%,40%); }
@@ -343,7 +476,7 @@ const CSS = `
   .dot-moderate { background: var(--warning); } .dot-major { background: hsl(25,95%,53%); }
   .dot-critical { background: var(--danger); } .dot-na { background: var(--sev-na); }
   .selected-option { font-size: 1.05rem; color: var(--muted-fg); }
-  .notes-cell { font-size: 1rem; color: var(--muted-fg); font-style: italic; max-width: 140px; }
+  .notes-cell { font-size: 1.1rem; color: var(--muted-fg); font-style: italic; max-width: 140px; }
 
   /* repair cost */
   .repair-total-card { background: linear-gradient(135deg, var(--navy) 0%, hsl(195,80%,22%) 100%); color: #fff; border-radius: 14px; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; position: relative; overflow: hidden; }
@@ -359,7 +492,7 @@ const CSS = `
   .legend-item { display: flex; align-items: center; gap: 6px; font-size: 1rem; color: var(--muted-fg); }
 
   /* subgroup */
-  .subgroup-header { background: var(--muted); padding: 6px 12px; font-size: 1.05rem; font-weight: 700; color: var(--muted-fg); text-transform: uppercase; letter-spacing: 0.5px; border-radius: 6px; margin: 8px 0 4px; }
+  .subgroup-header { background: linear-gradient(135deg, var(--navy) 0%, hsl(217,60%,35%) 100%); padding: 8px 14px; font-size: 1.08rem; font-weight: 700; color: #ffffff; text-transform: uppercase; letter-spacing: 0.8px; border-radius: 6px; margin: 10px 0 4px; }
   thead { display: table-row-group; }
 
   /* footer */
@@ -489,10 +622,13 @@ function buildCoverPage(d) {
         <div class="cmb-label">Location</div>
         <div class="cmb-value">${d.gpsAddress ? d.gpsAddress.split(',').slice(-2).join(',').trim() : '—'}</div>
       </div>
-      <div class="cover-meta-box">
+      ${d.isPDI ? `<div class="cover-meta-box">
+        <div class="cmb-label">Warranty</div>
+        <div class="cmb-value">New Car</div>
+      </div>` : `<div class="cover-meta-box">
         <div class="cmb-label">Est. Repair Cost</div>
         <div class="cmb-value">${d.score ? formatRupees(d.score.totalRepairCost) : '—'}</div>
-      </div>
+      </div>`}
     </div>
     <div class="cover-footer-bar">
       <div class="cover-footer-brand">moto<span>psy</span></div>
@@ -534,16 +670,16 @@ function buildTocPage(d, pageNum) {
       <ul>${modListItems}</ul>
     </div>
   </div>
-  <div class="toc-item">
+  ${d.isPDI ? '' : `<div class="toc-item">
     <div class="toc-num">04</div>
     <div class="toc-content">
       <h3>Total Estimated Repair Cost</h3>
       <p>Module-wise repair cost breakdown with total estimate</p>
     </div>
-  </div>
+  </div>`}
   ${d.certificate ? `
   <div class="toc-item">
-    <div class="toc-num">05</div>
+    <div class="toc-num">${d.isPDI ? '04' : '05'}</div>
     <div class="toc-content">
       <h3>Inspection Certificate</h3>
       <p>Motopsy certification with QR code for verification</p>
@@ -559,15 +695,6 @@ function buildOverviewPage(d, pageNum, vehiclePhotoDataUrl) {
   const certColorVal = certColor(cert);
 
   const totalIssues = (d.modules || []).reduce((acc, m) => acc + countModuleIssues(m), 0);
-
-  // Health summary bullets
-  const bullets = (d.modules || []).map(m => {
-    const issues = countModuleIssues(m);
-    if (issues === 0) return `<li>${m.name}: No issues found — in good condition.</li>`;
-    return `<li>${m.name}: ${issues} issue${issues > 1 ? 's' : ''} found.</li>`;
-  }).join('');
-
-  const overallStatus = cert === 'Gold' ? 'excellent condition' : cert === 'Silver' ? 'good condition' : cert === 'Verified' ? 'fair condition' : 'poor condition — significant repairs needed';
 
   return `
 <div class="page">
@@ -615,25 +742,9 @@ function buildOverviewPage(d, pageNum, vehiclePhotoDataUrl) {
     <div class="info-box"><div class="ib-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><div><div class="ib-label">Issues Found</div><div class="ib-val">${totalIssues}</div></div></div>
   </div>
 
-  <h3 class="section-title" style="font-size:1.5rem;margin-bottom:10px;"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span> Module Health</h3>
-  <div class="mod-health-grid">
-    ${(d.modules || []).map(m => {
-      const modRating = getModuleRating(m.slug, d.score);
-      const ri = modRating != null ? ratingInfo(modRating) : null;
-      return `<div class="mod-health-item">
-        <div class="mhi-name">${m.name}</div>
-        <div class="mhi-bar-wrap">
-          ${ri ? `<div class="mhi-bar"><div class="mhi-bar-fill ${ri.barCls}" style="width:${ri.bar}%;"></div></div><div class="mhi-score">${modRating.toFixed(1)}</div>` : '<div class="mhi-na">Not scored</div>'}
-        </div>
-      </div>`;
-    }).join('')}
-  </div>
-
-  <h3 class="section-title" style="font-size:1.5rem;margin-bottom:10px;"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></span> Health Summary</h3>
-  <div style="border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;font-size:1.15rem;line-height:1.8;color:var(--muted-fg);">
-    Motopsy inspected this vehicle across <strong style="color:var(--navy);">${d.modules?.length || 0} modules</strong> and <strong style="color:var(--navy);">${d.totalApplicableParams} parameters</strong>.
-    <ul style="padding-left:18px;margin-top:8px;">${bullets}</ul>
-    <p style="margin-top:8px;">Overall the vehicle is in <strong style="color:var(--success);">${overallStatus}</strong>.</p>
+  <h3 class="section-title" style="font-size:1.5rem;margin-top:18px;margin-bottom:10px;"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></span> Health Summary</h3>
+  <div style="border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;font-size:1.05rem;line-height:1.65;color:var(--muted-fg);">
+    ${generateHealthNarrative(d)}
   </div>
 
   ${pageFooter(d.vehicleRegNumber, `${d.vehicleMake} ${d.vehicleModel} ${d.vehicleYear}`, d.certificate?.certificateNumber, pageNum)}
@@ -648,18 +759,24 @@ function buildSummaryPage(d, pageNum) {
     const modRating = getModuleRating(m.slug, d.score);
     const modCost = getModuleRepairCost(m.slug, d.score);
     const ri = modRating != null ? ratingInfo(modRating) : { bar: 0, barCls: 'bar-poor', pillCls: 'pill-poor' };
+
+    // Check if this module has triggered red flags
+    const modRedFlags = [];
+    for (const sg of m.subGroups || []) {
+      for (const r of sg.responses || []) {
+        if (r.isRedFlag && r.severityScore != null && r.severityScore >= 0.75) {
+          modRedFlags.push(r.paramName);
+        }
+      }
+    }
+    const hasModRedFlag = modRedFlags.length > 0;
+
     return `
-      <tr>
-        <td><div class="module-name-cell"><div class="mod-icon">${getModuleIconSvg(m.icon, 16, 'var(--cyan)')}</div> ${m.name}</div></td>
+      <tr${hasModRedFlag ? ' style="background:hsl(0,85%,97%);"' : ''}>
+        <td><div class="module-name-cell"><div class="mod-icon">${getModuleIconSvg(m.icon, 16, hasModRedFlag ? 'hsl(0,60%,45%)' : 'var(--cyan)')}</div> ${m.name}${hasModRedFlag ? ' <span style="color:hsl(0,60%,45%);font-size:0.88rem;font-weight:600;">⚑ SAFETY FLAG</span>' : ''}</div></td>
         <td class="text-muted">${m.answeredParams}/${m.totalParams}</td>
-        <td>
-          <div class="rating-bar-wrap">
-            <div class="rating-bar"><div class="rating-bar-fill ${ri.barCls}" style="width:${ri.bar}%"></div></div>
-            <span class="rating-pill ${ri.pillCls}">${modRating != null ? modRating.toFixed(1) : '—'}</span>
-          </div>
-        </td>
         <td class="text-right fw-700 text-navy">${modRating != null ? modRating.toFixed(1) + '/5' : '—'}</td>
-        <td class="text-right">${formatRupees(modCost)}</td>
+        ${d.isPDI ? '' : `<td class="text-right">${formatRupees(modCost)}</td>`}
       </tr>`;
   }).join('');
 
@@ -675,6 +792,7 @@ function buildSummaryPage(d, pageNum) {
       <div class="vb-label">Overall Rating</div>
       <div class="vb-val">${Number(d.score.rating).toFixed(1)}<span style="font-size:1.3rem;font-weight:500;">/5</span></div>
       <div class="vb-sub" style="color:${certColor(cert)};">${cert}</div>
+      ${d.score.hasRedFlags && d.score.redFlagPenalty > 0 ? `<div style="font-size:0.92rem;color:hsl(0,60%,45%);margin-top:4px;">Base: ${Number(d.score.baseRating).toFixed(1)} − ${d.score.redFlagPenalty}% penalty</div>` : ''}
     </div>
     <div class="vri-box">
       <div class="vb-label">VRI Score</div>
@@ -682,20 +800,33 @@ function buildSummaryPage(d, pageNum) {
       <div class="vb-sub text-muted">${d.score.vri < 0.2 ? 'Low Risk' : d.score.vri < 0.5 ? 'Medium Risk' : 'High Risk'}</div>
     </div>
     <div class="vri-box">
-      <div class="vb-label">Est. Repair Cost</div>
-      <div class="vb-val" style="font-size:1.7rem;">${formatRupees(d.score.totalRepairCost)}</div>
-      <div class="vb-sub text-muted">${(d.modules || []).reduce((a, m) => a + countModuleIssues(m), 0)} issues found</div>
+      <div class="vb-label">${d.isPDI ? 'Issues Found' : 'Est. Repair Cost'}</div>
+      <div class="vb-val" style="font-size:1.7rem;">${d.isPDI ? (d.modules || []).reduce((a, m) => a + countModuleIssues(m), 0) : formatRupees(d.score.totalRepairCost)}</div>
+      <div class="vb-sub text-muted">${d.isPDI ? 'across all modules' : (d.modules || []).reduce((a, m) => a + countModuleIssues(m), 0) + ' issues found'}</div>
     </div>
   </div>` : ''}
+
+  ${d.score?.hasRedFlags ? (() => {
+    const rfParams = d.score.redFlagParams || [];
+    const rfNames = rfParams.map(rf => rf.paramName);
+    const baseR = Number(d.score.baseRating).toFixed(1);
+    const finalR = Number(d.score.rating).toFixed(1);
+    const penalty = d.score.redFlagPenalty;
+    return `
+  <div style="background:hsl(0,85%,97%);border:1.5px solid hsl(0,70%,85%);border-radius:10px;padding:14px 16px;margin-bottom:14px;font-size:1.05rem;line-height:1.7;color:hsl(0,40%,30%);">
+    <strong style="font-size:1.1rem;">⚠ Why is the overall rating lower than individual modules?</strong>
+    <p style="margin:8px 0 0 0;">During inspection, we found a serious safety issue — <strong style="color:hsl(0,60%,40%);">${rfNames.join(', ')}</strong> — which poses a risk to vehicle safety and reliability.</p>
+    <p style="margin:6px 0 0 0;">While the vehicle scored <strong>${baseR}/5</strong> based on its overall condition across all modules, this safety concern reduces the final rating by <strong>${penalty}%</strong> to <strong>${finalR}/5</strong>. This is similar to how insurance companies lower a vehicle's value when critical safety issues are present.</p>
+  </div>`;
+  })() : ''}
 
   <table class="summary-table">
     <thead>
       <tr>
-        <th style="width:36%;">Module</th>
-        <th style="width:12%;">Params</th>
-        <th style="width:26%;">Condition</th>
-        <th style="width:13%;text-align:right;">Rating</th>
-        <th style="width:13%;text-align:right;">Repair Cost</th>
+        <th style="width:${d.isPDI ? '50' : '45'}%;">Module</th>
+        <th style="width:15%;">Params</th>
+        <th style="width:${d.isPDI ? '35' : '20'}%;text-align:right;">Rating</th>
+        ${d.isPDI ? '' : '<th style="width:20%;text-align:right;">Repair Cost</th>'}
       </tr>
     </thead>
     <tbody>${modRows}</tbody>
@@ -723,10 +854,9 @@ function buildSgTableHtml(sgName, rowsHtml) {
     <thead>
       <tr>
         <th style="width:8%;">#</th>
-        <th style="width:35%;">Parameter</th>
-        <th style="width:22%;">Selected Option</th>
-        <th style="width:18%;" class="center">Condition</th>
-        <th style="width:17%;">Notes</th>
+        <th style="width:38%;">Parameter</th>
+        <th style="width:28%;">Observation</th>
+        <th style="width:26%;">Notes</th>
       </tr>
     </thead>
     <tbody>${rowsHtml}</tbody>
@@ -740,11 +870,11 @@ function buildSgTableHtml(sgName, rowsHtml) {
 //   Conservative budget per page: 840px
 //
 const MOD_LAYOUT = {
-  CONTENT_H:   840,   // usable vertical budget per page
-  MOD_HDR_H:    90,   // module-header-card (incl. bottom margin)
-  SG_HDR_H:     34,   // subgroup-header bar
-  TBL_HDR_H:    32,   // <thead> row
-  ROW_H:        36,   // normal param row
+  CONTENT_H:   860,   // usable vertical budget per page (~84% of A4 inner height)
+  MOD_HDR_H:    80,   // module-header-card (incl. bottom margin)
+  SG_HDR_H:     48,   // subgroup-header bar (margin-top:10 + padding:16 + font:15 + margin-bottom:4)
+  TBL_HDR_H:    30,   // <thead> row
+  ROW_H:        52,   // normal param row (name + detail subtitle + padding — bumped for larger fonts)
   PHOTO_ROW_H: 120,   // photo-evidence row (label + 90 px image + padding)
 };
 
@@ -776,8 +906,10 @@ function buildModulePage(d, mod, modIndex, startPageNum) {
   </div>`;
 
   // ── Pre-build all rows with height estimates ──────────────────────────────
+  let paramSeq = 0;
   const subgroups = (mod.subGroups || []).map(sg => {
     const rows = (sg.responses || []).map(resp => {
+      paramSeq++;
       const optText = selectedOptionText(resp);
       const cond    = conditionInfo(resp.severityScore, resp.isRedFlag, resp.selectedOption);
 
@@ -796,8 +928,8 @@ function buildModulePage(d, mod, modIndex, startPageNum) {
           photoHtml = `
         <tr style="background:hsl(210,40%,98.5%);">
           <td style="padding:2px;border-bottom:1px solid var(--border);"></td>
-          <td colspan="4" style="padding:6px 12px 10px;border-bottom:1px solid var(--border);">
-            <div style="font-size:0.85rem;font-weight:700;color:var(--muted-fg);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;">Photo Evidence</div>
+          <td colspan="3" style="padding:6px 12px 10px;border-bottom:1px solid var(--border);">
+            <div style="font-size:0.98rem;font-weight:700;color:var(--muted-fg);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;">Photo Evidence</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">${imgs}</div>
           </td>
         </tr>`;
@@ -805,21 +937,43 @@ function buildModulePage(d, mod, modIndex, startPageNum) {
         }
       }
 
+      // Observation badge color based on condition
+      const obsColors = {
+        'Normal':   { bg: 'hsl(152,60%,94%)', fg: 'hsl(152,55%,30%)', border: 'hsl(152,45%,82%)' },
+        'Minor':    { bg: 'hsl(210,60%,94%)', fg: 'hsl(210,55%,35%)', border: 'hsl(210,45%,82%)' },
+        'Moderate': { bg: 'hsl(38,80%,93%)',  fg: 'hsl(30,70%,30%)',  border: 'hsl(38,60%,80%)' },
+        'Major':    { bg: 'hsl(20,80%,93%)',  fg: 'hsl(15,70%,32%)',  border: 'hsl(20,60%,80%)' },
+        'Critical': { bg: 'hsl(0,75%,94%)',   fg: 'hsl(0,65%,38%)',   border: 'hsl(0,55%,82%)' },
+        'N/A':      { bg: 'hsl(210,20%,95%)', fg: 'hsl(210,15%,55%)', border: 'hsl(210,15%,88%)' },
+      };
+      const obsStyle = obsColors[cond.label] || obsColors['N/A'];
+
+      // Row indicator: colored left border + subtle bg tint for issue rows
+      const isIssue = resp.severityScore != null && resp.severityScore > 0;
+      const rowBorderColors = {
+        'Normal':   'hsl(152,55%,45%)',  // green
+        'Minor':    'hsl(210,55%,50%)',  // blue
+        'Moderate': 'hsl(38,80%,45%)',   // amber
+        'Major':    'hsl(20,80%,45%)',   // orange
+        'Critical': 'hsl(0,65%,45%)',    // red
+        'N/A':      'transparent',
+      };
+      const rowBorderColor = rowBorderColors[cond.label] || 'transparent';
+      const rowBgColor = isIssue ? obsStyle.bg : 'transparent';
+
+      // Extra height for detail text wrapping in param column (~38% of page width ≈ 28 chars/line at 0.85rem)
+      const detailLen = (resp.paramDetail || '').length;
+      const detailExtraH = detailLen > 80 ? 22 : detailLen > 40 ? 12 : 0;
       return {
-        height: ROW_H + extraH,
+        height: ROW_H + extraH + detailExtraH,
         html: `
-        <tr>
-          <td class="param-num">${modIndex + 1}.${resp.paramNumber}</td>
+        <tr style="border-left:4px solid ${rowBorderColor};background:${rowBgColor};">
+          <td class="param-num">${modIndex + 1}.${paramSeq}</td>
           <td class="param-name-cell">
-            ${resp.paramName}
-            ${resp.isRedFlag ? '<span class="rf-badge">RED FLAG</span>' : ''}
+            <div style="font-weight:600;font-size:1.12rem;color:var(--navy);">${resp.paramName}${resp.isRedFlag && resp.severityScore >= 0.75 ? ' <span class="rf-badge">RED FLAG</span>' : ''}</div>
+            ${resp.paramDetail ? `<div style="font-size:0.92rem;color:hsl(215,15%,55%);font-weight:400;margin-top:2px;line-height:1.35;font-style:italic;">${resp.paramDetail}</div>` : ''}
           </td>
-          <td class="selected-option">${optText}</td>
-          <td style="text-align:center;">
-            <span class="cond-badge ${cond.cls}">
-              <span class="dot ${cond.dot}"></span>${cond.label}
-            </span>
-          </td>
+          <td class="selected-option"><span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:0.95rem;font-weight:600;background:${obsStyle.bg};color:${obsStyle.fg};border:1px solid ${obsStyle.border};">${optText}</span></td>
           <td class="notes-cell">${resp.notes || '—'}</td>
         </tr>${photoHtml}`
       };
@@ -846,14 +1000,55 @@ function buildModulePage(d, mod, modIndex, startPageNum) {
     remaining   = CONTENT_H;
   };
 
-  for (const sg of subgroups) {
-    const sgTotalH = SG_HDR_H + TBL_HDR_H + sg.rows.reduce((s, r) => s + r.height, 0);
+  // Helper: estimate total height of a subgroup
+  const sgHeight = (sg) => SG_HDR_H + TBL_HDR_H + sg.rows.reduce((s, r) => s + r.height, 0);
+
+  for (let sgIdx = 0; sgIdx < subgroups.length; sgIdx++) {
+    const sg = subgroups[sgIdx];
+    const sgTotalH = sgHeight(sg);
+
+    // ── Anti-orphan look-ahead ──────────────────────────────────────────────
+    // If this SG fits but remaining SGs after it won't, and ALL remaining
+    // (including this one) would fit on a fresh page, flush now to keep them
+    // together — prevents sparse orphan pages with 1-2 items.
+    if (sgTotalH <= remaining && sgIdx + 1 < subgroups.length) {
+      const restSGs = subgroups.slice(sgIdx + 1);
+      const restH = restSGs.reduce((s, ns) => s + sgHeight(ns), 0);
+      const remainingAfter = remaining - sgTotalH;
+      const pageBudget = isFirstPage ? CONTENT_H - MOD_HDR_H : CONTENT_H;
+      const usedSoFar = pageBudget - remaining;
+
+      if (restH > remainingAfter && sgTotalH + restH <= CONTENT_H && usedSoFar >= CONTENT_H * 0.5) {
+        flushPage();
+      }
+    }
 
     if (sgTotalH <= remaining) {
       // Whole subgroup fits on current page
       pageContent += buildSgTableHtml(sg.name, sg.rows.map(r => r.html).join(''));
       remaining   -= sgTotalH;
     } else {
+      // ── Anti-orphan for split case ──────────────────────────────────
+      // If this SG + all remaining SGs fit on a fresh page and current
+      // page is already well-filled, flush now for a cleaner split
+      // instead of awkwardly splitting the subgroup across pages.
+      if (sgIdx + 1 < subgroups.length) {
+        const restSGs = subgroups.slice(sgIdx + 1);
+        const restH = restSGs.reduce((s, ns) => s + sgHeight(ns), 0);
+        const pageBudget = isFirstPage ? CONTENT_H - MOD_HDR_H : CONTENT_H;
+        const usedSoFar = pageBudget - remaining;
+
+        if (sgTotalH + restH <= CONTENT_H && usedSoFar >= CONTENT_H * 0.5) {
+          flushPage();
+          // After flush, SG likely fits entirely on the fresh page
+          if (sgTotalH <= remaining) {
+            pageContent += buildSgTableHtml(sg.name, sg.rows.map(r => r.html).join(''));
+            remaining -= sgTotalH;
+            continue;
+          }
+        }
+      }
+
       // Subgroup doesn't fit — check if at least header + 1 row can start here
       const minFit = SG_HDR_H + TBL_HDR_H + (sg.rows[0]?.height || ROW_H);
       if (remaining < minFit) {
@@ -897,17 +1092,18 @@ function buildRepairCostPage(d, pageNum) {
     const cost = getModuleRepairCost(m.slug, d.score);
     const issues = countModuleIssues(m);
     const modRisk = d.score?.moduleRisks?.[m.slug];
+    // Tighter thresholds for repair cost context — "Normal" next to ₹62K looks wrong
     const condLabel = modRisk == null ? 'N/A'
-      : modRisk <= 0.1 ? 'Normal'
-      : modRisk <= 0.3 ? 'Minor'
-      : modRisk <= 0.55 ? 'Moderate'
-      : modRisk <= 0.8 ? 'Major'
+      : modRisk <= 0.05 ? 'Normal'
+      : modRisk <= 0.12 ? 'Minor'
+      : modRisk <= 0.30 ? 'Moderate'
+      : modRisk <= 0.55 ? 'Major'
       : 'Critical';
     const condCls = modRisk == null ? 'cond-na'
-      : modRisk <= 0.1 ? 'cond-normal'
-      : modRisk <= 0.3 ? 'cond-minor'
-      : modRisk <= 0.55 ? 'cond-moderate'
-      : modRisk <= 0.8 ? 'cond-major'
+      : modRisk <= 0.05 ? 'cond-normal'
+      : modRisk <= 0.12 ? 'cond-minor'
+      : modRisk <= 0.30 ? 'cond-moderate'
+      : modRisk <= 0.55 ? 'cond-major'
       : 'cond-critical';
     return `
       <tr>
@@ -918,11 +1114,29 @@ function buildRepairCostPage(d, pageNum) {
       </tr>`;
   }).join('');
 
+  // Extract cost reasoning data from breakdown meta
+  const meta = d.score?.repairCostBreakdown?._meta || {};
+  const vehicleValue = meta.vehicleMarketValue || 0;
+  const tier = meta.repairCostTier || 'T2';
+  const capApplied = meta.capApplied || false;
+  const totalCost = d.score?.totalRepairCost || 0;
+  const costPercent = vehicleValue > 0 ? ((totalCost / vehicleValue) * 100).toFixed(1) : '0';
+
+  // Tier label for display
+  const tierLabels = {
+    'T1': 'Budget (Maruti, Tata, Renault)',
+    'T2': 'Mid-range (Hyundai, Honda, Toyota)',
+    'T3': 'Premium (Skoda, VW, MG)',
+    'T4': 'Luxury (BMW 1-3, Audi A3-Q3, Mercedes A-C)',
+    'T5': 'Ultra-luxury (BMW 5+, Audi A6+, Mercedes E+)',
+  };
+  const tierLabel = tierLabels[tier] || 'Standard';
+
   return `
 <div class="page">
   ${pageHeader('', '')}
   <h2 class="section-title"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span> Total Estimated Repair Cost</h2>
-  <p class="section-desc">A rough estimate of the cost required to fix identified issues in the vehicle.</p>
+  <p class="section-desc">What it would cost to bring this vehicle back to ideal condition, based on current market rates.</p>
 
   ${d.score ? `
   <div class="repair-total-card">
@@ -931,8 +1145,8 @@ function buildRepairCostPage(d, pageNum) {
       <p>${totalIssues} issues found across ${modulesWithCost.length} module${modulesWithCost.length !== 1 ? 's' : ''}</p>
     </div>
     <div class="rtc-right">
-      <div class="rtc-amount">${formatRupees(d.score.totalRepairCost)}</div>
-      <div class="rtc-sub">Approximate estimate</div>
+      <div class="rtc-amount">${formatRupees(totalCost)}</div>
+      <div class="rtc-sub">${costPercent}% of vehicle value${capApplied ? ' (capped)' : ''}</div>
     </div>
   </div>` : ''}
 
@@ -947,6 +1161,19 @@ function buildRepairCostPage(d, pageNum) {
     </thead>
     <tbody>${rows}</tbody>
   </table>
+
+  <div style="margin-top:16px;padding:14px 16px;background:hsl(210,40%,97%);border:1.5px solid hsl(210,30%,90%);border-radius:10px;font-size:1.02rem;line-height:1.6;color:hsl(215,20%,40%);">
+    <div style="font-weight:700;color:var(--navy);margin-bottom:6px;font-size:1.08rem;">How is this estimate calculated?</div>
+    <p style="margin:0 0 6px;">
+      <strong>Issues Found</strong> — the number of inspection checkpoints where a deviation from ideal condition was detected. This includes everything from minor cosmetic wear to significant mechanical concerns. Not every issue needs immediate repair — some may be normal wear for the vehicle's age and mileage.
+    </p>
+    <p style="margin:0 0 6px;">
+      <strong>Repair Cost</strong> — estimated using the vehicle's current market value (${formatRupees(vehicleValue)}), the type of issue found, and the brand's spare parts & labour cost category (<em>${tierLabel}</em>). Luxury and imported vehicles typically have higher parts and service costs than domestic brands.
+    </p>
+    <p style="margin:0;font-style:italic;color:hsl(215,15%,55%);">
+      <strong>Disclaimer:</strong> These are indicative estimates based on market research and may vary depending on your city, choice of service centre (authorised vs local), parts availability, and extent of repair needed. Always get a detailed quote from a trusted mechanic before making a purchase decision.
+    </p>
+  </div>
 
   ${pageFooter(d.vehicleRegNumber, `${d.vehicleMake} ${d.vehicleModel} ${d.vehicleYear}`, d.certificate?.certificateNumber, pageNum)}
 </div>`;
@@ -1028,14 +1255,16 @@ async function buildHtml(d) {
 
   pages.push(buildCoverPage(d));                                            // Page 1: Cover
   pages.push(buildTocPage(d, ++pageNum));                                   // Page 2: TOC
-  pages.push(buildOverviewPage(d, ++pageNum, vehiclePhotoDataUrl));         // Page 3: At a Glance
-  pages.push(buildSummaryPage(d, ++pageNum));               // Page 4: Summary
+  pages.push(buildOverviewPage(d, ++pageNum, vehiclePhotoDataUrl));         // Page 3: At a Glance + Health Summary
+  pages.push(buildSummaryPage(d, ++pageNum));               // Page 4: Inspection Summary
   for (let i = 0; i < (d.modules || []).length; i++) {
     const result = buildModulePage(d, d.modules[i], i, ++pageNum);
     pages.push(result.html);
     pageNum += result.pagesUsed - 1;  // advance counter for extra pages this module used
   }
-  pages.push(buildRepairCostPage(d, ++pageNum));            // Repair Cost
+  if (!d.isPDI) {
+    pages.push(buildRepairCostPage(d, ++pageNum));            // Repair Cost (skip for PDI — new car under warranty)
+  }
   if (d.certificate) {
     pages.push(await buildCertificatePage(d, ++pageNum));   // Certificate
   }

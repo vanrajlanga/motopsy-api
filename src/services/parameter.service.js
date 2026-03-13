@@ -11,7 +11,13 @@ class ParameterService {
    * filtered by fuel type and transmission type.
    */
   async getApplicableParameters(fuelType, transmissionType, context = {}) {
-    const { hasLift = true, roadTestPossible = true, templateSlug = null } = context;
+    const {
+      hasLift = true,
+      roadTestPossible = true,
+      templateSlug = null,
+      parameterVersion = 1,
+      vehicleFeatures = null
+    } = context;
     try {
       const modules = await InspectionModule.findAll({
         order: [['sort_order', 'ASC']],
@@ -27,18 +33,29 @@ class ParameterService {
         }]
       });
 
-      // Filter parameters by fuel and transmission
+      // Filter parameters by fuel, transmission, context, template, features, and version
       const result = modules.map(mod => {
         const moduleData = mod.toJSON();
         moduleData.SubGroups = moduleData.SubGroups
           .map(sg => {
-            sg.Parameters = sg.Parameters.filter(p =>
-              p.is_active &&
-              this.matchesFilter(p.fuel_filter, fuelType) &&
-              this.matchesFilter(p.transmission_filter, transmissionType) &&
-              this.matchesContextFilter(p.context_filter, hasLift, roadTestPossible) &&
-              this.matchesTemplateFilter(p.template_filter, templateSlug)
-            );
+            sg.Parameters = sg.Parameters.filter(p => {
+              // Base filters (same as before)
+              if (!p.is_active) return false;
+              if (!this.matchesFilter(p.fuel_filter, fuelType)) return false;
+              if (!this.matchesFilter(p.transmission_filter, transmissionType)) return false;
+              if (!this.matchesContextFilter(p.context_filter, hasLift, roadTestPossible)) return false;
+              if (!this.matchesTemplateFilter(p.template_filter, templateSlug)) return false;
+
+              // Feature filter (v2): exclude params requiring features the car doesn't have
+              if (!this.matchesFeatureFilter(p.feature_filter, vehicleFeatures)) return false;
+
+              // Version filter: v2 loads only composites, v1 loads only non-composites
+              if (parameterVersion >= 2) {
+                return p.is_composite === 1;
+              } else {
+                return p.is_composite === 0 && p.parent_id === null;
+              }
+            });
             return sg;
           })
           .filter(sg => sg.Parameters.length > 0);
@@ -77,6 +94,23 @@ class ParameterService {
     if (!templateSlug) return true;
     const slugs = templateFilter.split(',').map(s => s.trim().toLowerCase());
     return slugs.includes(templateSlug.toLowerCase());
+  }
+
+  /**
+   * Check if a parameter's feature_filter matches the vehicle's detected features.
+   * NULL filter = universal (applies to all cars).
+   * "sunroof" = only include if vehicleFeatures.sunroof is true.
+   * "sunroof,panoramic_roof" = include if ANY listed feature is present (OR logic).
+   */
+  matchesFeatureFilter(featureFilter, vehicleFeatures) {
+    // No feature requirement → universal param, always include
+    if (!featureFilter) return true;
+    // No features detected yet → include everything (features not yet set)
+    if (!vehicleFeatures) return true;
+
+    const requiredFeatures = featureFilter.split(',').map(f => f.trim().toLowerCase());
+    // Include if ANY of the required features is present on the vehicle (OR logic)
+    return requiredFeatures.some(f => vehicleFeatures[f] === true);
   }
 
   matchesFilter(filterValue, vehicleValue) {
@@ -308,7 +342,9 @@ class ParameterService {
         'option_1', 'option_2', 'option_3', 'option_4', 'option_5',
         'score_1', 'score_2', 'score_3', 'score_4', 'score_5',
         'fuel_filter', 'transmission_filter', 'context_filter', 'template_filter',
-        'is_red_flag', 'sort_order', 'weightage', 'weightage_pdi'
+        'feature_filter', 'sub_items_json',
+        'is_red_flag', 'is_composite', 'parent_id', 'sort_order',
+        'weightage', 'weightage_pdi'
       ];
 
       const updateData = {};

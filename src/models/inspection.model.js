@@ -26,6 +26,12 @@ const Inspection = sequelize.define('inspections', {
     allowNull: true,
     comment: 'FK inspection_templates.id — NULL defaults to used_car behaviour'
   },
+  parameter_version: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 1,
+    comment: '1 = legacy granular params, 2 = composite checkpoints'
+  },
   vehicle_reg_number: {
     type: DataTypes.STRING(20),
     allowNull: true
@@ -41,6 +47,21 @@ const Inspection = sequelize.define('inspections', {
   vehicle_year: {
     type: DataTypes.INTEGER,
     allowNull: true
+  },
+  ex_showroom_price: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: true,
+    comment: 'Ex-showroom price from vehicle_specifications (INR)'
+  },
+  vehicle_market_value: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: true,
+    comment: 'IRDAI-depreciated market value at time of inspection'
+  },
+  repair_cost_tier: {
+    type: DataTypes.STRING(2),
+    allowNull: true,
+    comment: 'Repair cost tier: T1-T5 based on brand/model'
   },
   fuel_type: {
     type: DataTypes.ENUM('Petrol', 'Diesel', 'CNG', 'Electric', 'Hybrid'),
@@ -59,6 +80,12 @@ const Inspection = sequelize.define('inspections', {
     type: DataTypes.TINYINT(1),
     allowNull: false,
     defaultValue: 0
+  },
+  vehicle_features: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Detected features: {sunroof:true, parking_sensors:false, ...}'
   },
   odometer_km: {
     type: DataTypes.INTEGER,

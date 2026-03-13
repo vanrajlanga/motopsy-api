@@ -319,6 +319,21 @@ if (!InspectionParameter.associations.SubGroup) {
   });
 }
 
+// InspectionParameter self-referencing: composite parent/children
+if (!InspectionParameter.associations.Children) {
+  InspectionParameter.hasMany(InspectionParameter, {
+    foreignKey: 'parent_id',
+    as: 'Children'
+  });
+}
+
+if (!InspectionParameter.associations.Parent) {
+  InspectionParameter.belongsTo(InspectionParameter, {
+    foreignKey: 'parent_id',
+    as: 'Parent'
+  });
+}
+
 // Inspection belongs to User (technician)
 if (!Inspection.associations.Technician) {
   Inspection.belongsTo(User, {

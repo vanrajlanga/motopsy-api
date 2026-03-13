@@ -82,6 +82,17 @@ class InspectionController extends BaseController {
     }
   }
 
+  async updateFeatures(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { vehicleFeatures } = req.body;
+      const result = await inspectionService.updateFeatures(parseInt(id), vehicleFeatures);
+      return this.fromResult(result, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async complete(req, res, next) {
     try {
       const { id } = req.params;

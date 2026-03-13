@@ -16,6 +16,8 @@ const ServicePlan = require('../models/service-plan.model');
 const InspectionTemplate = require('../models/inspection-template.model');
 const parameterService = require('./parameter.service');
 const scoringService = require('./scoring.service');
+const vehicleDetailService = require('./vehicle-detail.service');
+const { getRepairTier, calculateMarketValue } = require('../config/repair-tiers');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
 
@@ -35,7 +37,13 @@ class InspectionService {
               fuelType, transmissionType, odometerKm,
               gpsLatitude, gpsLongitude, gpsAddress, inspectorName,
               serviceOrderId, hasLift = false, roadTestPossible = false,
-              templateId: explicitTemplateId = null } = vehicleData;
+              templateId: explicitTemplateId = null,
+              vehicleFeatures = null, parameterVersion = 1 } = vehicleData;
+
+      // For v2 inspections, default to empty features (not null) so feature-filtered
+      // params start excluded and inspector toggles ON what they see on the car.
+      // null = "features not set yet, include everything" (backward compat for v1).
+      const effectiveFeatures = parameterVersion >= 2 && !vehicleFeatures ? {} : vehicleFeatures;
 
       // If linked to a service order, return existing inspection instead of creating a duplicate
       if (serviceOrderId) {
@@ -82,8 +90,10 @@ class InspectionService {
         }
       }
 
-      // Get applicable parameters (fuel + transmission + context + template filtered)
-      const paramResult = await parameterService.getApplicableParameters(fuelType, transmissionType, { hasLift, roadTestPossible, templateSlug });
+      // Get applicable parameters (fuel + transmission + context + template + feature + version filtered)
+      const paramResult = await parameterService.getApplicableParameters(fuelType, transmissionType, {
+        hasLift, roadTestPossible, templateSlug, parameterVersion, vehicleFeatures: effectiveFeatures
+      });
       if (!paramResult.isSuccess) {
         await transaction.rollback();
         return Result.failure('Failed to load parameters');
@@ -103,6 +113,7 @@ class InspectionService {
         technician_id: technicianId,
         service_order_id: serviceOrderId || null,
         template_id: templateId,
+        parameter_version: parameterVersion,
         vehicle_reg_number: vehicleRegNumber,
         vehicle_make: vehicleMake,
         vehicle_model: vehicleModel,
@@ -116,6 +127,7 @@ class InspectionService {
         inspector_name: inspectorName || null,
         has_lift: hasLift ? 1 : 0,
         road_test_possible: roadTestPossible ? 1 : 0,
+        vehicle_features: effectiveFeatures,
         status: 'in_progress',
         total_applicable_params: allParamIds.length,
         total_answered_params: 0,
@@ -134,6 +146,23 @@ class InspectionService {
       }));
 
       await InspectionResponse.bulkCreate(responseRows, { transaction });
+
+      // Auto-populate vehicle valuation (non-blocking — won't fail inspection creation)
+      try {
+        const valuation = await this.resolveVehicleValuation(
+          vehicleMake, vehicleModel, vehicleYear, serviceOrderId
+        );
+        if (valuation.exShowroomPrice || valuation.repairTier) {
+          await inspection.update({
+            ex_showroom_price: valuation.exShowroomPrice || null,
+            vehicle_market_value: valuation.marketValue || null,
+            repair_cost_tier: valuation.repairTier || null,
+          }, { transaction });
+        }
+        logger.info(`Valuation: tier=${valuation.repairTier}, exShowroom=${valuation.exShowroomPrice}, marketValue=${valuation.marketValue}`);
+      } catch (valErr) {
+        logger.warn('Vehicle valuation lookup failed (non-blocking):', valErr.message);
+      }
 
       await transaction.commit();
 
@@ -233,6 +262,11 @@ class InspectionService {
       if (selectedOption) {
         const param = await InspectionParameter.findByPk(parameterId);
         if (param) {
+          // Validate: ensure selected option exists for this parameter
+          const optionLabel = param[`option_${selectedOption}`];
+          if (!optionLabel) {
+            return Result.failure(`Invalid option ${selectedOption} for parameter ${parameterId} — only options with labels are valid`);
+          }
           severityScore = param[`score_${selectedOption}`];
         }
       }
@@ -411,6 +445,11 @@ class InspectionService {
             model: InspectionScore,
             as: 'Score',
             attributes: ['rating', 'certification', 'has_red_flags', 'total_repair_cost']
+          },
+          {
+            model: InspectionTemplate,
+            as: 'Template',
+            attributes: ['id', 'name', 'slug']
           }
         ],
         order: [['created_at', 'DESC']],
@@ -540,6 +579,155 @@ class InspectionService {
   }
 
   /**
+   * Update vehicle features mid-inspection and reconcile response rows.
+   * Similar to updateContext: adds/removes responses based on feature changes.
+   */
+  async updateFeatures(inspectionId, vehicleFeatures) {
+    const transaction = await sequelize.transaction();
+    try {
+      const inspection = await Inspection.findByPk(inspectionId, { transaction });
+      if (!inspection) {
+        await transaction.rollback();
+        return Result.failure('Inspection not found');
+      }
+
+      // Only relevant for v2 (composite) inspections
+      if (inspection.parameter_version < 2) {
+        await inspection.update({ vehicle_features: vehicleFeatures, modified_at: new Date() }, { transaction });
+        await transaction.commit();
+        return Result.success({ vehicleFeatures, delta: 0 });
+      }
+
+      const oldFeatures = inspection.vehicle_features || {};
+      let applicableDelta = 0;
+
+      // Find all feature-filtered params applicable to this inspection's fuel/trans/template
+      const templateSlug = inspection.template_id === 2 ? 'new_car_pdi' : 'used_car';
+      const featureParams = await InspectionParameter.findAll({
+        where: {
+          is_active: 1,
+          is_composite: 1,
+          feature_filter: { [Op.ne]: null }
+        },
+        attributes: ['id', 'feature_filter', 'fuel_filter', 'transmission_filter', 'template_filter', 'context_filter'],
+        transaction
+      });
+
+      const applicableFeatureParams = featureParams.filter(p =>
+        parameterService.matchesFilter(p.fuel_filter, inspection.fuel_type) &&
+        parameterService.matchesFilter(p.transmission_filter, inspection.transmission_type) &&
+        parameterService.matchesTemplateFilter(p.template_filter, templateSlug) &&
+        parameterService.matchesContextFilter(p.context_filter, !!inspection.has_lift, !!inspection.road_test_possible)
+      );
+
+      for (const param of applicableFeatureParams) {
+        const wasApplicable = parameterService.matchesFeatureFilter(param.feature_filter, oldFeatures);
+        const isNowApplicable = parameterService.matchesFeatureFilter(param.feature_filter, vehicleFeatures);
+
+        if (wasApplicable && !isNowApplicable) {
+          // Feature removed — delete unanswered response
+          const deleted = await InspectionResponse.destroy({
+            where: {
+              inspection_id: inspectionId,
+              parameter_id: param.id,
+              selected_option: null
+            },
+            transaction
+          });
+          applicableDelta -= deleted;
+        } else if (!wasApplicable && isNowApplicable) {
+          // Feature added — create response row if not exists
+          const existing = await InspectionResponse.findOne({
+            where: { inspection_id: inspectionId, parameter_id: param.id },
+            transaction
+          });
+          if (!existing) {
+            await InspectionResponse.create({
+              inspection_id: inspectionId,
+              parameter_id: param.id,
+              selected_option: null,
+              severity_score: null,
+              notes: null,
+              created_at: new Date()
+            }, { transaction });
+            applicableDelta++;
+          }
+        }
+      }
+
+      await inspection.update({
+        vehicle_features: vehicleFeatures,
+        total_applicable_params: inspection.total_applicable_params + applicableDelta,
+        modified_at: new Date()
+      }, { transaction });
+
+      await transaction.commit();
+
+      return Result.success({
+        vehicleFeatures,
+        totalApplicableParams: inspection.total_applicable_params + applicableDelta,
+        delta: applicableDelta
+      });
+    } catch (error) {
+      await transaction.rollback();
+      logger.error('Update features error:', error);
+      return Result.failure(error.message || 'Failed to update vehicle features');
+    }
+  }
+
+  /**
+   * Resolve vehicle market value and repair tier from make/model/year.
+   * Looks up ex-showroom price from vehicle_specifications, applies IRDAI depreciation.
+   */
+  async resolveVehicleValuation(vehicleMake, vehicleModel, vehicleYear, serviceOrderId) {
+    // 1. Determine repair tier from brand/model
+    const tierInfo = getRepairTier(vehicleMake, vehicleModel);
+    const repairTier = tierInfo.tier;
+
+    // 2. Look up ex-showroom price
+    let exShowroomPrice = null;
+
+    // Try from vehicle_specifications via make/model
+    if (vehicleMake && vehicleModel) {
+      try {
+        exShowroomPrice = await vehicleDetailService.lookupExShowroomPrice(vehicleMake, vehicleModel);
+      } catch (e) {
+        logger.warn(`Ex-showroom price lookup failed for ${vehicleMake} ${vehicleModel}:`, e.message);
+      }
+    }
+
+    // Fallback: try from service order's linked vehicle detail
+    if (!exShowroomPrice && serviceOrderId) {
+      try {
+        const order = await ServiceOrder.findByPk(serviceOrderId, { attributes: ['registration_number'] });
+        if (order?.registration_number) {
+          const VehicleDetail = require('../models/vehicle-detail.model');
+          const vd = await VehicleDetail.findOne({
+            where: { registration_number: order.registration_number },
+            attributes: ['ex_showroom_price'],
+            order: [['created_at', 'DESC']]
+          });
+          if (vd?.ex_showroom_price) {
+            exShowroomPrice = parseFloat(vd.ex_showroom_price);
+          }
+        }
+      } catch (e) {
+        logger.warn('Service order vehicle detail lookup failed:', e.message);
+      }
+    }
+
+    // 3. Calculate depreciated market value
+    let marketValue = null;
+    if (exShowroomPrice && exShowroomPrice > 0) {
+      const currentYear = new Date().getFullYear();
+      const vehicleAge = vehicleYear ? (currentYear - vehicleYear) : 5;
+      marketValue = calculateMarketValue(exShowroomPrice, vehicleAge);
+    }
+
+    return { exShowroomPrice, marketValue, repairTier };
+  }
+
+  /**
    * Group responses by module and sub-group for the frontend.
    */
   groupResponsesByModule(inspection) {
@@ -574,6 +762,12 @@ class InspectionService {
         };
       }
 
+      // Parse sub_items_json (MySQL may return string)
+      let subItems = param.sub_items_json || null;
+      if (typeof subItems === 'string') {
+        try { subItems = JSON.parse(subItems); } catch (e) { subItems = null; }
+      }
+
       moduleMap[mod.id].subGroups[sg.id].responses.push({
         responseId: resp.id,
         parameterId: param.id,
@@ -581,6 +775,9 @@ class InspectionService {
         paramName: param.name,
         paramDetail: param.detail,
         inputType: param.input_type,
+        isComposite: !!param.is_composite,
+        subItems: subItems,
+        featureFilter: param.feature_filter || null,
         options: [param.option_1, param.option_2, param.option_3, param.option_4, param.option_5].filter(Boolean),
         scores: [param.score_1, param.score_2, param.score_3, param.score_4, param.score_5].filter(s => s != null),
         isRedFlag: param.is_red_flag,
@@ -644,8 +841,10 @@ class InspectionService {
       inspectorPhotoPath: data.inspector_photo_path,
       vehiclePhotoPath: data.vehicle_photo_path,
       status: data.status,
+      parameterVersion: data.parameter_version || 1,
       hasLift: !!data.has_lift,
       roadTestPossible: !!data.road_test_possible,
+      vehicleFeatures: data.vehicle_features || null,
       totalApplicableParams: data.total_applicable_params,
       totalAnsweredParams: data.total_answered_params,
       startedAt: data.started_at,
@@ -708,9 +907,11 @@ class InspectionService {
 
     return {
       vri: parseFloat(score.vri || 0),
+      baseRating: parseFloat(score.base_rating || score.rating || 0),
       rating: parseFloat(score.rating || 0),
       certification: score.certification,
       hasRedFlags: !!score.has_red_flags,
+      redFlagPenalty: parseInt(score.red_flag_penalty || 0),
       redFlagParams,
       totalRepairCost: parseFloat(score.total_repair_cost || 0),
       repairCostBreakdown: breakdown,

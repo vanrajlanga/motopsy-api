@@ -164,7 +164,7 @@ class ServiceOrderService {
           {
             model: ServicePlan,
             as: 'ServicePlan',
-            attributes: ['service_name', 'service_key']
+            attributes: ['service_name', 'service_key', 'service_type']
           },
           {
             model: ServicePlanOption,
@@ -240,7 +240,7 @@ class ServiceOrderService {
           {
             model: ServicePlan,
             as: 'ServicePlan',
-            attributes: ['service_name', 'service_key']
+            attributes: ['service_name', 'service_key', 'service_type']
           },
           {
             model: ServicePlanOption,
@@ -315,7 +315,7 @@ class ServiceOrderService {
           {
             model: ServicePlan,
             as: 'ServicePlan',
-            attributes: ['service_name', 'service_key']
+            attributes: ['service_name', 'service_key', 'service_type']
           },
           {
             model: ServicePlanOption,
@@ -451,7 +451,7 @@ class ServiceOrderService {
           {
             model: ServicePlan,
             as: 'ServicePlan',
-            attributes: ['service_name', 'service_key']
+            attributes: ['service_name', 'service_key', 'service_type']
           },
           {
             model: ServicePlanOption,

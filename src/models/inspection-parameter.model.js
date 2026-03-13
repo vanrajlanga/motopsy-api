@@ -11,6 +11,12 @@ const InspectionParameter = sequelize.define('inspection_parameters', {
     type: DataTypes.INTEGER,
     allowNull: false
   },
+  parent_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: null,
+    comment: 'FK self-ref: links granular params to their composite parent'
+  },
   param_number: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -89,6 +95,18 @@ const InspectionParameter = sequelize.define('inspection_parameters', {
     defaultValue: null,
     comment: 'Comma-sep template slugs; NULL = all templates'
   },
+  feature_filter: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Comma-sep feature tags (sunroof,parking_sensors); NULL = universal'
+  },
+  sub_items_json: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Composite guidance: [{label,redFlag}] sub-checks for inspector'
+  },
   is_red_flag: {
     type: DataTypes.TINYINT(1),
     allowNull: false,
@@ -103,6 +121,12 @@ const InspectionParameter = sequelize.define('inspection_parameters', {
     type: DataTypes.TINYINT(1),
     allowNull: false,
     defaultValue: 1
+  },
+  is_composite: {
+    type: DataTypes.TINYINT(1),
+    allowNull: false,
+    defaultValue: 0,
+    comment: '1 = composite checkpoint (what inspector sees in v2)'
   },
   weightage: {
     type: DataTypes.DECIMAL(5, 2),

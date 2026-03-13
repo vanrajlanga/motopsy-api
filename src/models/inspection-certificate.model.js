@@ -26,7 +26,7 @@ const InspectionCertificate = sequelize.define('inspection_certificates', {
     allowNull: true
   },
   certification: {
-    type: DataTypes.ENUM('Gold', 'Silver', 'Verified', 'Not Certified'),
+    type: DataTypes.ENUM('Gold', 'Silver', 'Verified', 'Not Certified', 'Accept Delivery', 'Accept with Rectification', 'Rectify Before Delivery', 'Reject Delivery'),
     allowNull: true
   },
   issued_at: {

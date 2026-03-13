@@ -67,14 +67,25 @@ const InspectionScore = sequelize.define('inspection_scores', {
     allowNull: true,
     defaultValue: 0
   },
+  base_rating: {
+    type: DataTypes.DECIMAL(3, 2),
+    allowNull: true,
+    comment: 'Rating before red flag penalty'
+  },
   certification: {
-    type: DataTypes.ENUM('Gold', 'Silver', 'Verified', 'Not Certified'),
+    type: DataTypes.STRING(50),
     allowNull: true
   },
   has_red_flags: {
     type: DataTypes.TINYINT(1),
     allowNull: false,
     defaultValue: 0
+  },
+  red_flag_penalty: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 0,
+    comment: 'Total red flag penalty as percentage (e.g., 40 = 40%)'
   },
   red_flag_params: {
     type: DataTypes.JSON,
