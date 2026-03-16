@@ -2,6 +2,7 @@ const ApiController = require('./base.controller');
 const serviceOrderService = require('../services/service-order.service');
 const inspectionService = require('../services/inspection.service');
 const Inspection = require('../models/inspection.model');
+const { generateEmailLoginToken } = require('../utils/jwt.helper');
 
 class PublicController extends ApiController {
   /**
@@ -18,6 +19,15 @@ class PublicController extends ApiController {
         attributes: ['id', 'status']
       });
 
+      // Generate auto-login token for the assigned mechanic
+      let autoLoginToken = null;
+      if (order.mechanic_id) {
+        const redirectPath = existingInspection
+          ? `/inspections/${existingInspection.id}/fill`
+          : null;
+        autoLoginToken = generateEmailLoginToken(order.mechanic_id, redirectPath || '/inspections');
+      }
+
       return this.ok({
         success: true,
         data: {
@@ -29,7 +39,8 @@ class PublicController extends ApiController {
           customerName: order.name,
           shareToken: token,
           existingInspectionId: existingInspection?.id || null,
-          existingInspectionStatus: existingInspection?.status || null
+          existingInspectionStatus: existingInspection?.status || null,
+          autoLoginToken
         }
       }, res);
     } catch (error) {
@@ -73,7 +84,13 @@ class PublicController extends ApiController {
         return res.status(500).json({ isSuccess: false, error: result.error });
       }
 
-      return this.ok({ success: true, inspectionId: result.value.id }, res);
+      // Generate auto-login token for the assigned mechanic
+      let autoLoginToken = null;
+      if (order.mechanic_id) {
+        autoLoginToken = generateEmailLoginToken(order.mechanic_id, `/inspections/${result.value.id}/fill`);
+      }
+
+      return this.ok({ success: true, inspectionId: result.value.id, autoLoginToken }, res);
     } catch (error) {
       return res.status(404).json({ isSuccess: false, error: 'Invalid or expired share link' });
     }

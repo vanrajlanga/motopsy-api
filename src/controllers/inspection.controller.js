@@ -46,9 +46,9 @@ class InspectionController extends BaseController {
   async saveResponse(req, res, next) {
     try {
       const { id, parameterId } = req.params;
-      const { selectedOption, notes } = req.body;
+      const { selectedOption, notes, subItemResponses } = req.body;
       const result = await inspectionService.saveResponse(
-        parseInt(id), parseInt(parameterId), selectedOption, notes
+        parseInt(id), parseInt(parameterId), selectedOption, notes, subItemResponses
       );
       return this.fromResult(result, res);
     } catch (error) {

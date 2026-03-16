@@ -961,11 +961,38 @@ function buildModulePage(d, mod, modIndex, startPageNum) {
       const rowBorderColor = rowBorderColors[cond.label] || 'transparent';
       const rowBgColor = isIssue ? obsStyle.bg : 'transparent';
 
+      // Sub-item detail rows for composites with individual ratings
+      let subItemsHtml = '';
+      let subItemsH = 0;
+      const SUB_ITEM_H = 28; // height per sub-item mini-row
+
+      let subResponses = resp.subItemResponses || resp.sub_item_responses || null;
+      if (typeof subResponses === 'string') {
+        try { subResponses = JSON.parse(subResponses); } catch (e) { subResponses = null; }
+      }
+
+      if (resp.isComposite && Array.isArray(subResponses) && subResponses.length > 0) {
+        const subRows = subResponses.map(si => {
+          const siOpt = si.selectedOption ? (resp.options?.[si.selectedOption - 1] || `Option ${si.selectedOption}`) : '—';
+          const siCond = conditionInfo(si.severityScore, si.redFlag, si.selectedOption);
+          const siObsStyle = obsColors[siCond.label] || obsColors['N/A'];
+          const rfBadge = si.redFlag && si.severityScore >= 0.75 ? ' <span class="rf-badge" style="font-size:0.7rem;">RED FLAG</span>' : '';
+          return `<tr style="background:hsl(210,40%,98.5%);border-left:4px solid ${rowBorderColor};">
+            <td style="padding:2px 8px;border-bottom:1px solid var(--border);"></td>
+            <td style="padding:4px 12px;border-bottom:1px solid var(--border);font-size:0.95rem;color:hsl(215,15%,40%);">↳ ${si.label}${rfBadge}</td>
+            <td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center;"><span style="display:inline-block;padding:2px 8px;border-radius:16px;font-size:0.85rem;font-weight:600;background:${siObsStyle.bg};color:${siObsStyle.fg};border:1px solid ${siObsStyle.border};">${siOpt}</span></td>
+            <td style="padding:4px 8px;border-bottom:1px solid var(--border);"></td>
+          </tr>`;
+        }).join('');
+        subItemsHtml = subRows;
+        subItemsH = subResponses.length * SUB_ITEM_H;
+      }
+
       // Extra height for detail text wrapping in param column (~38% of page width ≈ 28 chars/line at 0.85rem)
       const detailLen = (resp.paramDetail || '').length;
       const detailExtraH = detailLen > 80 ? 22 : detailLen > 40 ? 12 : 0;
       return {
-        height: ROW_H + extraH + detailExtraH,
+        height: ROW_H + extraH + detailExtraH + subItemsH,
         html: `
         <tr style="border-left:4px solid ${rowBorderColor};background:${rowBgColor};">
           <td class="param-num">${modIndex + 1}.${paramSeq}</td>
@@ -975,7 +1002,7 @@ function buildModulePage(d, mod, modIndex, startPageNum) {
           </td>
           <td class="selected-option"><span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:0.95rem;font-weight:600;background:${obsStyle.bg};color:${obsStyle.fg};border:1px solid ${obsStyle.border};">${optText}</span></td>
           <td class="notes-cell">${resp.notes || '—'}</td>
-        </tr>${photoHtml}`
+        </tr>${subItemsHtml}${photoHtml}`
       };
     });
     return { name: sg.name, rows };

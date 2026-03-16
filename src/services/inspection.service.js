@@ -247,7 +247,7 @@ class InspectionService {
   /**
    * Save a single response for one parameter.
    */
-  async saveResponse(inspectionId, parameterId, selectedOption, notes) {
+  async saveResponse(inspectionId, parameterId, selectedOption, notes, subItemResponses) {
     try {
       const response = await InspectionResponse.findOne({
         where: { inspection_id: inspectionId, parameter_id: parameterId }
@@ -257,29 +257,98 @@ class InspectionService {
         return Result.failure('Response row not found for this parameter');
       }
 
-      // Look up the severity score from the parameter definition
+      const param = await InspectionParameter.findByPk(parameterId);
+
       let severityScore = null;
-      if (selectedOption) {
-        const param = await InspectionParameter.findByPk(parameterId);
-        if (param) {
-          // Validate: ensure selected option exists for this parameter
-          const optionLabel = param[`option_${selectedOption}`];
-          if (!optionLabel) {
-            return Result.failure(`Invalid option ${selectedOption} for parameter ${parameterId} — only options with labels are valid`);
-          }
-          severityScore = param[`score_${selectedOption}`];
+      let finalSelectedOption = selectedOption;
+      let finalSubItemResponses = undefined; // undefined = don't touch
+
+      // Composite with per-sub-item ratings
+      if (param && param.is_composite && Array.isArray(subItemResponses) && subItemResponses.length > 0) {
+        // Compute severity scores for each sub-item from the param's option scores
+        const scoredItems = subItemResponses.map(si => {
+          const sev = si.selectedOption ? parseFloat(param[`score_${si.selectedOption}`] || 0) : null;
+          return { ...si, severityScore: sev };
+        });
+
+        // Determine if this is a PDI inspection (for sub-item weight selection)
+        const inspection = await Inspection.findByPk(inspectionId, {
+          attributes: ['id', 'template_id'],
+          include: [{ model: InspectionTemplate, as: 'Template', attributes: ['slug'] }]
+        });
+        const isPDI = inspection?.Template?.slug === 'new_car_pdi';
+
+        // Parse sub_items_json for weight data (may be multi-level encoded)
+        let subItemsDef = param.sub_items_json;
+        while (typeof subItemsDef === 'string') {
+          try { subItemsDef = JSON.parse(subItemsDef); } catch (e) { subItemsDef = []; break; }
         }
+        const hasWeights = Array.isArray(subItemsDef) && subItemsDef.some(d => d.weight != null && d.weight > 0);
+
+        // Compute composite severity (skip N/A = 0 and unanswered = null)
+        const answered = scoredItems.filter(si => si.selectedOption && si.selectedOption > 0);
+        if (answered.length > 0) {
+          if (hasWeights) {
+            // Weighted average using sub-item weights
+            let weightedSum = 0;
+            let totalWeight = 0;
+            for (const si of answered) {
+              const def = (subItemsDef || []).find(d => d.label === si.label);
+              const w = isPDI ? (def?.weight_pdi ?? def?.weight ?? 1) : (def?.weight ?? 1);
+              weightedSum += si.severityScore * w;
+              totalWeight += w;
+            }
+            severityScore = totalWeight > 0 ? weightedSum / totalWeight : 0;
+          } else {
+            // Fallback: flat average (backward compat)
+            severityScore = answered.reduce((sum, si) => sum + si.severityScore, 0) / answered.length;
+          }
+          severityScore = parseFloat(severityScore.toFixed(2));
+        }
+
+        // Derive selected_option from average severity (map to closest option score)
+        if (severityScore !== null) {
+          let bestOpt = 1;
+          let bestDist = Infinity;
+          for (let i = 1; i <= 5; i++) {
+            const s = parseFloat(param[`score_${i}`]);
+            if (s == null || isNaN(s)) continue;
+            const dist = Math.abs(s - severityScore);
+            if (dist < bestDist) { bestDist = dist; bestOpt = i; }
+          }
+          finalSelectedOption = bestOpt;
+        } else {
+          // All sub-items are N/A or unanswered — check if any are explicitly N/A
+          const hasAnyNA = scoredItems.some(si => si.selectedOption === 0);
+          if (hasAnyNA && answered.length === 0) {
+            finalSelectedOption = 0; // composite N/A
+          }
+        }
+
+        finalSubItemResponses = scoredItems;
+      } else if (selectedOption && param) {
+        // Non-composite or legacy: single option
+        const optionLabel = param[`option_${selectedOption}`];
+        if (!optionLabel) {
+          return Result.failure(`Invalid option ${selectedOption} for parameter ${parameterId} — only options with labels are valid`);
+        }
+        severityScore = param[`score_${selectedOption}`];
       }
 
       const wasUnanswered = response.selected_option === null;
-      const isNowAnswered = selectedOption !== null;
+      const isNowAnswered = finalSelectedOption !== null;
 
-      await response.update({
-        selected_option: selectedOption,
+      const updateData = {
+        selected_option: finalSelectedOption,
         severity_score: severityScore,
         notes: notes !== undefined ? notes : response.notes,
         modified_at: new Date()
-      });
+      };
+      if (finalSubItemResponses !== undefined) {
+        updateData.sub_item_responses = finalSubItemResponses;
+      }
+
+      await response.update(updateData);
 
       // Update answered count
       if (wasUnanswered && isNowAnswered) {
@@ -296,8 +365,9 @@ class InspectionService {
 
       return Result.success({
         parameterId,
-        selectedOption,
-        severityScore
+        selectedOption: finalSelectedOption,
+        severityScore,
+        subItemResponses: finalSubItemResponses || null
       });
     } catch (error) {
       logger.error('Save response error:', error);
@@ -762,10 +832,10 @@ class InspectionService {
         };
       }
 
-      // Parse sub_items_json (MySQL may return string)
+      // Parse sub_items_json (may be multi-level encoded)
       let subItems = param.sub_items_json || null;
-      if (typeof subItems === 'string') {
-        try { subItems = JSON.parse(subItems); } catch (e) { subItems = null; }
+      while (typeof subItems === 'string') {
+        try { subItems = JSON.parse(subItems); } catch (e) { subItems = null; break; }
       }
 
       moduleMap[mod.id].subGroups[sg.id].responses.push({
@@ -785,6 +855,9 @@ class InspectionService {
         selectedOption: resp.selected_option,
         severityScore: resp.severity_score,
         notes: resp.notes,
+        subItemResponses: typeof resp.sub_item_responses === 'string'
+          ? JSON.parse(resp.sub_item_responses)
+          : (resp.sub_item_responses || null),
         photos: (resp.Photos || []).map(p => ({
           id: p.id,
           filePath: this._resolvePhotoUrl(p.file_path),

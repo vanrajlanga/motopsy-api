@@ -81,13 +81,46 @@ const InspectionScore = sequelize.define('inspection_scores', {
     allowNull: false,
     defaultValue: 0
   },
-  red_flag_penalty: {
+  red_flag_tier: {
+    type: DataTypes.TINYINT,
+    allowNull: true,
+    comment: 'Highest triggered tier: 1=Instant Kill, 2=Hard Cap, 3=Soft Penalty'
+  },
+  tier1_count: {
     type: DataTypes.INTEGER,
     allowNull: true,
-    defaultValue: 0,
-    comment: 'Total red flag penalty as percentage (e.g., 40 = 40%)'
+    defaultValue: 0
+  },
+  tier2_count: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 0
+  },
+  tier2_cap: {
+    type: DataTypes.DECIMAL(3, 2),
+    allowNull: true,
+    comment: 'Applied rating cap from Tier 2 flags'
+  },
+  tier3_count: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 0
+  },
+  tier3_deduction: {
+    type: DataTypes.DECIMAL(3, 2),
+    allowNull: true,
+    comment: 'Total rating deduction from Tier 3 flags'
+  },
+  warning_count: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 0
   },
   red_flag_params: {
+    type: DataTypes.JSON,
+    allowNull: true
+  },
+  red_flag_warnings: {
     type: DataTypes.JSON,
     allowNull: true
   },

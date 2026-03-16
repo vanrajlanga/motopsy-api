@@ -29,6 +29,12 @@ const InspectionResponse = sequelize.define('inspection_responses', {
     type: DataTypes.TEXT,
     allowNull: true
   },
+  sub_item_responses: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Per-sub-item ratings for composite checkpoints: [{label, selectedOption, severityScore, redFlag}]'
+  },
   created_at: {
     type: DataTypes.DATE,
     allowNull: false,

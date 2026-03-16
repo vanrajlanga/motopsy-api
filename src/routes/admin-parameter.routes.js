@@ -19,6 +19,18 @@ router.get('/modules/:moduleId', (req, res) => adminParameterController.getModul
 // GET /api/admin/parameters/module/:id/weight-summary
 router.get('/module/:id/weight-summary', (req, res) => adminParameterController.getModuleWeightSummary(req, res));
 
+// GET /api/admin/parameters/red-flag-tiers — tier items from DB for admin UI
+router.get('/red-flag-tiers', (req, res) => adminParameterController.getRedFlagTiers(req, res));
+
+// POST /api/admin/parameters/red-flag-tiers — create a new tier record
+router.post('/red-flag-tiers', (req, res) => adminParameterController.createRedFlagTier(req, res));
+
+// PUT /api/admin/parameters/red-flag-tiers/:id — update tier for an existing record
+router.put('/red-flag-tiers/:id', (req, res) => adminParameterController.updateRedFlagTier(req, res));
+
+// DELETE /api/admin/parameters/red-flag-tiers/:rfId — delete a tier record
+router.delete('/red-flag-tiers/:rfId', (req, res) => adminParameterController.deleteRedFlagTier(req, res));
+
 // GET /api/admin/parameters/templates — all templates + module list for weight editor
 // ⚠️ Must be declared before /:id wildcard
 router.get('/templates', (req, res) => adminParameterController.getTemplates(req, res));

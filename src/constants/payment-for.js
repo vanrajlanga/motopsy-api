@@ -23,6 +23,13 @@ PAYMENT_FOR.INSPECTION_TYPES = [
   PAYMENT_FOR.NEW_VEHICLE_PDI,
 ];
 
+/** payment_for values that create a ServiceOrder (includes inspections + service history) */
+PAYMENT_FOR.SERVICE_ORDER_TYPES = [
+  PAYMENT_FOR.USED_VEHICLE_PDI,
+  PAYMENT_FOR.NEW_VEHICLE_PDI,
+  PAYMENT_FOR.SERVICE_HISTORY,
+];
+
 /** Human-readable labels */
 PAYMENT_FOR.NAMES = {
   [PAYMENT_FOR.VEHICLE_HISTORY_REPORT]: 'Vehicle History Report',
@@ -34,7 +41,10 @@ PAYMENT_FOR.NAMES = {
 
 PAYMENT_FOR.getName = (code) => PAYMENT_FOR.NAMES[code] || 'Unknown';
 
-/** Returns true if this payment_for code is a service/inspection order */
-PAYMENT_FOR.isServiceOrder = (code) => PAYMENT_FOR.INSPECTION_TYPES.includes(code);
+/** Returns true if this payment_for code creates a ServiceOrder record */
+PAYMENT_FOR.isServiceOrder = (code) => PAYMENT_FOR.SERVICE_ORDER_TYPES.includes(code);
+
+/** Returns true if this payment_for code is a physical inspection (PDI) */
+PAYMENT_FOR.isInspection = (code) => PAYMENT_FOR.INSPECTION_TYPES.includes(code);
 
 module.exports = PAYMENT_FOR;

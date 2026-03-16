@@ -105,7 +105,7 @@ const InspectionParameter = sequelize.define('inspection_parameters', {
     type: DataTypes.JSON,
     allowNull: true,
     defaultValue: null,
-    comment: 'Composite guidance: [{label,redFlag}] sub-checks for inspector'
+    comment: 'Composite: [{label,redFlag,originalParams,weight,weight_pdi}]'
   },
   is_red_flag: {
     type: DataTypes.TINYINT(1),

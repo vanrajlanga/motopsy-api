@@ -30,6 +30,7 @@ const InspectionResponse = require('./inspection-response.model');
 const InspectionPhoto = require('./inspection-photo.model');
 const InspectionScore = require('./inspection-score.model');
 const InspectionCertificate = require('./inspection-certificate.model');
+const RedFlagTier = require('./red-flag-tier.model');
 
 // Setup associations (only if not already defined)
 
@@ -444,5 +445,6 @@ module.exports = {
   InspectionResponse,
   InspectionPhoto,
   InspectionScore,
-  InspectionCertificate
+  InspectionCertificate,
+  RedFlagTier
 };

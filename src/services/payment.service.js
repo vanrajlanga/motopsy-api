@@ -14,6 +14,7 @@ const pricingService = require('./pricing.service');
 const invoiceService = require('./invoice.service');
 const servicePlanService = require('./service-plan.service');
 const serviceOrderService = require('./service-order.service');
+const vehicleDetailService = require('./vehicle-detail.service');
 const { sequelize } = require('../config/database');
 require('dotenv').config();
 
@@ -354,7 +355,7 @@ class PaymentService {
             car_company: serviceData.carCompany || null,
             car_model: serviceData.carModel || null,
             chassis_number: serviceData.chassisNumber || null,
-            registration_number: serviceData.registrationNumber || null,
+            registration_number: serviceData.registrationNumber || serviceData.carNumber || null,
             car_model_year: serviceData.carModelYear || null,
             // Address (defaults to empty string when UI collection is disabled)
             state: serviceData.state || '',
@@ -378,6 +379,7 @@ class PaymentService {
 
           if (isCombo && serviceData.carNumber) {
             try {
+              const regNo = serviceData.carNumber.toUpperCase().replace(/\s/g, '');
               const maxVehicleRequest = await VehicleDetailRequest.findOne({
                 attributes: [[sequelize.fn('MAX', sequelize.col('id')), 'maxId']],
                 raw: true
@@ -388,12 +390,31 @@ class PaymentService {
                 id: nextVehicleRequestId,
                 user_id: userId,
                 payment_history_id: paymentHistoryId,
-                registration_number: serviceData.carNumber.toUpperCase().replace(/\s/g, ''),
+                registration_number: regNo,
                 make: serviceData.carCompany || null,
                 model: serviceData.carModel || null,
                 created_at: new Date()
               });
               logger.info(`Combo plan: VehicleDetailRequest created: ${vehicleDetailRequest.id} for payment ${paymentHistoryId}`);
+
+              // Trigger actual vehicle report generation so user can view it immediately
+              try {
+                const user = await User.findByPk(userId);
+                const reportResult = await vehicleDetailService.getVehicleDetailsByRCAsync({
+                  registrationNumber: regNo,
+                  vehicleDetailRequestId: vehicleDetailRequest.id,
+                  userId: userId
+                }, user?.email || serviceData.email);
+
+                if (reportResult.isSuccess && reportResult.value?.vehicleDetail?.id) {
+                  vehicleDetailRequest._vehicleDetailId = reportResult.value.vehicleDetail.id;
+                  logger.info(`Combo plan: Vehicle report generated, vehicleDetailId: ${reportResult.value.vehicleDetail.id}`);
+                } else {
+                  logger.warn(`Combo plan: Vehicle report generation returned no data for ${regNo}`);
+                }
+              } catch (reportError) {
+                logger.error('Combo plan: Vehicle report generation failed (non-critical):', reportError.message);
+              }
             } catch (comboError) {
               logger.error('Failed to create VehicleDetailRequest for combo plan:', comboError);
               // Don't fail the payment if this fails
@@ -615,6 +636,9 @@ class PaymentService {
 
       if (vehicleDetailRequest) {
         response.vehicleDetailRequestId = vehicleDetailRequest.id;
+        if (vehicleDetailRequest._vehicleDetailId) {
+          response.vehicleDetailId = vehicleDetailRequest._vehicleDetailId;
+        }
       }
 
       if (serviceOrder) {

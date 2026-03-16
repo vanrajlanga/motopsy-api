@@ -1,4 +1,6 @@
 const parameterService = require('../services/parameter.service');
+const { TIER_1, TIER_2, TIER_3, SEVERITY_THRESHOLDS, refreshTierIndex, isTiersLoadedFromDB } = require('../config/red-flag-tiers');
+const RedFlagTier = require('../models/red-flag-tier.model');
 const InspectionTemplate = require('../models/inspection-template.model');
 const InspectionModule = require('../models/inspection-module.model');
 const InspectionSubGroup = require('../models/inspection-sub-group.model');
@@ -53,8 +55,8 @@ class AdminParameterController extends BaseController {
     const { id } = req.params;
     const data = req.body;
 
-    if (!data.name || !data.name.trim()) {
-      return this.badRequest('name is required', res);
+    if (data.name !== undefined && (!data.name || !data.name.trim())) {
+      return this.badRequest('name cannot be empty', res);
     }
 
     const result = await parameterService.updateParameter(parseInt(id), data);
@@ -120,6 +122,151 @@ class AdminParameterController extends BaseController {
   }
 
   /**
+   * GET /api/admin/parameters/red-flag-tiers
+   * Returns tier items from the database along with tier metadata for the admin UI.
+   */
+  async getRedFlagTiers(req, res) {
+    try {
+      // Fetch all tier items from DB
+      const rows = await RedFlagTier.findAll({
+        order: [['tier', 'ASC'], ['param_number', 'ASC'], ['sub_item_label', 'ASC']],
+        raw: true,
+      });
+
+      // Build tierMap: paramNumber → { subItemLabel → tier }
+      const tierMap = {};
+      for (const row of rows) {
+        if (!tierMap[row.param_number]) tierMap[row.param_number] = {};
+        tierMap[row.param_number][row.sub_item_label] = row.tier;
+      }
+
+      // Count per tier (excluding PDI-only for tier counts)
+      const tier1Count = rows.filter(r => r.tier === 1 && !r.is_pdi_only).length;
+      const tier2Count = rows.filter(r => r.tier === 2 && !r.is_pdi_only).length;
+      const tier3Count = rows.filter(r => r.tier === 3 && !r.is_pdi_only).length;
+      const pdiCount = rows.filter(r => r.is_pdi_only).length;
+
+      return this.ok({
+        tierMap,
+        items: rows,
+        source: isTiersLoadedFromDB() ? 'database' : 'fallback',
+        tiers: {
+          1: { label: TIER_1.label, description: TIER_1.description, count: tier1Count },
+          2: { label: TIER_2.label, description: TIER_2.description, count: tier2Count, baseCap: TIER_2.baseCap, perAdditional: TIER_2.perAdditional, floorCap: TIER_2.floorCap },
+          3: { label: TIER_3.label, description: TIER_3.description, count: tier3Count, perFlagDeduction: TIER_3.perFlagDeduction, maxDeduction: TIER_3.maxDeduction },
+        },
+        pdiCount,
+        thresholds: SEVERITY_THRESHOLDS,
+      }, res);
+    } catch (error) {
+      return res.status(500).json({ isSuccess: false, error: error.message });
+    }
+  }
+
+  /**
+   * POST /api/admin/parameters/red-flag-tiers
+   * Create a new red flag tier record.
+   * Body: { param_number, sub_item_label, tier, is_pdi_only? }
+   */
+  async createRedFlagTier(req, res) {
+    try {
+      const { param_number, sub_item_label, tier, is_pdi_only } = req.body;
+
+      // Validation
+      if (!param_number || typeof param_number !== 'number') {
+        return this.badRequest('param_number (integer) is required', res);
+      }
+      if (!sub_item_label || typeof sub_item_label !== 'string' || !sub_item_label.trim()) {
+        return this.badRequest('sub_item_label (string) is required', res);
+      }
+      if (![1, 2, 3].includes(tier)) {
+        return this.badRequest('tier must be 1, 2, or 3', res);
+      }
+
+      // Check for duplicate
+      const existing = await RedFlagTier.findOne({
+        where: { param_number, sub_item_label: sub_item_label.trim() },
+      });
+      if (existing) {
+        return this.badRequest(`Red flag tier already exists for param ${param_number} / "${sub_item_label.trim()}"`, res);
+      }
+
+      const record = await RedFlagTier.create({
+        param_number,
+        sub_item_label: sub_item_label.trim(),
+        tier,
+        is_pdi_only: is_pdi_only ? 1 : 0,
+      });
+
+      // Refresh the in-memory tier index so the scoring engine picks up the change
+      await refreshTierIndex();
+
+      return this.ok({ success: true, record: record.toJSON() }, res);
+    } catch (error) {
+      return res.status(500).json({ isSuccess: false, error: error.message });
+    }
+  }
+
+  /**
+   * PUT /api/admin/parameters/red-flag-tiers/:id
+   * Update an existing red flag tier record.
+   * Body: { tier: 1|2|3, is_pdi_only? }
+   */
+  async updateRedFlagTier(req, res) {
+    try {
+      const { id } = req.params;
+      const { tier, is_pdi_only } = req.body;
+
+      if (![1, 2, 3].includes(tier)) {
+        return this.badRequest('tier must be 1, 2, or 3', res);
+      }
+
+      const record = await RedFlagTier.findByPk(parseInt(id));
+      if (!record) {
+        return this.notFound('Red flag tier record not found', res);
+      }
+
+      const updates = { tier };
+      if (typeof is_pdi_only === 'boolean' || typeof is_pdi_only === 'number') {
+        updates.is_pdi_only = is_pdi_only ? 1 : 0;
+      }
+
+      await record.update(updates);
+
+      // Refresh the in-memory tier index so the scoring engine picks up the change
+      await refreshTierIndex();
+
+      return this.ok({ success: true, record: record.toJSON() }, res);
+    } catch (error) {
+      return res.status(500).json({ isSuccess: false, error: error.message });
+    }
+  }
+
+  /**
+   * DELETE /api/admin/parameters/red-flag-tiers/:rfId
+   * Delete a red flag tier record.
+   */
+  async deleteRedFlagTier(req, res) {
+    try {
+      const { rfId } = req.params;
+
+      const record = await RedFlagTier.findByPk(parseInt(rfId));
+      if (!record) {
+        return this.notFound('Red flag tier record not found', res);
+      }
+
+      await record.destroy();
+
+      // Refresh the in-memory tier index so the scoring engine picks up the change
+      await refreshTierIndex();
+
+      return this.ok({ success: true, deleted: true }, res);
+    } catch (error) {
+      return res.status(500).json({ isSuccess: false, error: error.message });
+    }
+  }
+
+  /**
    * GET /api/admin/parameters/templates
    * Returns all inspection templates alongside the global module list so the
    * frontend can render a weight-editor grid (modules as rows, templates as columns).
@@ -130,7 +277,7 @@ class AdminParameterController extends BaseController {
         InspectionTemplate.findAll({ where: { is_active: 1 }, order: [['id', 'ASC']] }),
         InspectionModule.findAll({ order: [['sort_order', 'ASC']], attributes: ['id', 'name', 'slug', 'weight'] }),
         InspectionSubGroup.findAll({ attributes: ['id', 'module_id'] }),
-        InspectionParameter.findAll({ attributes: ['id', 'sub_group_id', 'template_filter', 'is_active'] })
+        InspectionParameter.findAll({ where: { parent_id: null }, attributes: ['id', 'sub_group_id', 'template_filter', 'is_active'] })
       ]);
 
       // Build sub_group → module_id lookup

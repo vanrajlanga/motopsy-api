@@ -7,8 +7,15 @@ const InspectionScore = require('../models/inspection-score.model');
 const Inspection = require('../models/inspection.model');
 const InspectionTemplate = require('../models/inspection-template.model');
 const { getTierMultiplier, TOTAL_REPAIR_CAP_PERCENT } = require('../config/repair-tiers');
+const { getSubItemTier, getTier2Cap, getTier3Deduction, SEVERITY_THRESHOLDS, loadTiersFromDB } = require('../config/red-flag-tiers');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
+
+// Load tier items from DB at service initialization (non-blocking).
+// Falls back to static items if DB is not yet available.
+loadTiersFromDB().catch(err => {
+  logger.warn('ScoringService: Initial tier load from DB failed, using static fallback —', err.message);
+});
 
 // Default certification thresholds (used_car)
 const DEFAULT_CERT_LEVELS = [
@@ -188,60 +195,124 @@ class ScoringService {
       baseRating = Math.max(0, Math.min(5, baseRating));
       baseRating = Math.round(baseRating * 100) / 100;
 
-      // Check for red flags
-      const redFlagResponses = responses.filter(r => {
+      // ── Red flag detection — tiered system ──────────────────────────────────
+      // Tier 1: Instant Kill (rating → 0)
+      // Tier 2: Hard Cap (rating ≤ 2.0, decreasing with count)
+      // Tier 3: Soft Penalty (−0.10 per flag, max −1.50)
+      // Warning: severity 0.50–0.69 (shown on report, no penalty)
+
+      const tier1Flags = [];
+      const tier2Flags = [];
+      const tier3Flags = [];
+      const warningFlags = [];
+      const redFlagParams = []; // All triggered flags (for backward compat / reporting)
+
+      for (const r of responses) {
         const param = r.Parameter;
-        return param && param.is_red_flag && parseFloat(r.severity_score || 0) >= 0.75;
-      });
+        if (!param) continue;
 
-      const hasRedFlags = redFlagResponses.length > 0;
-      const redFlagParams = redFlagResponses.map(r => {
-        const param = r.Parameter;
-        const severity = parseFloat(r.severity_score);
-
-        // Per-red-flag penalty based on severity (industry-aligned: NAAA/ADESA grade cap approach)
-        let penalty = 0;
-        if (severity >= 0.95)      penalty = 0.40;  // Critical / near-catastrophic
-        else if (severity >= 0.85) penalty = 0.25;  // Major issue, expensive fix
-        else                       penalty = 0.15;  // Serious but repairable (0.75-0.84)
-
-        const entry = {
-          paramNumber: param.param_number,
-          paramName: param.name,
-          severityScore: severity,
-          penalty
-        };
-
-        // For composite params, include which sub-items are red flags
-        if (param.is_composite && param.sub_items_json) {
-          let subItems = param.sub_items_json;
-          if (typeof subItems === 'string') {
-            try { subItems = JSON.parse(subItems); } catch (e) { subItems = []; }
+        // For composites with sub_item_responses, check individual sub-items
+        if (param.is_composite && r.sub_item_responses) {
+          let subResponses = r.sub_item_responses;
+          if (typeof subResponses === 'string') {
+            try { subResponses = JSON.parse(subResponses); } catch (e) { subResponses = []; }
           }
-          const rfSubItems = (subItems || []).filter(si => si.redFlag);
-          if (rfSubItems.length > 0) {
-            entry.redFlagSubItems = rfSubItems.map(si => si.label);
+
+          for (const si of (subResponses || [])) {
+            if (!si.redFlag || si.severityScore == null) continue;
+            const severity = parseFloat(si.severityScore);
+
+            // Warning zone: 0.50–0.69
+            if (severity >= SEVERITY_THRESHOLDS.WARNING_MIN && severity < SEVERITY_THRESHOLDS.RED_FLAG_MIN) {
+              warningFlags.push({
+                paramNumber: param.param_number,
+                paramName: param.name,
+                subItemLabel: si.label,
+                severityScore: severity,
+                tier: 'warning',
+              });
+              continue;
+            }
+
+            // Below warning threshold — not flagged
+            if (severity < SEVERITY_THRESHOLDS.RED_FLAG_MIN) continue;
+
+            // Determine tier
+            const tier = getSubItemTier(param.param_number, si.label);
+            const flagEntry = {
+              paramNumber: param.param_number,
+              paramName: param.name,
+              subItemLabel: si.label,
+              severityScore: severity,
+              tier: tier || 3, // default to Tier 3 if not classified
+            };
+
+            if (tier === 1) tier1Flags.push(flagEntry);
+            else if (tier === 2) tier2Flags.push(flagEntry);
+            else tier3Flags.push(flagEntry);
+
+            redFlagParams.push(flagEntry);
+          }
+        }
+        // Non-composite red flag (legacy params)
+        else if (param.is_red_flag) {
+          const severity = parseFloat(r.severity_score || 0);
+
+          if (severity >= SEVERITY_THRESHOLDS.WARNING_MIN && severity < SEVERITY_THRESHOLDS.RED_FLAG_MIN) {
+            warningFlags.push({
+              paramNumber: param.param_number,
+              paramName: param.name,
+              severityScore: severity,
+              tier: 'warning',
+            });
+          } else if (severity >= SEVERITY_THRESHOLDS.RED_FLAG_MIN) {
+            const flagEntry = {
+              paramNumber: param.param_number,
+              paramName: param.name,
+              severityScore: severity,
+              tier: 3, // legacy non-composite → Tier 3
+            };
+            tier3Flags.push(flagEntry);
+            redFlagParams.push(flagEntry);
+          }
+        }
+      }
+
+      const hasRedFlags = redFlagParams.length > 0;
+      const hasWarnings = warningFlags.length > 0;
+
+      // ── Apply tiered penalties ────────────────────────────────────────────
+      let rating = baseRating;
+      let appliedTier = null;  // Which tier drove the final penalty
+      let tier2Cap = Infinity;
+      let tier3Deduction = 0;
+
+      if (!isPDI && hasRedFlags) {
+        // Tier 1: Instant Kill — rating forced to 0
+        if (tier1Flags.length > 0) {
+          rating = 0;
+          appliedTier = 1;
+        } else {
+          // Tier 2: Hard Cap
+          if (tier2Flags.length > 0) {
+            tier2Cap = getTier2Cap(tier2Flags.length);
+            rating = Math.min(rating, tier2Cap);
+            appliedTier = 2;
+          }
+
+          // Tier 3: Soft Penalty (applied after cap)
+          if (tier3Flags.length > 0) {
+            tier3Deduction = getTier3Deduction(tier3Flags.length);
+            rating = rating - tier3Deduction;
+            if (!appliedTier) appliedTier = 3;
           }
         }
 
-        return entry;
-      });
-
-      // Apply red flag penalty to rating (grade cap approach)
-      // Total penalty = sum of individual penalties, capped at 80%
-      let rating = baseRating;
-      let totalRedFlagPenalty = 0;
-      if (hasRedFlags && !isPDI) {
-        totalRedFlagPenalty = Math.min(
-          redFlagParams.reduce((sum, rf) => sum + rf.penalty, 0),
-          0.80  // Max 80% penalty — always leaves some rating
-        );
-        rating = baseRating * (1 - totalRedFlagPenalty);
         rating = Math.max(0, Math.min(5, rating));
         rating = Math.round(rating * 100) / 100;
       }
 
-      // Determine certification using template-specific levels
+      // ── Determine certification ───────────────────────────────────────────
       let certification;
       if (isPDI && hasRedFlags) {
         // PDI: any red flag = Reject Delivery (non-negotiable for new car)
@@ -265,8 +336,15 @@ class ScoringService {
         certification,
         has_red_flags: hasRedFlags ? 1 : 0,
         red_flag_params: redFlagParams.length > 0 ? redFlagParams : null,
+        red_flag_warnings: warningFlags.length > 0 ? warningFlags : null,
         base_rating: baseRating,
-        red_flag_penalty: hasRedFlags ? Math.round(totalRedFlagPenalty * 100) : 0,
+        red_flag_tier: appliedTier,
+        tier1_count: tier1Flags.length,
+        tier2_count: tier2Flags.length,
+        tier2_cap: tier2Flags.length > 0 ? tier2Cap : null,
+        tier3_count: tier3Flags.length,
+        tier3_deduction: tier3Flags.length > 0 ? tier3Deduction : null,
+        warning_count: warningFlags.length,
         total_repair_cost: Math.round(totalRepairCost * 100) / 100,
         repair_cost_breakdown: {
           ...repairCostBreakdown,
@@ -309,8 +387,16 @@ class ScoringService {
         rating,
         certification,
         hasRedFlags,
-        redFlagPenalty: hasRedFlags ? Math.round(totalRedFlagPenalty * 100) : 0,
+        hasWarnings,
+        redFlagTier: appliedTier,
+        tier1Count: tier1Flags.length,
+        tier2Count: tier2Flags.length,
+        tier2Cap: tier2Flags.length > 0 ? tier2Cap : null,
+        tier3Count: tier3Flags.length,
+        tier3Deduction: tier3Flags.length > 0 ? tier3Deduction : null,
+        warningCount: warningFlags.length,
         redFlagParams,
+        warningParams: warningFlags,
         totalRepairCost: scoreData.total_repair_cost,
         repairCostBreakdown,
         moduleRisks

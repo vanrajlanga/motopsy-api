@@ -136,7 +136,9 @@ class ParameterService {
           include: [{
             model: InspectionParameter,
             as: 'Parameters',
-            attributes: ['id', 'is_active', 'weightage']
+            attributes: ['id', 'is_active', 'weightage', 'weightage_pdi', 'template_filter'],
+            where: { parent_id: null },
+            required: false
           }]
         }]
       });
@@ -147,6 +149,8 @@ class ParameterService {
         let activeCount = 0;
         let weightTotal = 0;
         let activeWeightTotal = 0;
+        let pdiWeightTotal = 0;
+        let activePdiWeightTotal = 0;
         moduleData.SubGroups = moduleData.SubGroups.map(sg => {
           const sgActive = sg.Parameters.filter(p => p.is_active).length;
           const sgTotal = sg.Parameters.length;
@@ -156,6 +160,12 @@ class ParameterService {
             const wt = parseFloat(p.weightage || 0);
             weightTotal += wt;
             if (p.is_active) activeWeightTotal += wt;
+            // PDI weight: only params visible to PDI template
+            if (!p.template_filter || p.template_filter === 'new_car_pdi') {
+              const pdiWt = parseFloat(p.weightage_pdi != null ? p.weightage_pdi : p.weightage || 0);
+              pdiWeightTotal += pdiWt;
+              if (p.is_active) activePdiWeightTotal += pdiWt;
+            }
           });
           return { id: sg.id, name: sg.name, activeCount: sgActive, totalCount: sgTotal };
         });
@@ -163,7 +173,9 @@ class ParameterService {
           id: moduleData.id, name: moduleData.name, icon: moduleData.icon,
           SubGroups: moduleData.SubGroups, activeCount, totalCount,
           weightTotal: parseFloat(weightTotal.toFixed(2)),
-          activeWeightTotal: parseFloat(activeWeightTotal.toFixed(2))
+          activeWeightTotal: parseFloat(activeWeightTotal.toFixed(2)),
+          pdiWeightTotal: parseFloat(pdiWeightTotal.toFixed(2)),
+          activePdiWeightTotal: parseFloat(activePdiWeightTotal.toFixed(2))
         };
       });
 
@@ -189,6 +201,8 @@ class ParameterService {
           include: [{
             model: InspectionParameter,
             as: 'Parameters',
+            where: { parent_id: null },
+            required: false,
             order: [['sort_order', 'ASC']]
           }]
         }]
