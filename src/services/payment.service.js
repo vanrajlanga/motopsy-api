@@ -371,15 +371,19 @@ class PaymentService {
 
           logger.info(`Service order created: ${serviceOrder.id} for payment ${paymentHistoryId}`);
 
-          // For combo plan (Vehicle Intelligence + Service History), also create a VehicleDetailRequest
-          // so the Vehicle Intelligence report is generated and appears in Report History
+          // For plans that include Vehicle Intelligence Report, create a VehicleDetailRequest
+          // so the VI report is generated and appears in Report History
           const isCombo = serviceData.servicePackageName &&
             serviceData.servicePackageName.includes('Vehicle Intelligence') &&
             serviceData.servicePackageName.includes('Service History');
+          const isSafetyPack = serviceData.servicePackageName &&
+            serviceData.servicePackageName.includes('Safety Pack');
+          const needsVIReport = isCombo || isSafetyPack;
+          const viRegNumber = serviceData.carNumber || serviceData.registrationNumber;
 
-          if (isCombo && serviceData.carNumber) {
+          if (needsVIReport && viRegNumber) {
             try {
-              const regNo = serviceData.carNumber.toUpperCase().replace(/\s/g, '');
+              const regNo = viRegNumber.toUpperCase().replace(/\s/g, '');
               const maxVehicleRequest = await VehicleDetailRequest.findOne({
                 attributes: [[sequelize.fn('MAX', sequelize.col('id')), 'maxId']],
                 raw: true
@@ -395,7 +399,7 @@ class PaymentService {
                 model: serviceData.carModel || null,
                 created_at: new Date()
               });
-              logger.info(`Combo plan: VehicleDetailRequest created: ${vehicleDetailRequest.id} for payment ${paymentHistoryId}`);
+              logger.info(`${isCombo ? 'Combo' : 'Safety Pack'}: VehicleDetailRequest created: ${vehicleDetailRequest.id} for payment ${paymentHistoryId}`);
 
               // Trigger actual vehicle report generation so user can view it immediately
               try {
@@ -408,12 +412,12 @@ class PaymentService {
 
                 if (reportResult.isSuccess && reportResult.value?.vehicleDetail?.id) {
                   vehicleDetailRequest._vehicleDetailId = reportResult.value.vehicleDetail.id;
-                  logger.info(`Combo plan: Vehicle report generated, vehicleDetailId: ${reportResult.value.vehicleDetail.id}`);
+                  logger.info(`VI Report generated, vehicleDetailId: ${reportResult.value.vehicleDetail.id}`);
                 } else {
-                  logger.warn(`Combo plan: Vehicle report generation returned no data for ${regNo}`);
+                  logger.warn(`VI Report generation returned no data for ${regNo}`);
                 }
               } catch (reportError) {
-                logger.error('Combo plan: Vehicle report generation failed (non-critical):', reportError.message);
+                logger.error('VI Report generation failed (non-critical):', reportError.message);
               }
             } catch (comboError) {
               logger.error('Failed to create VehicleDetailRequest for combo plan:', comboError);
