@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('./instrument');
 const app = require('./app');
 const { testConnection } = require('./src/config/database');
 const logger = require('./src/config/logger');

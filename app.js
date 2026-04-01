@@ -157,6 +157,12 @@ app.use((req, res) => {
   });
 });
 
+// Sentry error handler (must be before custom error handler)
+const Sentry = require('@sentry/node');
+if (process.env.SENTRY_DSN) {
+  Sentry.setupExpressErrorHandler(app);
+}
+
 // Global error handler (must be last)
 app.use(errorHandler);
 
