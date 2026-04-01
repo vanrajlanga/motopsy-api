@@ -1010,38 +1010,49 @@ class VehicleDetailService {
 
       logger.info(`Finding specification for: make=${make}, model=${model}, version=${version}, year=${year}, cc=${rcCubicCapacity}, color=${rcColor}, norms=${rcNormsType}`);
 
+      // Only fetch columns needed for scoring — full spec loaded for winner only
+      const scoringAttributes = [
+        'id', 'naming_versionId', 'naming_version', 'naming_model', 'naming_make',
+        'keydata_key_engine', 'keydata_key_fueltype', 'enginetransmission_fueltype',
+        'colors_color_name', 'enginetransmission_emissionstandard'
+      ];
+
       // Always use partial match to include year-suffixed models (e.g., "Celerio [2017-2021]")
       // This ensures we get both exact matches AND year-suffixed variants
       let candidates = await VehicleSpecification.findAll({
+        attributes: scoringAttributes,
         where: {
           naming_make: { [Op.like]: `%${make}%` },
           naming_model: { [Op.like]: `${model}%` }  // Starts with model (includes year suffixes)
-        }
-        // No limit - fetch all candidates to ensure correct generation matching
+        },
+        raw: true
       });
 
       // Step 3: Fallback to contains match (last resort)
       if (candidates.length === 0) {
         candidates = await VehicleSpecification.findAll({
+          attributes: scoringAttributes,
           where: {
             naming_make: { [Op.like]: `%${make}%` },
             naming_model: { [Op.like]: `%${model}%` }
-          }
-          // No limit - fetch all candidates
+          },
+          raw: true
         });
       }
 
       // Step 4: If model is just brand name fragment (e.g., "Benz" from "MERCEDES BENZ"),
-      // fetch ALL specs for the make and rely on scoring algorithm (cc, fuel, etc.)
+      // fetch specs for the make and rely on scoring algorithm (cc, fuel, etc.)
       if (candidates.length === 0 && rcCubicCapacity) {
         const brandFragments = ['BENZ', 'ROVER', 'MARTIN', 'ROMEO', 'ROYCE'];
         if (brandFragments.includes(model.toUpperCase())) {
-          logger.info(`Model "${model}" appears to be a brand fragment, fetching all ${make} specs for CC-based matching`);
-          // Fetch ALL specs for the make (no limit) since we need to score by engine capacity
+          logger.info(`Model "${model}" appears to be a brand fragment, fetching ${make} specs for CC-based matching`);
           candidates = await VehicleSpecification.findAll({
+            attributes: scoringAttributes,
             where: {
               naming_make: { [Op.like]: `%${make}%` }
-            }
+            },
+            limit: 1000,
+            raw: true
           });
         }
       }
@@ -1343,13 +1354,15 @@ class VehicleDetailService {
 
       if (bestMatch) {
         logger.info(`Best match: ${bestMatch.naming_model} - ${bestMatch.naming_version} with score ${bestScore}`);
-        // Return object with spec and matching log
-        return { spec: bestMatch, matchingLog };
+        // Fetch full spec for the winning candidate only
+        const fullSpec = await VehicleSpecification.findByPk(bestMatch.id);
+        return { spec: fullSpec, matchingLog };
       }
 
       // Fallback to first candidate if no scoring match
       if (candidates[0]) {
-        return { spec: candidates[0], matchingLog };
+        const fullSpec = await VehicleSpecification.findByPk(candidates[0].id);
+        return { spec: fullSpec, matchingLog };
       }
 
       return { spec: null, matchingLog };

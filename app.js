@@ -41,6 +41,9 @@ const publicRoutes = require('./src/routes/public.routes');
 
 const app = express();
 
+// Trust first proxy (nginx) for correct client IP in rate limiting & logs
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 
