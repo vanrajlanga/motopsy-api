@@ -2,6 +2,7 @@ const VehicleSpecification = require('../models/vehicle-specification.model');
 const droomService = require('./droom.service');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
+const cache = require('../utils/cache');
 const { Op } = require('sequelize');
 
 /**
@@ -46,6 +47,9 @@ class VehicleCatalogService {
    */
   async getMakesFromDB() {
     try {
+      const cached = cache.get('catalog:makes');
+      if (cached) return Result.success(cached);
+
       const makes = await VehicleSpecification.findAll({
         attributes: ['naming_make'],
         where: {
@@ -62,7 +66,9 @@ class VehicleCatalogService {
       if (makes && makes.length > 0) {
         const makeList = makes.map(m => m.naming_make).filter(Boolean);
         logger.info(`Found ${makeList.length} makes in database`);
-        return Result.success({ code: 'success', data: makeList });
+        const result = { code: 'success', data: makeList };
+        cache.set('catalog:makes', result);
+        return Result.success(result);
       }
 
       // Fallback to Droom API
@@ -81,6 +87,10 @@ class VehicleCatalogService {
    */
   async getModelsFromDB(make) {
     try {
+      const cacheKey = `catalog:models:${make.toLowerCase()}`;
+      const cached = cache.get(cacheKey);
+      if (cached) return Result.success(cached);
+
       const models = await VehicleSpecification.findAll({
         attributes: ['naming_model'],
         where: {
@@ -100,7 +110,9 @@ class VehicleCatalogService {
       if (models && models.length > 0) {
         const modelList = models.map(m => m.naming_model).filter(Boolean);
         logger.info(`Found ${modelList.length} models for make ${make} in database`);
-        return Result.success({ code: 'success', data: modelList });
+        const result = { code: 'success', data: modelList };
+        cache.set(cacheKey, result);
+        return Result.success(result);
       }
 
       // Fallback to Droom API
@@ -119,6 +131,10 @@ class VehicleCatalogService {
    */
   async getVersionsFromDB(make, model) {
     try {
+      const cacheKey = `catalog:versions:${make.toLowerCase()}:${model.toLowerCase()}`;
+      const cached = cache.get(cacheKey);
+      if (cached) return Result.success(cached);
+
       const versions = await VehicleSpecification.findAll({
         attributes: ['naming_version'],
         where: {
@@ -141,7 +157,9 @@ class VehicleCatalogService {
       if (versions && versions.length > 0) {
         const versionList = versions.map(v => v.naming_version).filter(Boolean);
         logger.info(`Found ${versionList.length} versions for ${make} ${model} in database`);
-        return Result.success({ code: 'success', data: versionList });
+        const result = { code: 'success', data: versionList };
+        cache.set(cacheKey, result);
+        return Result.success(result);
       }
 
       // Fallback to Droom API

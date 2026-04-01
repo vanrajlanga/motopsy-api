@@ -2,6 +2,7 @@ const VehicleSpecification = require('../models/vehicle-specification.model');
 const Result = require('../utils/result');
 const logger = require('../config/logger');
 const obvService = require('./obv.service');
+const cache = require('../utils/cache');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
 
@@ -100,13 +101,18 @@ class VehicleSpecificationService {
    */
   async getMakesAsync() {
     try {
+      const cached = cache.get('spec:makes');
+      if (cached) return Result.success(cached);
+
       const makes = await VehicleSpecification.findAll({
         attributes: [[sequelize.fn('DISTINCT', sequelize.col('naming_make')), 'naming_make']],
         where: { naming_make: { [Op.ne]: null } },
         order: [['naming_make', 'ASC']],
         raw: true
       });
-      return Result.success(makes.map(m => m.naming_make).filter(Boolean).sort());
+      const result = makes.map(m => m.naming_make).filter(Boolean).sort();
+      cache.set('spec:makes', result);
+      return Result.success(result);
     } catch (error) {
       logger.error('Get makes error:', error);
       return Result.failure(error.message || 'Failed to get makes');
@@ -121,6 +127,10 @@ class VehicleSpecificationService {
       if (!make) {
         return Result.failure('Make is required');
       }
+      const cacheKey = `spec:models:${make.toLowerCase()}`;
+      const cached = cache.get(cacheKey);
+      if (cached) return Result.success(cached);
+
       const models = await VehicleSpecification.findAll({
         attributes: [[sequelize.fn('DISTINCT', sequelize.col('naming_model')), 'naming_model']],
         where: {
@@ -130,7 +140,9 @@ class VehicleSpecificationService {
         order: [['naming_model', 'ASC']],
         raw: true
       });
-      return Result.success(models.map(m => m.naming_model).filter(Boolean).sort());
+      const result = models.map(m => m.naming_model).filter(Boolean).sort();
+      cache.set(cacheKey, result);
+      return Result.success(result);
     } catch (error) {
       logger.error('Get models error:', error);
       return Result.failure(error.message || 'Failed to get models');
@@ -145,6 +157,10 @@ class VehicleSpecificationService {
       if (!make || !model) {
         return Result.failure('Make and model are required');
       }
+      const cacheKey = `spec:versions:${make.toLowerCase()}:${model.toLowerCase()}`;
+      const cached = cache.get(cacheKey);
+      if (cached) return Result.success(cached);
+
       const versions = await VehicleSpecification.findAll({
         attributes: ['id', 'naming_version', 'naming_make', 'naming_model', 'price_breakdown_ex_showroom_price'],
         where: {
@@ -164,6 +180,7 @@ class VehicleSpecificationService {
         exShowroomPrice: v.price_breakdown_ex_showroom_price
       }));
 
+      cache.set(cacheKey, result);
       return Result.success(result);
     } catch (error) {
       logger.error('Get versions error:', error);
