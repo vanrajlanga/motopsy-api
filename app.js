@@ -44,12 +44,20 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration - Allow all origins (matching .NET "AllOrigin" policy)
+// CORS configuration
+const allowedOrigins = [
+  'https://motopsy.com',
+  'https://www.motopsy.com',
+  'https://console.motopsy.com',
+  process.env.NODE_ENV !== 'production' && 'http://localhost:4200',
+  process.env.NODE_ENV !== 'production' && 'http://localhost:4201',
+].filter(Boolean);
+
 app.use(cors({
-  origin: '*',
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: false
+  credentials: true
 }));
 
 // Compression middleware
