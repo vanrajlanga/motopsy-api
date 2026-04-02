@@ -69,13 +69,13 @@ class AdminParameterController extends BaseController {
    */
   async toggleParameterStatus(req, res) {
     const { id } = req.params;
-    const { isActive } = req.body;
+    const { isActive, template } = req.body;
 
     if (typeof isActive !== 'boolean') {
       return this.badRequest('isActive (boolean) is required', res);
     }
 
-    const result = await parameterService.toggleParameterStatus(parseInt(id), isActive);
+    const result = await parameterService.toggleParameterStatus(parseInt(id), isActive, template || 'uc');
     return this.fromResult(result, res);
   }
 
@@ -133,11 +133,14 @@ class AdminParameterController extends BaseController {
         raw: true,
       });
 
-      // Build tierMap: paramNumber → { subItemLabel → tier }
+      // Build tierMap: paramNumber → { subItemLabel → { uc: tier, pdi: tier } }
       const tierMap = {};
       for (const row of rows) {
         if (!tierMap[row.param_number]) tierMap[row.param_number] = {};
-        tierMap[row.param_number][row.sub_item_label] = row.tier;
+        tierMap[row.param_number][row.sub_item_label] = {
+          uc: row.tier_uc || (row.is_pdi_only ? 0 : row.tier),
+          pdi: row.tier_pdi || row.tier,
+        };
       }
 
       // Count per tier (excluding PDI-only for tier counts)
@@ -191,10 +194,13 @@ class AdminParameterController extends BaseController {
         return this.badRequest(`Red flag tier already exists for param ${param_number} / "${sub_item_label.trim()}"`, res);
       }
 
+      const { tier_uc, tier_pdi } = req.body;
       const record = await RedFlagTier.create({
         param_number,
         sub_item_label: sub_item_label.trim(),
         tier,
+        tier_uc: tier_uc != null ? tier_uc : tier,
+        tier_pdi: tier_pdi != null ? tier_pdi : tier,
         is_pdi_only: is_pdi_only ? 1 : 0,
       });
 
@@ -226,7 +232,10 @@ class AdminParameterController extends BaseController {
         return this.notFound('Red flag tier record not found', res);
       }
 
+      const { tier_uc, tier_pdi } = req.body;
       const updates = { tier };
+      if (tier_uc != null) updates.tier_uc = tier_uc;
+      if (tier_pdi != null) updates.tier_pdi = tier_pdi;
       if (typeof is_pdi_only === 'boolean' || typeof is_pdi_only === 'number') {
         updates.is_pdi_only = is_pdi_only ? 1 : 0;
       }

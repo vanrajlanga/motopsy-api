@@ -118,7 +118,12 @@ class ScoringService {
       let totalRepairCost = 0;
 
       for (const [slug, group] of Object.entries(moduleGroups)) {
-        const answered = group.responses.filter(r => r.severity_score != null);
+        // Filter by per-template active status
+        const isParamActive = (r) => isPDI
+          ? r.Parameter?.is_active_pdi !== false && r.Parameter?.is_active_pdi !== 0
+          : r.Parameter?.is_active !== false && r.Parameter?.is_active !== 0;
+
+        const answered = group.responses.filter(r => r.severity_score != null && isParamActive(r));
 
         let moduleRisk = 0;
         if (answered.length > 0) {
@@ -237,8 +242,8 @@ class ScoringService {
             // Below warning threshold — not flagged
             if (severity < SEVERITY_THRESHOLDS.RED_FLAG_MIN) continue;
 
-            // Determine tier
-            const tier = getSubItemTier(param.param_number, si.label);
+            // Determine tier (UC or PDI based on template)
+            const tier = getSubItemTier(param.param_number, si.label, isPDI ? 'pdi' : 'uc');
             const flagEntry = {
               paramNumber: param.param_number,
               paramName: param.name,

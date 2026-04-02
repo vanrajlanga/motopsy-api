@@ -122,6 +122,11 @@ const InspectionParameter = sequelize.define('inspection_parameters', {
     allowNull: false,
     defaultValue: 1
   },
+  is_active_pdi: {
+    type: DataTypes.TINYINT(1),
+    allowNull: false,
+    defaultValue: 1
+  },
   is_composite: {
     type: DataTypes.TINYINT(1),
     allowNull: false,

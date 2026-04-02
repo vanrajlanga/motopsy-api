@@ -19,13 +19,25 @@ const RedFlagTier = sequelize.define('red_flag_tiers', {
   tier: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    comment: '1 = Instant Kill, 2 = Hard Cap, 3 = Soft Penalty'
+    comment: 'Legacy — use tier_uc/tier_pdi instead'
+  },
+  tier_uc: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    comment: 'UC tier: 0=none, 1=Instant Kill, 2=Hard Cap, 3=Soft Penalty'
+  },
+  tier_pdi: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    comment: 'PDI tier: 0=none, 1=Instant Kill, 2=Hard Cap, 3=Soft Penalty'
   },
   is_pdi_only: {
     type: DataTypes.TINYINT(1),
     allowNull: false,
     defaultValue: 0,
-    comment: '1 = only applies to PDI (new car) inspections'
+    comment: 'Legacy — kept for backward compat'
   },
   created_at: {
     type: DataTypes.DATE,

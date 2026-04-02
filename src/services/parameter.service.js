@@ -136,7 +136,7 @@ class ParameterService {
           include: [{
             model: InspectionParameter,
             as: 'Parameters',
-            attributes: ['id', 'is_active', 'weightage', 'weightage_pdi', 'template_filter'],
+            attributes: ['id', 'is_active', 'is_active_pdi', 'weightage', 'weightage_pdi', 'template_filter'],
             where: { parent_id: null },
             required: false
           }]
@@ -147,31 +147,31 @@ class ParameterService {
         const moduleData = mod.toJSON();
         let totalCount = 0;
         let activeCount = 0;
+        let activeCountPdi = 0;
         let weightTotal = 0;
         let activeWeightTotal = 0;
         let pdiWeightTotal = 0;
         let activePdiWeightTotal = 0;
         moduleData.SubGroups = moduleData.SubGroups.map(sg => {
-          const sgActive = sg.Parameters.filter(p => p.is_active).length;
+          const sgActiveUc = sg.Parameters.filter(p => p.is_active).length;
+          const sgActivePdi = sg.Parameters.filter(p => p.is_active_pdi).length;
           const sgTotal = sg.Parameters.length;
           totalCount += sgTotal;
-          activeCount += sgActive;
+          activeCount += sgActiveUc;
+          activeCountPdi += sgActivePdi;
           sg.Parameters.forEach(p => {
             const wt = parseFloat(p.weightage || 0);
+            const pdiWt = parseFloat(p.weightage_pdi != null ? p.weightage_pdi : p.weightage || 0);
             weightTotal += wt;
+            pdiWeightTotal += pdiWt;
             if (p.is_active) activeWeightTotal += wt;
-            // PDI weight: only params visible to PDI template
-            if (!p.template_filter || p.template_filter === 'new_car_pdi') {
-              const pdiWt = parseFloat(p.weightage_pdi != null ? p.weightage_pdi : p.weightage || 0);
-              pdiWeightTotal += pdiWt;
-              if (p.is_active) activePdiWeightTotal += pdiWt;
-            }
+            if (p.is_active_pdi) activePdiWeightTotal += pdiWt;
           });
-          return { id: sg.id, name: sg.name, activeCount: sgActive, totalCount: sgTotal };
+          return { id: sg.id, name: sg.name, activeCount: sgActiveUc, activeCountPdi: sgActivePdi, totalCount: sgTotal };
         });
         return {
           id: moduleData.id, name: moduleData.name, icon: moduleData.icon,
-          SubGroups: moduleData.SubGroups, activeCount, totalCount,
+          SubGroups: moduleData.SubGroups, activeCount, activeCountPdi, totalCount,
           weightTotal: parseFloat(weightTotal.toFixed(2)),
           activeWeightTotal: parseFloat(activeWeightTotal.toFixed(2)),
           pdiWeightTotal: parseFloat(pdiWeightTotal.toFixed(2)),
@@ -212,8 +212,9 @@ class ParameterService {
 
       const mod = modules[0].toJSON();
       const subGroups = mod.SubGroups.map(sg => {
-        const active = sg.Parameters.filter(p => p.is_active).length;
-        return { ...sg, activeCount: active, totalCount: sg.Parameters.length };
+        const activeCount = sg.Parameters.filter(p => p.is_active).length;
+        const activeCountPdi = sg.Parameters.filter(p => p.is_active_pdi).length;
+        return { ...sg, activeCount, activeCountPdi, totalCount: sg.Parameters.length };
       });
 
       return Result.success(subGroups);
@@ -276,15 +277,16 @@ class ParameterService {
   /**
    * Toggle a single parameter's is_active status.
    */
-  async toggleParameterStatus(parameterId, isActive) {
+  async toggleParameterStatus(parameterId, isActive, template = 'uc') {
     try {
       const param = await InspectionParameter.findByPk(parameterId);
       if (!param) {
         return Result.failure('Parameter not found');
       }
 
-      await param.update({ is_active: isActive ? 1 : 0 });
-      return Result.success({ id: parameterId, is_active: isActive });
+      const field = template === 'pdi' ? 'is_active_pdi' : 'is_active';
+      await param.update({ [field]: isActive ? 1 : 0 });
+      return Result.success({ id: parameterId, [field]: isActive });
     } catch (error) {
       logger.error('Toggle parameter status error:', error);
       return Result.failure(error.message || 'Failed to toggle parameter status');

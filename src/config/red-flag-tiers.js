@@ -161,7 +161,7 @@ async function loadTiersFromDB() {
     // Late-require to avoid circular dependency at module load time
     const RedFlagTier = require('../models/red-flag-tier.model');
     const rows = await RedFlagTier.findAll({
-      attributes: ['param_number', 'sub_item_label', 'tier', 'is_pdi_only'],
+      attributes: ['param_number', 'sub_item_label', 'tier', 'tier_uc', 'tier_pdi', 'is_pdi_only'],
       raw: true,
     });
 
@@ -173,7 +173,11 @@ async function loadTiersFromDB() {
 
     _tierIndex.clear();
     for (const row of rows) {
-      _tierIndex.set(`${row.param_number}:${row.sub_item_label}`, row.tier);
+      const key = `${row.param_number}:${row.sub_item_label}`;
+      // Use new tier_uc/tier_pdi columns if populated, fallback to legacy tier + is_pdi_only
+      const ucTier = row.tier_uc || (row.is_pdi_only ? 0 : row.tier);
+      const pdiTier = row.tier_pdi || row.tier;
+      _tierIndex.set(key, { uc: ucTier, pdi: pdiTier });
     }
 
     _tiersLoadedFromDB = true;
@@ -202,8 +206,13 @@ async function refreshTierIndex() {
  * @param {string} subItemLabel - Exact sub-item label
  * @returns {number|null} 1, 2, 3 or null (not a red flag)
  */
-function getSubItemTier(paramNumber, subItemLabel) {
-  return _tierIndex.get(`${paramNumber}:${subItemLabel}`) || null;
+function getSubItemTier(paramNumber, subItemLabel, template = 'uc') {
+  const entry = _tierIndex.get(`${paramNumber}:${subItemLabel}`);
+  if (!entry) return null;
+  // Support both old format (number) and new format ({ uc, pdi })
+  if (typeof entry === 'number') return entry;
+  const tier = template === 'pdi' ? entry.pdi : entry.uc;
+  return tier || null;
 }
 
 /**
